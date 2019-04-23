@@ -314,12 +314,14 @@ class FixedExtentMetrics extends FixedScrollMetrics {
     @required double viewportDimension,
     @required AxisDirection axisDirection,
     @required this.itemIndex,
+    @required this.maxScrollObstructionExtent
   }) : super(
          minScrollExtent: minScrollExtent,
          maxScrollExtent: maxScrollExtent,
          pixels: pixels,
          viewportDimension: viewportDimension,
          axisDirection: axisDirection,
+         maxScrollObstructionExtent: maxScrollObstructionExtent
        );
 
   @override
@@ -329,6 +331,7 @@ class FixedExtentMetrics extends FixedScrollMetrics {
     double pixels,
     double viewportDimension,
     AxisDirection axisDirection,
+    double maxScrollObstructionExtent,
     int itemIndex,
   }) {
     return FixedExtentMetrics(
@@ -337,6 +340,7 @@ class FixedExtentMetrics extends FixedScrollMetrics {
       pixels: pixels ?? this.pixels,
       viewportDimension: viewportDimension ?? this.viewportDimension,
       axisDirection: axisDirection ?? this.axisDirection,
+      maxScrollObstructionExtent: maxScrollObstructionExtent ?? this.maxScrollObstructionExtent,
       itemIndex: itemIndex ?? this.itemIndex,
     );
   }

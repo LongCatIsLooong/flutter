@@ -46,6 +46,7 @@ abstract class ScrollMetrics {
     double pixels,
     double viewportDimension,
     AxisDirection axisDirection,
+    double maxScrollObstructionExtent,
   }) {
     return FixedScrollMetrics(
       minScrollExtent: minScrollExtent ?? this.minScrollExtent,
@@ -53,6 +54,7 @@ abstract class ScrollMetrics {
       pixels: pixels ?? this.pixels,
       viewportDimension: viewportDimension ?? this.viewportDimension,
       axisDirection: axisDirection ?? this.axisDirection,
+      maxScrollObstructionExtent: maxScrollObstructionExtent ?? this.maxScrollObstructionExtent
     );
   }
 
@@ -79,6 +81,9 @@ abstract class ScrollMetrics {
   /// The direction in which the scroll view scrolls.
   AxisDirection get axisDirection;
 
+  ///
+  double get maxScrollObstructionExtent;
+
   /// The axis in which the scroll view scrolls.
   Axis get axis => axisDirectionToAxis(axisDirection);
 
@@ -103,13 +108,14 @@ abstract class ScrollMetrics {
   double get extentInside {
     return math.min(pixels, maxScrollExtent) -
            math.max(pixels, minScrollExtent) +
-           math.min(viewportDimension, maxScrollExtent - minScrollExtent);
+           maxScrollExtent - minScrollExtent + viewportDimension;
   }
 
   /// The quantity of content conceptually "below" the currently visible content
   /// of the viewport in the scrollable. This is the content below the content
   /// described by [extentInside].
   double get extentAfter => math.max(maxScrollExtent - pixels, 0.0);
+
 }
 
 /// An immutable snapshot of values associated with a [Scrollable] viewport.
@@ -123,6 +129,7 @@ class FixedScrollMetrics extends ScrollMetrics {
     @required this.pixels,
     @required this.viewportDimension,
     @required this.axisDirection,
+    @required this.maxScrollObstructionExtent
   });
 
   @override
@@ -139,6 +146,9 @@ class FixedScrollMetrics extends ScrollMetrics {
 
   @override
   final AxisDirection axisDirection;
+
+  @override
+  final double maxScrollObstructionExtent;
 
   @override
   String toString() {
