@@ -35,4 +35,5 @@ export 'src/cupertino/text_selection.dart';
 export 'src/cupertino/text_theme.dart';
 export 'src/cupertino/theme.dart';
 export 'src/cupertino/thumb_painter.dart';
+export 'src/cupertino/trait_environment.dart';
 export 'widgets.dart';
