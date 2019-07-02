@@ -128,51 +128,6 @@ class CupertinoTraitEnvironment extends InheritedWidget {
        assert(data != null),
        super(key: key, child: child);
 
-  /// Creates a new [MediaQuery] that inherits from the ambient [MediaQuery] from
-  /// the given context, but removes the specified paddings.
-  ///
-  /// This should be inserted into the widget tree when the [MediaQuery] padding
-  /// is consumed by a widget in such a way that the padding is no longer
-  /// exposed to the widget's descendants or siblings.
-  ///
-  /// The [context] argument is required, must not be null, and must have a
-  /// [MediaQuery] in scope.
-  ///
-  /// The `removeLeft`, `removeTop`, `removeRight`, and `removeBottom` arguments
-  /// must not be null. If all four are false (the default) then the returned
-  /// [MediaQuery] reuses the ambient [MediaQueryData] unmodified, which is not
-  /// particularly useful.
-  ///
-  /// The [child] argument is required and must not be null.
-  ///
-  /// See also:
-  ///
-  ///  * [SafeArea], which both removes the padding from the [MediaQuery] and
-  ///    adds a [Padding] widget.
-  ///  * [MediaQueryData.padding], the affected property of the [MediaQueryData].
-  ///  * [new removeViewInsets], the same thing but for removing view insets.
-  ///  * [new removeViewPadding], the same thing but for removing view insets.
-  factory MediaQuery.removePadding({
-    Key key,
-    @required BuildContext context,
-    bool removeLeft = false,
-    bool removeTop = false,
-    bool removeRight = false,
-    bool removeBottom = false,
-    @required Widget child,
-  }) {
-    return MediaQuery(
-      key: key,
-      data: MediaQuery.of(context).removePadding(
-        removeLeft: removeLeft,
-        removeTop: removeTop,
-        removeRight: removeRight,
-        removeBottom: removeBottom,
-      ),
-      child: child,
-    );
-  }
-
   /// Contains information about the current media.
   ///
   /// For example, the [MediaQueryData.size] property contains the width and
@@ -189,14 +144,15 @@ class CupertinoTraitEnvironment extends InheritedWidget {
   /// Typical usage is as follows:
   ///
   /// ```dart
-  /// MediaQueryData media = MediaQuery.of(context);
+  /// CupertinoInterfaceTraitData data = CupertinoTraitEnvironment.of(context);
   /// ```
   ///
-  /// If there is no [MediaQuery] in scope, then this will throw an exception.
-  /// To return null if there is no [MediaQuery], then pass `nullOk: true`.
+  /// If there is no [CupertinoTraitEnvironment] in scope, then this will throw
+  /// an exception. To return null if there is no [CupertinoTraitEnvironment],
+  /// then pass `nullOk: true`.
   ///
   /// If you use this from a widget (e.g. in its build function), consider
-  /// calling [debugCheckHasMediaQuery].
+  /// calling [debugCheckHasTraitData].
   static CupertinoInterfaceTraitData of(BuildContext context, { bool nullOk = false }) {
     assert(context != null);
     assert(nullOk != null);
@@ -209,7 +165,7 @@ class CupertinoTraitEnvironment extends InheritedWidget {
       'CupertinoTraitEnvironment.of() called with a context that does not contain a CupertinoTraitEnvironment.\n'
       'No CupertinoTraitEnvironment ancestor could be found starting from the context that was passed '
       'to CupertinoTraitEnvironment.of(). This can happen because you do not have a WidgetsApp or '
-      'MaterialApp widget (those widgets introduce a CupertinoTraitEnvironment), or it can happen '
+      'CupertinoApp widget (those widgets introduce a CupertinoTraitEnvironment), or it can happen '
       'if the context you use comes from a widget above those widgets.\n'
       'The context used was:\n'
       '  $context'
@@ -224,4 +180,37 @@ class CupertinoTraitEnvironment extends InheritedWidget {
     super.debugFillProperties(properties);
     properties.add(DiagnosticsProperty<CupertinoInterfaceTraitData>('data', data, showName: false));
   }
+}
+
+/// Asserts that the given context has a [CupertinoTraitEnvironment] ancestor.
+///
+/// Used by various widgets to make sure that they are only used in an
+/// appropriate context.
+///
+/// To invoke this function, use the following pattern, typically in the
+/// relevant Widget's build method:
+///
+/// ```dart
+/// assert(debugCheckHasTraitData(context));
+/// ```
+///
+/// Does nothing if asserts are disabled. Always returns true.
+bool debugCheckHasTraitData(BuildContext context) {
+  assert(() {
+    if (context.widget is! CupertinoTraitEnvironment && context.ancestorWidgetOfExactType(CupertinoTraitEnvironment) == null) {
+      final Element element = context;
+      throw FlutterError(
+        'No CupertinoTraitEnvironment widget found.\n'
+        '${context.widget.runtimeType} widgets require a CupertinoTraitEnvironment widget ancestor.\n'
+        'The specific widget that could not find a CupertinoTraitEnvironment ancestor was:\n'
+        '  ${context.widget}\n'
+        'The ownership chain for the affected widget is:\n'
+        '  ${element.debugGetCreatorChain(10)}\n'
+        'Typically, the CupertinoTraitEnvironment widget is introduced by the CupertinoApp or '
+        'WidgetsApp widget at the top of your application widget tree.'
+      );
+    }
+    return true;
+  }());
+  return true;
 }
