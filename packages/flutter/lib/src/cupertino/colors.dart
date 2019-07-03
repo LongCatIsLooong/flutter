@@ -4,6 +4,8 @@
 
 import 'dart:ui' show Color;
 
+import 'package:flutter/widgets.dart';
+
 /// A palette of [Color] constants that describe colors commonly used when
 /// matching the iOS platform aesthetics.
 class CupertinoColors {
@@ -79,4 +81,8 @@ class CupertinoColors {
   ///
   /// This is SystemRed in the iOS palette.
   static const Color destructiveRed = Color(0xFFFF3B30);
+}
+
+
+class CupertinoDynamicColor extends Color implements ColorSwatch<CupertinoInterfaceTraitData> {
 }

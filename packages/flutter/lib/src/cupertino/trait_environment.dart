@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import '../widgets/framework.dart';
 
@@ -24,7 +25,7 @@ enum CupertinoAccessibilityContrast {
   high,
 }
 
-/// Cupertino-specific information about the correct UI subtree.
+/// Cupertino-specific information about the current widget subtree.
 ///
 /// For example, the [CupertinoInterfaceTraitData.accessibilityContrast] property
 /// governs if the descendant widgets should display their foreground and background
@@ -47,12 +48,22 @@ enum CupertinoAccessibilityContrast {
 class CupertinoInterfaceTraitData {
   /// Creates data for a [CupertinoTraitEnvironment] with explicit values.
   const CupertinoInterfaceTraitData({
-    this.userInterfaceLevel,
-    this.accessibilityContrast,
-  });
+    @required this.userInterfaceLevel,
+    @required this.accessibilityContrast,
+    this.userInterfaceStyle,
+  }) : assert(userInterfaceLevel != null),
+       assert(accessibilityContrast != null);
 
   /// The elevation level of the interface.
+  ///
+  /// Must not be null.
   final CupertinoInterfaceLevel userInterfaceLevel;
+
+  /// Whether the content should be in light mode or dark mode.
+  ///
+  /// Can be null, in which case it will defer to the closest [MediaQuery] ancestor's
+  /// [MediaQueryData.platformBrightness].
+  final Brightness userInterfaceStyle;
 
   /// TBD:
   /// Whether the user requested a high contrast between foreground and background
@@ -64,10 +75,12 @@ class CupertinoInterfaceTraitData {
   /// Creates a copy of this interface trait data but with the given fields replaced
   /// with the new values.
   CupertinoInterfaceTraitData copyWith({
+    Brightness userInterfaceStyle,
     CupertinoInterfaceLevel userInterfaceLevel,
     CupertinoAccessibilityContrast accessibilityContrast,
   }) {
     return CupertinoInterfaceTraitData(
+      userInterfaceStyle: this.userInterfaceStyle ?? userInterfaceStyle,
       userInterfaceLevel: this.userInterfaceLevel ?? userInterfaceLevel,
       accessibilityContrast: this.accessibilityContrast ?? accessibilityContrast,
     );
@@ -79,11 +92,12 @@ class CupertinoInterfaceTraitData {
       return false;
     final CupertinoInterfaceTraitData typedOther = other;
     return typedOther.userInterfaceLevel == userInterfaceLevel
-        && typedOther.accessibilityContrast == accessibilityContrast;
+        && typedOther.accessibilityContrast == accessibilityContrast
+        && typedOther.userInterfaceStyle == userInterfaceStyle;
   }
 
   @override
-  int get hashCode => hashValues(userInterfaceLevel, accessibilityContrast);
+  int get hashCode => hashValues(userInterfaceLevel, accessibilityContrast, userInterfaceLevel);
 
   @override
   String toString() {
@@ -94,7 +108,7 @@ class CupertinoInterfaceTraitData {
   }
 }
 
-/// Establishes a subtree in which media queries resolve to the given data.
+/// Establishes a subtree in which [CupertinoTraitEnvironment.of] resolve to the given data.
 ///
 /// For example, to learn the size of the current media (e.g., the window
 /// containing your app), you can read the [MediaQueryData.size] property from
@@ -109,30 +123,28 @@ class CupertinoInterfaceTraitData {
 /// exception, unless the `nullOk` argument is set to true, in which case it
 /// returns null.
 ///
-/// {@youtube 560 315 https://www.youtube.com/watch?v=A3WrA4zAaPw}
-///
 /// See also:
 ///
 ///  * [WidgetsApp] and [MaterialApp], which introduce a [MediaQuery] and keep
 ///    it up to date with the current screen metrics as they change.
 ///  * [MediaQueryData], the data structure that represents the metrics.
 class CupertinoTraitEnvironment extends InheritedWidget {
-  /// Creates a widget that provides [MediaQueryData] to its descendants.
+  /// Creates a widget that provides [CupertinoInterfaceTraitData] to its descendants.
   ///
   /// The [data] and [child] arguments must not be null.
-  const CupertinoTraitEnvironment({
+  CupertinoTraitEnvironment({
     Key key,
-    @required this.data,
+    CupertinoInterfaceLevel userInterfaceLevel,
+    CupertinoAccessibilityContrast accessibilityContrast,
     @required Widget child,
   }) : assert(child != null),
-       assert(data != null),
+       _data = CupertinoInterfaceTraitData(
+         userInterfaceLevel: userInterfaceLevel,
+         accessibilityContrast: accessibilityContrast,
+       ),
        super(key: key, child: child);
 
-  /// Contains information about the current media.
-  ///
-  /// For example, the [MediaQueryData.size] property contains the width and
-  /// height of the current window.
-  final CupertinoInterfaceTraitData data;
+  final CupertinoInterfaceTraitData _data;
 
   /// The data from the closest instance of this class that encloses the given
   /// context.
@@ -156,16 +168,18 @@ class CupertinoTraitEnvironment extends InheritedWidget {
   static CupertinoInterfaceTraitData of(BuildContext context, { bool nullOk = false }) {
     assert(context != null);
     assert(nullOk != null);
+    final MediaQueryData data = MediaQuery.of(context, nullOk: nullOk);
     final CupertinoTraitEnvironment environment = context.inheritFromWidgetOfExactType(CupertinoTraitEnvironment);
-    if (environment != null)
-      return environment.data;
+
+    if (environment != null && data != null)
+      return environment._data.copyWith(userInterfaceStyle: data.platformBrightness);
     if (nullOk)
       return null;
     throw FlutterError(
-      'CupertinoTraitEnvironment.of() called with a context that does not contain a CupertinoTraitEnvironment.\n'
+      'CupertinoTraitEnvironment.of() called with a context that does not contain a CupertinoTraitEnvironment or a MediaQuery.\n'
       'No CupertinoTraitEnvironment ancestor could be found starting from the context that was passed '
       'to CupertinoTraitEnvironment.of(). This can happen because you do not have a WidgetsApp or '
-      'CupertinoApp widget (those widgets introduce a CupertinoTraitEnvironment), or it can happen '
+      'CupertinoApp widget (those widgets introduce a CupertinoTraitEnvironment and a MediaQuery), or it can happen '
       'if the context you use comes from a widget above those widgets.\n'
       'The context used was:\n'
       '  $context'
@@ -173,12 +187,15 @@ class CupertinoTraitEnvironment extends InheritedWidget {
   }
 
   @override
-  bool updateShouldNotify(CupertinoTraitEnvironment oldWidget) => data != oldWidget.data;
+  bool updateShouldNotify(CupertinoTraitEnvironment oldWidget) {
+    return _data.accessibilityContrast != oldWidget._data.accessibilityContrast
+        || _data.userInterfaceLevel != _data.userInterfaceLevel;
+  }
 
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
-    properties.add(DiagnosticsProperty<CupertinoInterfaceTraitData>('data', data, showName: false));
+    properties.add(DiagnosticsProperty<CupertinoInterfaceTraitData>('data', _data, showName: false));
   }
 }
 
@@ -196,6 +213,7 @@ class CupertinoTraitEnvironment extends InheritedWidget {
 ///
 /// Does nothing if asserts are disabled. Always returns true.
 bool debugCheckHasTraitData(BuildContext context) {
+  debugCheckHasMediaQuery(context);
   assert(() {
     if (context.widget is! CupertinoTraitEnvironment && context.ancestorWidgetOfExactType(CupertinoTraitEnvironment) == null) {
       final Element element = context;
