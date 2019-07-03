@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:ui' show Color;
+import 'dart:ui' show Color, Brightness;
 
+import 'package:flutter/src/cupertino/trait_environment.dart' as prefix0;
 import 'package:flutter/widgets.dart';
+
+import 'trait_environment.dart';
 
 /// A palette of [Color] constants that describe colors commonly used when
 /// matching the iOS platform aesthetics.
@@ -83,6 +86,102 @@ class CupertinoColors {
   static const Color destructiveRed = Color(0xFFFF3B30);
 }
 
+/*
+class CupertinoDynamicColor extends ColorSwatch<CupertinoInterfaceTraitData> {
+  CupertinoDynamicColor({
+    @required Color defaultColor,
+    Map<CupertinoInterfaceTraitData, Color> swatch,
+  }) : assert(swatch.isNotEmpty),
+       assert(defaultColor != null),
+       super(defaultColor.value, swatch);
 
-class CupertinoDynamicColor extends Color implements ColorSwatch<CupertinoInterfaceTraitData> {
+  @override
+  Color operator [](CupertinoInterfaceTraitData index) => super[index] ?? this;
+}
+*/
+
+class CupertinoDynamicColor {
+  CupertinoDynamicColor.withResolver({
+    @required Color Function(CupertinoInterfaceTraitData) resolver,
+  }) : _resolver = resolver,
+       assert(resolver != null);
+
+  CupertinoDynamicColor({
+    Color defaultColor,
+    Color normalColor,
+    Color darkColor,
+    Color highContrastColor,
+    Color darkHighContrastColor,
+    Color elevatedColor,
+    Color darkElevatedColor,
+    Color elevatedHighContrastColor,
+    Color darkElevatedHighContrastColor,
+  }) : assert(defaultColor != null || normalColor != null
+                                   && darkColor != null
+                                   && elevatedColor != null
+                                   && highContrastColor != null
+                                   && darkElevatedColor != null
+                                   && darkHighContrastColor != null
+                                   && darkElevatedHighContrastColor != null
+                                   && elevatedHighContrastColor != null),
+      this._withOptionSet(
+        defaultColor,
+        <Color> [
+          normalColor,
+          darkColor,
+          highContrastColor,
+          darkHighContrastColor,
+          elevatedColor,
+          darkElevatedColor,
+          elevatedHighContrastColor,
+          darkElevatedHighContrastColor,
+        ]
+      );
+
+  CupertinoDynamicColor._withOptionSet(
+    Color defaultColor,
+    List<Color> colorMap,
+  ) : this.withResolver(
+    resolver: (CupertinoInterfaceTraitData traitData) {
+      int featureIndex = 0;
+
+      switch (traitData.userInterfaceLevel) {
+        case CupertinoInterfaceLevel.base:
+          break;
+        case CupertinoInterfaceLevel.elevated:
+          featureIndex++;
+          break;
+      }
+      featureIndex <<= 1;
+
+      switch (traitData.accessibilityContrast) {
+        case CupertinoAccessibilityContrast.normal:
+          break;
+        case CupertinoAccessibilityContrast.high:
+          featureIndex++;
+          break;
+      }
+      featureIndex <<= 1;
+
+      switch (traitData.userInterfaceStyle) {
+        case Brightness.light:
+          break;
+        case Brightness.dark:
+          featureIndex++;
+          break;
+      }
+
+      return colorMap[featureIndex] ?? defaultColor;
+    },
+  );
+
+  Color Function(CupertinoInterfaceTraitData) _resolver;
+
+  Color resolve({@required CupertinoInterfaceTraitData traitData}) {
+    final Color resolvedColor = _resolver(traitData);
+    assert(resolvedColor != null);
+    return resolvedColor;
+  }
+
+  Color resolveFromContext(BuildContext context) => resolve(traitData: CupertinoTraitEnvironment.of(context));
 }
