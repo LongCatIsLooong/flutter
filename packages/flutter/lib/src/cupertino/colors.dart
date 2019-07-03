@@ -4,7 +4,6 @@
 
 import 'dart:ui' show Color, Brightness;
 
-import 'package:flutter/src/cupertino/trait_environment.dart' as prefix0;
 import 'package:flutter/widgets.dart';
 
 import 'trait_environment.dart';
@@ -84,6 +83,16 @@ class CupertinoColors {
   ///
   /// This is SystemRed in the iOS palette.
   static const Color destructiveRed = Color(0xFFFF3B30);
+
+  // The default system blue color, as shown in
+  // https://developer.apple.com/design/human-interface-guidelines/ios/visual-design/color/.
+  // This is only for demostration and is not meant to be used in an app.
+  static final CupertinoDynamicColor _defaultSystemBlue = CupertinoDynamicColor(
+    defaultColor: const Color(0xFF007AFF),
+    darkColor: const Color(0xFF1084FF),
+    highContrastColor: const Color(0xFF0040DD),
+    darkHighContrastColor: const Color(0xFF409CFF),
+  );
 }
 
 /*
@@ -101,11 +110,6 @@ class CupertinoDynamicColor extends ColorSwatch<CupertinoInterfaceTraitData> {
 */
 
 class CupertinoDynamicColor {
-  CupertinoDynamicColor.withResolver({
-    @required Color Function(CupertinoInterfaceTraitData) resolver,
-  }) : _resolver = resolver,
-       assert(resolver != null);
-
   CupertinoDynamicColor({
     Color defaultColor,
     Color normalColor,
@@ -124,7 +128,7 @@ class CupertinoDynamicColor {
                                    && darkHighContrastColor != null
                                    && darkElevatedHighContrastColor != null
                                    && elevatedHighContrastColor != null),
-      this._withOptionSet(
+      this._withConfigSet(
         defaultColor,
         <Color> [
           normalColor,
@@ -138,7 +142,7 @@ class CupertinoDynamicColor {
         ]
       );
 
-  CupertinoDynamicColor._withOptionSet(
+  CupertinoDynamicColor._withConfigSet(
     Color defaultColor,
     List<Color> colorMap,
   ) : this.withResolver(
@@ -175,13 +179,18 @@ class CupertinoDynamicColor {
     },
   );
 
-  Color Function(CupertinoInterfaceTraitData) _resolver;
+  CupertinoDynamicColor.withResolver({
+      @required Color Function(CupertinoInterfaceTraitData) resolver,
+  }) : _resolver = resolver,
+       assert(resolver != null);
 
-  Color resolve({@required CupertinoInterfaceTraitData traitData}) {
+  final Color Function(CupertinoInterfaceTraitData) _resolver;
+
+  Color resolveWith({@required CupertinoInterfaceTraitData traitData}) {
     final Color resolvedColor = _resolver(traitData);
     assert(resolvedColor != null);
     return resolvedColor;
   }
 
-  Color resolveFromContext(BuildContext context) => resolve(traitData: CupertinoTraitEnvironment.of(context));
+  Color resolveFromContext(BuildContext context) => resolveWith(traitData: CupertinoTraitEnvironment.of(context));
 }
