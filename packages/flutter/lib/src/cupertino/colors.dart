@@ -146,37 +146,7 @@ class CupertinoDynamicColor {
     Color defaultColor,
     List<Color> colorMap,
   ) : this.withResolver(
-    resolver: (CupertinoInterfaceTraitData traitData) {
-      int featureIndex = 0;
-
-      switch (traitData.userInterfaceLevel) {
-        case CupertinoInterfaceLevel.base:
-          break;
-        case CupertinoInterfaceLevel.elevated:
-          featureIndex++;
-          break;
-      }
-      featureIndex <<= 1;
-
-      switch (traitData.accessibilityContrast) {
-        case CupertinoAccessibilityContrast.normal:
-          break;
-        case CupertinoAccessibilityContrast.high:
-          featureIndex++;
-          break;
-      }
-      featureIndex <<= 1;
-
-      switch (traitData.userInterfaceStyle) {
-        case Brightness.light:
-          break;
-        case Brightness.dark:
-          featureIndex++;
-          break;
-      }
-
-      return colorMap[featureIndex] ?? defaultColor;
-    },
+    resolver: (CupertinoInterfaceTraitData traitData) => colorMap[traitData.maskValue] ?? defaultColor,
   );
 
   CupertinoDynamicColor.withResolver({

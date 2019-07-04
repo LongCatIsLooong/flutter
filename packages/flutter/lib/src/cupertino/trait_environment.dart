@@ -7,6 +7,10 @@ import 'package:flutter/material.dart';
 
 import '../widgets/framework.dart';
 
+abstract class BitSet {
+  int get maskValue;
+}
+
 /// Indicates the visual level for a piece of content.
 enum CupertinoInterfaceLevel {
   /// The level for your window's main content.
@@ -45,7 +49,7 @@ enum CupertinoAccessibilityContrast {
 ///   information while [CupertinoInterfaceTraitData] provides only Cupertino-specific
 ///   information, and will only be consumed by Cupertino components.
 @immutable
-class CupertinoInterfaceTraitData {
+class CupertinoInterfaceTraitData implements BitSet {
   /// Creates data for a [CupertinoTraitEnvironment] with explicit values.
   const CupertinoInterfaceTraitData({
     @required this.userInterfaceLevel,
@@ -71,6 +75,38 @@ class CupertinoInterfaceTraitData {
   /// * Settings -> Accessibility -> Increase Contrast (iOS)
   /// * Settings -> Accessibility -> High contrast text (Android)
   final CupertinoAccessibilityContrast accessibilityContrast;
+
+  int get maskValue {
+    int mask = 0;
+
+    switch (userInterfaceLevel) {
+      case CupertinoInterfaceLevel.base:
+      break;
+      case CupertinoInterfaceLevel.elevated:
+      mask++;
+      break;
+    }
+    mask <<= 1;
+
+    switch (accessibilityContrast) {
+      case CupertinoAccessibilityContrast.normal:
+      break;
+      case CupertinoAccessibilityContrast.high:
+      mask++;
+      break;
+    }
+    mask <<= 1;
+
+    switch (userInterfaceStyle) {
+      case Brightness.light:
+      break;
+      case Brightness.dark:
+      mask++;
+      break;
+    }
+
+    return mask;
+  }
 
   /// Creates a copy of this interface trait data but with the given fields replaced
   /// with the new values.
