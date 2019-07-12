@@ -2,8 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:ui' show Color, Brightness;
+import 'dart:ui' show Color;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import 'trait_environment.dart';
@@ -87,7 +88,7 @@ class CupertinoColors {
   // The default system blue color, as shown in
   // https://developer.apple.com/design/human-interface-guidelines/ios/visual-design/color/.
   // This is only for demostration and is not meant to be used in an app.
-  static final CupertinoDynamicColor _defaultSystemBlue = CupertinoDynamicColor(
+  static final CupertinoResolvableColor _defaultSystemBlue = CupertinoDynamicColor(
     defaultColor: const Color(0xFF007AFF),
     darkColor: const Color(0xFF1084FF),
     highContrastColor: const Color(0xFF0040DD),
@@ -95,7 +96,8 @@ class CupertinoColors {
   );
 }
 
-class CupertinoDynamicColor {
+class CupertinoResolvableColor {
+  /*
   CupertinoDynamicColor({
     Color defaultColor,
     Color normalColor,
@@ -114,6 +116,7 @@ class CupertinoDynamicColor {
                                    && darkHighContrastColor != null
                                    && darkElevatedHighContrastColor != null
                                    && elevatedHighContrastColor != null),
+        ???????? NANI
       this._withConfigSet(
         defaultColor,
         <Color> [
@@ -127,20 +130,68 @@ class CupertinoDynamicColor {
           darkElevatedHighContrastColor,
         ]
       );
+        */
 
-  CupertinoDynamicColor._withConfigSet(
-    Color defaultColor,
-    List<Color> colorMap,
-  ) : this.withResolver(
-    resolver: (CupertinoInterfaceTraitData traitData) => colorMap[traitData.maskValue] ?? defaultColor,
-  );
-
-  CupertinoDynamicColor.withResolver({
+  CupertinoResolvableColor.withResolver({
       @required Color Function(CupertinoInterfaceTraitData) resolver,
   }) : _resolver = resolver,
        assert(resolver != null);
 
   final Color Function(CupertinoInterfaceTraitData) _resolver;
+
+  Color resolveWith({@required CupertinoInterfaceTraitData traitData}) {
+    final Color resolvedColor = _resolver(traitData);
+    assert(resolvedColor != null);
+    return resolvedColor;
+  }
+
+  Color resolveFromContext(BuildContext context) => resolveWith(traitData: CupertinoTraitEnvironment.of(context));
+}
+
+
+@immutable
+class CupertinoDynamicColor extends Diagnosticable implements CupertinoResolvableColor {
+  const CupertinoDynamicColor({
+    this.defaultColor,
+    this.normalColor,
+    this.darkColor,
+    this.highContrastColor,
+    this.darkHighContrastColor,
+    this.elevatedColor,
+    this.darkElevatedColor,
+    this.elevatedHighContrastColor,
+    this.darkElevatedHighContrastColor,
+  }) : assert(defaultColor != null || normalColor != null
+                                   && darkColor != null
+                                   && elevatedColor != null
+                                   && highContrastColor != null
+                                   && darkElevatedColor != null
+                                   && darkHighContrastColor != null
+                                   && darkElevatedHighContrastColor != null
+                                   && elevatedHighContrastColor != null);
+
+  final Color defaultColor;
+  final Color normalColor;
+  final Color darkColor;
+  final Color highContrastColor;
+  final Color darkHighContrastColor;
+  final Color elevatedColor;
+  final Color darkElevatedColor;
+  final Color elevatedHighContrastColor;
+  final Color darkElevatedHighContrastColor;
+
+  List<Color> get _colorMap => <Color> [
+    normalColor,
+    darkColor,
+    highContrastColor,
+    darkHighContrastColor,
+    elevatedColor,
+    darkElevatedColor,
+    elevatedHighContrastColor,
+    darkElevatedHighContrastColor,
+  ];
+
+  Color Function(CupertinoInterfaceTraitData) get _resolver => (CupertinoInterfaceTraitData traitData) => _colorMap[traitData.maskValue] ?? defaultColor;
 
   Color resolveWith({@required CupertinoInterfaceTraitData traitData}) {
     final Color resolvedColor = _resolver(traitData);

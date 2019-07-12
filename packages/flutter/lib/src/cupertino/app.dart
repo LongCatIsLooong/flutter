@@ -110,7 +110,7 @@ class CupertinoApp extends StatefulWidget {
   ///
   /// A null [theme] or unspecified [theme] attributes will default to iOS
   /// system values.
-  final CupertinoThemeData theme;
+  final CupertinoDynamicThemeData theme;
 
   /// The application's top-level routing table.
   ///

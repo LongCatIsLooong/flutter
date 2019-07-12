@@ -8,6 +8,31 @@ import 'dart:ui' as ui show lerpDouble;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/painting.dart';
 
+import 'framework.dart' show BuildContext;
+
+class DynamicIconThemeData extends Diagnosticable {
+  DynamicIconThemeData({
+    @required this.unresolvedData,
+  }) : assert(unresolvedData != null);
+
+  /// Returns a new icon theme that matches this icon theme but with some values
+  /// replaced by the non-null parameters of the given icon theme. If the given
+  /// icon theme is null, simply returns this icon theme.
+  DynamicIconThemeData merge(covariant DynamicIconThemeData other) {
+    if (other == null)
+      return this;
+
+    return DynamicIconThemeData(
+      unresolvedData: (BuildContext context) {
+        final IconThemeData otherUnwrapped = other.unresolvedData(context);
+        return unresolvedData(context)?.merge(otherUnwrapped) ?? otherUnwrapped;
+      },
+    );
+  }
+
+  final IconThemeData Function(BuildContext) unresolvedData;
+}
+
 /// Defines the color, opacity, and size of icons.
 ///
 /// Used by [IconTheme] to control the color, opacity, and size of icons in a
@@ -16,7 +41,8 @@ import 'package:flutter/painting.dart';
 /// To obtain the current icon theme, use [IconTheme.of]. To convert an icon
 /// theme to a version with all the fields filled in, use [new
 /// IconThemeData.fallback].
-class IconThemeData extends Diagnosticable {
+@immutable
+class IconThemeData extends Diagnosticable implements DynamicIconThemeData {
   /// Creates an icon theme data.
   ///
   /// The opacity applies to both explicit and default icon colors. The value
@@ -41,9 +67,7 @@ class IconThemeData extends Diagnosticable {
     );
   }
 
-  /// Returns a new icon theme that matches this icon theme but with some values
-  /// replaced by the non-null parameters of the given icon theme. If the given
-  /// icon theme is null, simply returns this icon theme.
+  @override
   IconThemeData merge(IconThemeData other) {
     if (other == null)
       return this;
@@ -53,6 +77,9 @@ class IconThemeData extends Diagnosticable {
       size: other.size,
     );
   }
+
+  @override
+  IconThemeData Function(BuildContext) get unresolvedData => (BuildContext context) => this;
 
   /// Whether all the properties of this object are non-null.
   bool get isConcrete => color != null && opacity != null && size != null;

@@ -45,7 +45,7 @@ class IconTheme extends InheritedWidget {
   }
 
   /// The color, opacity, and size to use for icons in this subtree.
-  final IconThemeData data;
+  final DynamicIconThemeData data;
 
   /// The data from the closest instance of this class that encloses the given
   /// context.
@@ -64,7 +64,7 @@ class IconTheme extends InheritedWidget {
 
   static IconThemeData _getInheritedIconThemeData(BuildContext context) {
     final IconTheme iconTheme = context.inheritFromWidgetOfExactType(IconTheme);
-    return iconTheme?.data ?? const IconThemeData.fallback();
+    return iconTheme?.data?.unresolvedData(context) ?? const IconThemeData.fallback();
   }
 
   @override

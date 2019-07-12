@@ -16,50 +16,6 @@ export 'package:flutter/services.dart' show Brightness;
 const Color _kDefaultBarLightBackgroundColor = Color(0xCCF8F8F8);
 const Color _kDefaultBarDarkBackgroundColor = Color(0xB7212121);
 
-typedef DynamicCupertinoThemeData = CupertinoThemeData Function(CupertinoInterfaceTraitData);
-
-/// Applies a dynamic visual styling theme to descendant Cupertino widgets.
-///
-/// Affects the color and text styles of Cupertino widgets whose styling
-/// are not overridden when constructing the respective widgets instances.
-///
-/// Descendant widgets can retrieve the current [CupertinoThemeData] by calling
-/// [CupertinoTheme.of]. One or more [InheritedWidget] dependency will be created
-/// when an ancestor [CupertinoThemeData] is retrieved via [CupertinoTheme.of].
-///
-///
-/// See also:
-///
-///  * [CupertinoThemeData], specifies the static theme's visual styling.
-///  * [CupertinoApp], which will automatically add a [CupertinoTheme].
-///  * [Theme], a Material theme which will automatically add a [CupertinoTheme]
-///    with a [CupertinoThemeData] derived from the Material [ThemeData].
-class CupertinoDynamicTheme extends StatelessWidget {
-  const CupertinoDynamicTheme.withResolver({
-    Key key,
-    @required this.child,
-    @required this.unresolved,
-  }) : assert(unresolved != null),
-       super(key: key);
-
-  /// Unresolved CupertinoThemeData.
-  final DynamicCupertinoThemeData unresolved;
-
-  /// The widget below this widget in the tree.
-  ///
-  /// {@macro flutter.widgets.child}
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    debugCheckHasTraitData(context);
-    return _InheritedCupertinoTheme(
-      unresolved: unresolved,
-      child: child,
-    );
-  }
-}
-
 /// Applies a visual styling theme to descendant Cupertino widgets.
 ///
 /// Affects the color and text styles of Cupertino widgets whose styling
@@ -78,7 +34,7 @@ class CupertinoDynamicTheme extends StatelessWidget {
 ///  * [CupertinoApp], which will automatically add a [CupertinoTheme].
 ///  * [Theme], a Material theme which will automatically add a [CupertinoTheme]
 ///    with a [CupertinoThemeData] derived from the Material [ThemeData].
-class CupertinoTheme extends StatelessWidget implements CupertinoDynamicTheme {
+class CupertinoTheme extends StatelessWidget {
   /// Creates a [CupertinoTheme] to change descendant Cupertino widgets' styling.
   ///
   /// The [data] and [child] parameters must not be null.
@@ -91,10 +47,7 @@ class CupertinoTheme extends StatelessWidget implements CupertinoDynamicTheme {
        super(key: key);
 
   /// The [CupertinoThemeData] styling for this theme.
-  final CupertinoThemeData data;
-
-  @override
-  DynamicCupertinoThemeData get unresolved => (CupertinoInterfaceTraitData traitData) => data;
+  final CupertinoDynamicThemeData data;
 
   /// Retrieve the [CupertinoThemeData] from an ancestor [CupertinoDynamicTheme] widget.
   ///
@@ -103,24 +56,12 @@ class CupertinoTheme extends StatelessWidget implements CupertinoDynamicTheme {
   /// but couldn't find a [CupertinoTraitEnvironment] to resolve its data.
   static CupertinoThemeData of(BuildContext context) {
     final _InheritedCupertinoTheme inheritedTheme = context.inheritFromWidgetOfExactType(_InheritedCupertinoTheme);
-    if (inheritedTheme == null)
-      return const CupertinoThemeData();
-
-    final CupertinoThemeData data = inheritedTheme.data;
-    if (data != null)
-      return data;
-
-    final CupertinoInterfaceTraitData traitsData = CupertinoTraitEnvironment.of(context, nullOk: true);
-    if (traitsData == null)
-      return const CupertinoThemeData();
-
-    return inheritedTheme.unresolved(traitsData) ?? const CupertinoThemeData();
+    return inheritedTheme?.data?.unresolvedThemeData(context) ?? const CupertinoThemeData();
   }
 
   /// The widget below this widget in the tree.
   ///
   /// {@macro flutter.widgets.child}
-  @override
   final Widget child;
 
   @override
@@ -128,9 +69,11 @@ class CupertinoTheme extends StatelessWidget implements CupertinoDynamicTheme {
     return  _InheritedCupertinoTheme(
       data: data,
       child: IconTheme(
-        data: IconThemeData(color: data.primaryColor),
+        data: DynamicIconThemeData(
+          unresolvedData: (BuildContext context) => IconThemeData(color: data.unresolvedThemeData(context).primaryColor),
+          ),
         child: child,
-      )
+      ),
     );
   }
 }
@@ -140,20 +83,24 @@ class _InheritedCupertinoTheme extends InheritedWidget {
   // but not both.
   const _InheritedCupertinoTheme({
     Key key,
-    this.data,
-    this.unresolved,
+    @required this.data,
     @required Widget child,
-  }) : assert(data != null || unresolved != null),
-       assert(data == null || unresolved == null),
+  }) : assert(data != null),
        super(key: key, child: child);
 
-  final CupertinoThemeData data;
-
-  final DynamicCupertinoThemeData unresolved;
+  final CupertinoDynamicThemeData data;
 
   @override
-  bool updateShouldNotify(_InheritedCupertinoTheme old) => data != old.data
-                                                        || unresolved != old.unresolved;
+  bool updateShouldNotify(_InheritedCupertinoTheme old) => data != old.data;
+}
+
+class CupertinoDynamicThemeData extends Diagnosticable {
+  CupertinoDynamicThemeData({
+    @required this.unresolvedThemeData,
+  }) : assert(unresolvedThemeData != null);
+
+  /// Unresolved CupertinoThemeData.
+  final CupertinoThemeData Function(BuildContext) unresolvedThemeData;
 }
 
 /// Styling specifications for a [CupertinoTheme].
@@ -173,7 +120,7 @@ class _InheritedCupertinoTheme extends InheritedWidget {
 ///  * [ThemeData], a Material equivalent that also configures Cupertino
 ///    styling via a [CupertinoThemeData] subclass [MaterialBasedCupertinoThemeData].
 @immutable
-class CupertinoThemeData extends Diagnosticable {
+class CupertinoThemeData extends Diagnosticable implements CupertinoDynamicThemeData {
   /// Create a [CupertinoTheme] styling specification.
   ///
   /// Unspecified parameters default to a reasonable iOS default style.
@@ -206,6 +153,9 @@ class CupertinoThemeData extends Diagnosticable {
     this._barBackgroundColor,
     this._scaffoldBackgroundColor,
   );
+
+  @override
+  CupertinoThemeData Function(BuildContext) get unresolvedThemeData => (BuildContext context) => this;
 
   bool get _isLight => brightness == Brightness.light;
 
