@@ -6,7 +6,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../widgets/framework.dart';
+import 'theme.dart';
 
+/// An interface that allows for serialization of the adoptor.
+/// The adoptor of the interface may assume that the caller of [maskValue] knows
+/// how the mask value is generated (how to intepret each bit?).
 abstract class BitSet {
   int get maskValue;
 }
@@ -76,6 +80,7 @@ class CupertinoInterfaceTraitData implements BitSet {
   /// * Settings -> Accessibility -> High contrast text (Android)
   final CupertinoAccessibilityContrast accessibilityContrast;
 
+  @override
   int get maskValue {
     int mask = 0;
 
@@ -204,11 +209,13 @@ class CupertinoTraitEnvironment extends InheritedWidget {
   static CupertinoInterfaceTraitData of(BuildContext context, { bool nullOk = false }) {
     assert(context != null);
     assert(nullOk != null);
-    final MediaQueryData data = MediaQuery.of(context, nullOk: nullOk);
+    final CupertinoThemeData themeData = CupertinoTheme.of(context).noDefault();
+    final Brightness brightness = themeData.brightness
+      ?? MediaQuery.of(context, nullOk: nullOk).platformBrightness;
     final CupertinoTraitEnvironment environment = context.inheritFromWidgetOfExactType(CupertinoTraitEnvironment);
 
-    if (environment != null && data != null)
-      return environment._data.copyWith(userInterfaceStyle: data.platformBrightness);
+    if (environment != null && brightness != null)
+      return environment._data.copyWith(userInterfaceStyle: brightness);
     if (nullOk)
       return null;
     throw FlutterError(

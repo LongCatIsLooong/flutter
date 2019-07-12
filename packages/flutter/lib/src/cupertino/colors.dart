@@ -95,20 +95,6 @@ class CupertinoColors {
   );
 }
 
-/*
-class CupertinoDynamicColor extends ColorSwatch<CupertinoInterfaceTraitData> {
-  CupertinoDynamicColor({
-    @required Color defaultColor,
-    Map<CupertinoInterfaceTraitData, Color> swatch,
-  }) : assert(swatch.isNotEmpty),
-       assert(defaultColor != null),
-       super(defaultColor.value, swatch);
-
-  @override
-  Color operator [](CupertinoInterfaceTraitData index) => super[index] ?? this;
-}
-*/
-
 class CupertinoDynamicColor {
   CupertinoDynamicColor({
     Color defaultColor,
