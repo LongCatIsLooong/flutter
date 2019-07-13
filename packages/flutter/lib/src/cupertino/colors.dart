@@ -89,11 +89,11 @@ class CupertinoColors {
   // The default system blue color, as shown in
   // https://developer.apple.com/design/human-interface-guidelines/ios/visual-design/color/.
   // This is only for demostration and is not meant to be used in an app.
-  static final CupertinoResolvableColor _defaultSystemBlue = CupertinoDynamicColor(
-    defaultColor: const Color(0xFF007AFF),
-    darkColor: const Color(0xFF1084FF),
-    highContrastColor: const Color(0xFF0040DD),
-    darkHighContrastColor: const Color(0xFF409CFF),
+  static const CupertinoDynamicColor _defaultSystemBlue = CupertinoDynamicColor(
+    defaultColor: Color(0xFF007AFF),
+    darkColor: Color(0xFF1084FF),
+    highContrastColor: Color(0xFF0040DD),
+    darkHighContrastColor: Color(0xFF409CFF),
   );
 }
 
