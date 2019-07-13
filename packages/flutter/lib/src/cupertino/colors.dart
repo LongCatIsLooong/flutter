@@ -4,6 +4,7 @@
 
 import 'dart:ui' show Color;
 
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
@@ -200,4 +201,25 @@ class CupertinoDynamicColor extends Diagnosticable implements CupertinoResolvabl
   }
 
   Color resolveFromContext(BuildContext context) => resolveWith(traitData: CupertinoTraitEnvironment.of(context));
+
+  @override
+  bool operator ==(dynamic other) {
+    if (other.runtimeType != runtimeType)
+      return false;
+
+    return ListEquality<Color>(_ColorMapElementEquality<Color>(defaultColor))
+      .equals(_colorMap, other._colorMap);
+  }
+
+  @override
+  int get hashCode => _colorMap.map((Color color) => color ?? defaultColor).hashCode;
+}
+
+class _ColorMapElementEquality<E> extends DefaultEquality<E> {
+  const _ColorMapElementEquality(this.nullFallbackValue) : super();
+  final E nullFallbackValue;
+
+  @override
+  bool equals(Object e1, Object e2) => super.equals(e1, e2)
+                                    || super.equals(e1 ?? nullFallbackValue, e2 ?? nullFallbackValue);
 }
