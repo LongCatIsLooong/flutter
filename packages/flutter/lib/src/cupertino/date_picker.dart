@@ -1200,12 +1200,16 @@ class _CupertinoTimerPickerState extends State<CupertinoTimerPicker> {
 
   Widget _buildMinutePicker() {
     double offAxisFraction;
-    if (widget.mode == CupertinoTimerPickerMode.hm)
-      offAxisFraction = 0.5 * textDirectionFactor;
-    else if (widget.mode == CupertinoTimerPickerMode.hms)
-      offAxisFraction = 0.0;
-    else
-      offAxisFraction = -0.5 * textDirectionFactor;
+    switch (widget.mode) {
+      case CupertinoTimerPickerMode.hm:
+        offAxisFraction = 0.5 * textDirectionFactor;
+        break;
+      case CupertinoTimerPickerMode.hms:
+        offAxisFraction = 0;
+        break;
+      case CupertinoTimerPickerMode.ms:
+        offAxisFraction = -0.5 * textDirectionFactor;
+    }
 
     return CupertinoPicker(
       scrollController: FixedExtentScrollController(
@@ -1232,39 +1236,41 @@ class _CupertinoTimerPickerState extends State<CupertinoTimerPicker> {
           ? localizations.timerPickerMinute(minute) + localizations.timerPickerMinuteLabel(minute)
           : localizations.timerPickerMinuteLabel(minute) + localizations.timerPickerMinute(minute);
 
-        if (widget.mode == CupertinoTimerPickerMode.ms) {
-          return Semantics(
-            label: semanticsLabel,
-            excludeSemantics: true,
-            child: Container(
-              alignment: alignCenterRight,
-              padding: textDirectionFactor == 1
-                ? const EdgeInsets.only(right: _kPickerWidth / 4)
-                : const EdgeInsets.only(left: _kPickerWidth / 4),
+        switch (widget.mode) {
+          case CupertinoTimerPickerMode.ms:
+            return Semantics(
+              label: semanticsLabel,
+              excludeSemantics: true,
               child: Container(
                 alignment: alignCenterRight,
-                padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                child: Text(localizations.timerPickerMinute(minute)),
+                padding: textDirectionFactor == 1
+                  ? const EdgeInsets.only(right: _kPickerWidth / 4)
+                  : const EdgeInsets.only(left: _kPickerWidth / 4),
+                child: Container(
+                  alignment: alignCenterRight,
+                  padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                  child: Text(localizations.timerPickerMinute(minute)),
+                ),
               ),
-            ),
-          );
-        } else {
-          return Semantics(
-            label: semanticsLabel,
-            excludeSemantics: true,
-            child: Container(
-              alignment: alignCenterLeft,
+            );
+          case CupertinoTimerPickerMode.hm:
+          case CupertinoTimerPickerMode.hms:
+            return Semantics(
+              label: semanticsLabel,
+              excludeSemantics: true,
               child: Container(
-                alignment: alignCenterRight,
-                width: widget.mode == CupertinoTimerPickerMode.hm
-                  ? _kPickerWidth / 10
-                  : _kPickerWidth / 6,
-                // Adds some spaces between words.
-                padding: const EdgeInsets.symmetric(horizontal: 2.0),
-                child: Text(localizations.timerPickerMinute(minute)),
+                alignment: alignCenterLeft,
+                child: Container(
+                  alignment: alignCenterRight,
+                  width: widget.mode == CupertinoTimerPickerMode.hm
+                    ? _kPickerWidth / 10
+                    : _kPickerWidth / 6,
+                  // Adds some spaces between words.
+                  padding: const EdgeInsets.symmetric(horizontal: 2.0),
+                  child: Text(localizations.timerPickerMinute(minute)),
+                ),
               ),
-            ),
-          );
+            );
         }
       }),
     );
