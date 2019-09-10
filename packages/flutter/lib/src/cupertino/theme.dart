@@ -12,8 +12,42 @@ import 'text_theme.dart';
 export 'package:flutter/services.dart' show Brightness;
 
 // Values derived from https://developer.apple.com/design/resources/.
-const Color _kDefaultBarLightBackgroundColor = Color(0xCCF8F8F8);
-const Color _kDefaultBarDarkBackgroundColor = Color(0xB7212121);
+const Color _kDefaultBarBackgroundColor = CupertinoDynamicColor.withBrightness(
+  color: Color(0xF2F9F9F9),
+  darkColor: Color(0xF21D1D1D),
+);
+
+// The CupertinoSystemColors.systemBlue fallback value.
+const Color _kPrimaryColor = CupertinoDynamicColor.withBrightnessAndContrast(
+  color: Color.fromARGB(255, 0, 122, 255),
+  darkColor: Color.fromARGB(255, 10, 132, 255),
+  highContrastColor: Color.fromARGB(255, 0, 64, 221),
+  darkHighContrastColor: Color.fromARGB(255, 64, 156, 255),
+);
+
+// The CupertinoSystemColors.label fallback value.
+const Color _kPrimaryContrastingColor = CupertinoDynamicColor(
+  color: Color.fromARGB(255, 0, 0, 0),
+  darkColor: Color.fromARGB(255, 255, 255, 255),
+  highContrastColor: Color.fromARGB(255, 0, 0, 0),
+  darkHighContrastColor: Color.fromARGB(255, 255, 255, 255),
+  elevatedColor: Color.fromARGB(255, 0, 0, 0),
+  darkElevatedColor: Color.fromARGB(255, 255, 255, 255),
+  highContrastElevatedColor: Color.fromARGB(255, 0, 0, 0),
+  darkHighContrastElevatedColor: Color.fromARGB(255, 255, 255, 255),
+);
+
+const Color _kScaffoldBackgroundColor = CupertinoDynamicColor(
+  color: Color.fromARGB(255, 255, 255, 255),
+  darkColor: Color.fromARGB(255, 0, 0, 0),
+  highContrastColor: Color.fromARGB(255, 255, 255, 255),
+  darkHighContrastColor: Color.fromARGB(255, 0, 0, 0),
+  elevatedColor: Color.fromARGB(255, 255, 255, 255),
+  darkElevatedColor: Color.fromARGB(255, 28, 28, 30),
+  highContrastElevatedColor: Color.fromARGB(255, 255, 255, 255),
+  darkHighContrastElevatedColor: Color.fromARGB(255, 36, 36, 38),
+);
+
 
 /// Applies a visual styling theme to descendant Cupertino widgets.
 ///
@@ -42,8 +76,9 @@ class CupertinoTheme extends StatelessWidget {
     @required this.data,
     @required this.child,
   }) : assert(child != null),
-       assert(data != null),
-       super(key: key);
+      assert(data != null),
+      super(key: key);
+
 
   /// The [CupertinoThemeData] styling for this theme.
   final CupertinoThemeData data;
@@ -54,7 +89,9 @@ class CupertinoTheme extends StatelessWidget {
   /// exist in the ancestry tree.
   static CupertinoThemeData of(BuildContext context) {
     final _InheritedCupertinoTheme inheritedTheme = context.inheritFromWidgetOfExactType(_InheritedCupertinoTheme);
-    return (inheritedTheme?.theme?.data ?? const CupertinoThemeData()).resolveFrom(context, nullOk: true);
+    final CupertinoThemeData data = (inheritedTheme?.theme?.data ?? const CupertinoThemeData()).
+updateDefaultsIfNeeded(context);
+    return data.resolveFrom(context);
   }
 
   /// Retrieve the [Brightness] value from the closest ancestor [CupertinoTheme]
@@ -150,9 +187,19 @@ class CupertinoThemeData extends Diagnosticable {
     this._textTheme,
     this._barBackgroundColor,
     this._scaffoldBackgroundColor,
+  ) : _defaultsFromSystemColors = null;
+
+  const CupertinoThemeData._withDefaults(
+    this._brightness,
+    this._primaryColor,
+    this._primaryContrastingColor,
+    this._textTheme,
+    this._barBackgroundColor,
+    this._scaffoldBackgroundColor,
+    this._defaultsFromSystemColors,
   );
 
-  bool get _isLight => brightness == Brightness.light;
+  final _NoDefaultCupertinoThemeData _defaultsFromSystemColors;
 
   /// The general brightness theme of the [CupertinoThemeData].
   ///
@@ -176,8 +223,9 @@ class CupertinoThemeData extends Diagnosticable {
   /// Design where the [primaryColor] can appear on non-interactive surfaces like
   /// the [AppBar] background, [TextField] borders etc.
   Color get primaryColor {
-    return _primaryColor ??
-        (_isLight ? CupertinoColors.activeBlue : CupertinoColors.activeOrange);
+    return _primaryColor
+        ?? _defaultsFromSystemColors?.primaryColor
+        ?? _kPrimaryColor;
   }
   final Color _primaryColor;
 
@@ -189,8 +237,9 @@ class CupertinoThemeData extends Diagnosticable {
   /// If coming from a Material [Theme] and unspecified, [primaryContrastingColor]
   /// will be derived from the Material [ThemeData]'s `colorScheme.onPrimary`.
   Color get primaryContrastingColor {
-    return _primaryContrastingColor ??
-        (_isLight ? CupertinoColors.white : CupertinoColors.black);
+    return _primaryContrastingColor
+        ?? _defaultsFromSystemColors?.primaryContrastingColor
+        ?? _kPrimaryContrastingColor;
   }
   final Color _primaryContrastingColor;
 
@@ -212,8 +261,7 @@ class CupertinoThemeData extends Diagnosticable {
   /// Defaults to a light gray or a dark gray translucent color depending
   /// on the [brightness].
   Color get barBackgroundColor {
-    return _barBackgroundColor ??
-        (_isLight ? _kDefaultBarLightBackgroundColor : _kDefaultBarDarkBackgroundColor);
+    return _barBackgroundColor ?? _defaultsFromSystemColors?._barBackgroundColor ?? _kDefaultBarBackgroundColor;
   }
   final Color _barBackgroundColor;
 
@@ -221,8 +269,7 @@ class CupertinoThemeData extends Diagnosticable {
   ///
   /// Defaults to white or black depending on the [brightness].
   Color get scaffoldBackgroundColor {
-    return _scaffoldBackgroundColor ??
-        (_isLight ? CupertinoColors.white : CupertinoColors.black);
+    return _scaffoldBackgroundColor ?? _defaultsFromSystemColors?.scaffoldBackgroundColor ?? _kScaffoldBackgroundColor;
   }
   final Color _scaffoldBackgroundColor;
 
@@ -245,17 +292,20 @@ class CupertinoThemeData extends Diagnosticable {
   /// Return a new `CupertinoThemeData` whose colors are from this `CupertinoThemeData`,
   /// but resolved aginst the given [BuildContext].
   ///
-  /// It will be called in [CupertinoTheme.of].
+  /// It will be called by [CupertinoTheme.of], to aquire a [CupertinoThemeData]
+  /// that suits the given [BuildContext].
   @protected
   CupertinoThemeData resolveFrom(BuildContext context, { bool nullOk = false }) {
     Color convertColor(Color color) => CupertinoDynamicColor.resolve(color, context, nullOk: nullOk);
 
-    return copyWith(
-      primaryColor: convertColor(primaryColor),
-      primaryContrastingColor: convertColor(primaryContrastingColor),
-      textTheme: textTheme?.resolveFrom(context, nullOk: nullOk),
-      barBackgroundColor: convertColor(barBackgroundColor),
-      scaffoldBackgroundColor: convertColor(scaffoldBackgroundColor),
+    return CupertinoThemeData._withDefaults(
+      _brightness,
+      convertColor(primaryColor),
+      convertColor(primaryContrastingColor),
+      textTheme?.resolveFrom(context, nullOk: nullOk),
+      convertColor(barBackgroundColor),
+      convertColor(scaffoldBackgroundColor),
+      _defaultsFromSystemColors?.resolveFrom(context, nullOk: nullOk),
     );
   }
 
@@ -274,13 +324,40 @@ class CupertinoThemeData extends Diagnosticable {
     Color barBackgroundColor,
     Color scaffoldBackgroundColor,
   }) {
-    return CupertinoThemeData(
-      brightness: brightness ?? _brightness,
-      primaryColor: primaryColor ?? _primaryColor,
-      primaryContrastingColor: primaryContrastingColor ?? _primaryContrastingColor,
-      textTheme: textTheme ?? _textTheme,
-      barBackgroundColor: barBackgroundColor ?? _barBackgroundColor,
-      scaffoldBackgroundColor: scaffoldBackgroundColor ?? _scaffoldBackgroundColor,
+    return CupertinoThemeData._withDefaults(
+      brightness ?? _brightness,
+      primaryColor ?? _primaryColor,
+      primaryContrastingColor ?? _primaryContrastingColor,
+      textTheme ?? _textTheme,
+      barBackgroundColor ?? _barBackgroundColor,
+      scaffoldBackgroundColor ?? _scaffoldBackgroundColor,
+      _defaultsFromSystemColors,
+    );
+  }
+
+  @protected
+  /// Update the default values of this theme for the given [BuildContext].
+  ///
+  /// Called by [CupertinoTheme.of] to update the default values. The [BuildContext]
+  /// must not be null.
+  CupertinoThemeData updateDefaultsIfNeeded(BuildContext context) {
+    assert(context != null);
+    final bool needsSystemColorDefaults = _primaryColor == null
+                                       || _primaryContrastingColor == null
+                                       || _barBackgroundColor == null
+                                       || _scaffoldBackgroundColor == null;
+
+    if (!needsSystemColorDefaults)
+      return this;
+
+    return CupertinoThemeData._withDefaults(
+      _brightness,
+      _primaryColor,
+      _primaryContrastingColor,
+      _textTheme,
+      _barBackgroundColor,
+      _scaffoldBackgroundColor,
+      _NoDefaultCupertinoThemeData._fromSystemColors(CupertinoSystemColors.of(context)),
     );
   }
 
@@ -312,6 +389,17 @@ class _NoDefaultCupertinoThemeData extends CupertinoThemeData {
         textTheme,
         barBackgroundColor,
         scaffoldBackgroundColor,
+      );
+
+  _NoDefaultCupertinoThemeData._fromSystemColors(
+    CupertinoSystemColorsData systemColors,
+  ) : this(
+        null,
+        systemColors.systemBlue,
+        systemColors.label,
+        null,
+        _kDefaultBarBackgroundColor,
+        systemColors.systemBackground,
       );
 
   @override
@@ -359,4 +447,7 @@ class _NoDefaultCupertinoThemeData extends CupertinoThemeData {
       scaffoldBackgroundColor ?? this.scaffoldBackgroundColor,
     );
   }
+
+  @override
+  _NoDefaultCupertinoThemeData updateDefaultsIfNeeded(BuildContext context) => this;
 }

@@ -1496,6 +1496,9 @@ class MaterialBasedCupertinoThemeData extends CupertinoThemeData {
       _cupertinoOverrideTheme.resolveFrom(context, nullOk: nullOk),
     );
   }
+
+  @override
+  CupertinoThemeData updateDefaultsIfNeeded(BuildContext context) => this;
 }
 
 class _IdentityThemeDataCacheKey {

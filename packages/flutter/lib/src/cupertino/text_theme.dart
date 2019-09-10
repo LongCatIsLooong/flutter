@@ -8,23 +8,38 @@ import 'package:flutter/widgets.dart';
 
 import 'colors.dart';
 
-// Values derived from https://developer.apple.com/design/resources/.
-const TextStyle _kDefaultLightTextStyle = TextStyle(
-  inherit: false,
-  fontFamily: '.SF Pro Text',
-  fontSize: 17.0,
-  letterSpacing: -0.41,
+// The CupertinoSystemColors.systemBlue fallback value.
+const Color _kPrimaryColor = CupertinoDynamicColor.withBrightnessAndContrast(
+  color: Color.fromARGB(255, 0, 122, 255),
+  darkColor: Color.fromARGB(255, 10, 132, 255),
+  highContrastColor: Color.fromARGB(255, 0, 64, 221),
+  darkHighContrastColor: Color.fromARGB(255, 64, 156, 255),
+);
+
+// The CupertinoSystemColors.label fallback value.
+const Color _kPrimaryContrastingColor = CupertinoDynamicColor(
+  color: Color.fromARGB(255, 0, 0, 0),
+  darkColor: Color.fromARGB(255, 255, 255, 255),
+  highContrastColor: Color.fromARGB(255, 0, 0, 0),
+  darkHighContrastColor: Color.fromARGB(255, 255, 255, 255),
+  elevatedColor: Color.fromARGB(255, 0, 0, 0),
+  darkElevatedColor: Color.fromARGB(255, 255, 255, 255),
+  highContrastElevatedColor: Color.fromARGB(255, 0, 0, 0),
+  darkHighContrastElevatedColor: Color.fromARGB(255, 255, 255, 255),
+);
+
+const Color _kBlackWhiteLabelColor = CupertinoDynamicColor.withBrightness(
   color: CupertinoColors.black,
-  decoration: TextDecoration.none,
+  darkColor: CupertinoColors.white,
 );
 
 // Values derived from https://developer.apple.com/design/resources/.
-const TextStyle _kDefaultDarkTextStyle = TextStyle(
+const TextStyle _kDefaultTextStyle = TextStyle(
   inherit: false,
   fontFamily: '.SF Pro Text',
   fontSize: 17.0,
   letterSpacing: -0.41,
-  color: CupertinoColors.white,
+  color: _kPrimaryContrastingColor,
   decoration: TextDecoration.none,
 );
 
@@ -34,7 +49,7 @@ const TextStyle _kDefaultActionTextStyle = TextStyle(
   fontFamily: '.SF Pro Text',
   fontSize: 17.0,
   letterSpacing: -0.41,
-  color: CupertinoColors.activeBlue,
+  color: _kPrimaryColor,
   decoration: TextDecoration.none,
 );
 
@@ -47,81 +62,38 @@ const TextStyle _kDefaultTabLabelTextStyle = TextStyle(
   color: CupertinoColors.inactiveGray,
 );
 
-const TextStyle _kDefaultMiddleTitleLightTextStyle = TextStyle(
+const TextStyle _kDefaultMiddleTitleTextStyle = TextStyle(
   inherit: false,
   fontFamily: '.SF Pro Text',
   fontSize: 17.0,
   fontWeight: FontWeight.w600,
   letterSpacing: -0.41,
-  color: CupertinoColors.black,
+  color: _kBlackWhiteLabelColor,
 );
 
-const TextStyle _kDefaultMiddleTitleDarkTextStyle = TextStyle(
-  inherit: false,
-  fontFamily: '.SF Pro Text',
-  fontSize: 17.0,
-  fontWeight: FontWeight.w600,
-  letterSpacing: -0.41,
-  color: CupertinoColors.white,
-);
-
-const TextStyle _kDefaultLargeTitleLightTextStyle = TextStyle(
+const TextStyle _kDefaultLargeTitleTextStyle = TextStyle(
   inherit: false,
   fontFamily: '.SF Pro Display',
   fontSize: 34.0,
   fontWeight: FontWeight.w700,
   letterSpacing: 0.41,
-  color: CupertinoColors.black,
+  color: _kBlackWhiteLabelColor,
 );
 
-const TextStyle _kDefaultLargeTitleDarkTextStyle = TextStyle(
+// Inspected on iOS 13 simulator using "Debug View Hierarchy".
+// Note that its font size is extracted from off-centered labels. Centered labels
+// (the text that currently under the magnifier) have a font size of 23.5 pt.
+const TextStyle _kDefaultPickerTextStyle = TextStyle(
   inherit: false,
   fontFamily: '.SF Pro Display',
-  fontSize: 34.0,
-  fontWeight: FontWeight.w700,
-  letterSpacing: 0.41,
-  color: CupertinoColors.white,
-);
-
-// Eyeballed value since it's not documented in https://developer.apple.com/design/resources/.
-const TextStyle _kDefaultPickerLightTextStyle = TextStyle(
-  inherit: false,
-  fontFamily: '.SF Pro Display',
-  fontSize: 25.0,
-  fontWeight: FontWeight.w400,
-  letterSpacing: -0.41,
-  color: CupertinoColors.black,
-);
-
-// Eyeballed value since it's not documented in https://developer.apple.com/design/resources/.
-const TextStyle _kDefaultPickerDarkTextStyle = TextStyle(
-  inherit: false,
-  fontFamily: '.SF Pro Display',
-  fontSize: 25.0,
-  fontWeight: FontWeight.w400,
-  letterSpacing: -0.41,
-  color: CupertinoColors.white,
-);
-
-// Eyeballed value since it's not documented in https://developer.apple.com/design/resources/.
-// Inspected on iOS 13 simulator with "Debug View Hierarchy".
-const TextStyle _kDefaultDateTimePickerLightTextStyle = TextStyle(
-  inherit: false,
-  fontFamily: '.SF Pro Display',
-  fontSize: 21,
+  fontSize: 21.0,
   fontWeight: FontWeight.normal,
-  color: CupertinoColors.black,
+  letterSpacing: -0.41,
+  color: _kBlackWhiteLabelColor,
 );
 
-// Eyeballed value since it's not documented in https://developer.apple.com/design/resources/.
-// Inspected on iOS 13 simulator with "Debug View Hierarchy".
-const TextStyle _kDefaultDateTimePickerDarkTextStyle = TextStyle(
-  inherit: false,
-  fontFamily: '.SF Pro Display',
-  fontSize: 21,
-  fontWeight: FontWeight.normal,
-  color: CupertinoColors.white,
-);
+// Inspected on iOS 13 simulator using "Debug View Hierarchy".
+const TextStyle _kDefaultDateTimePickerTextStyle = _kDefaultPickerTextStyle;
 
 /// Cupertino typography theme in a [CupertinoThemeData].
 @immutable
@@ -146,7 +118,7 @@ class CupertinoTextThemeData extends Diagnosticable {
     TextStyle navActionTextStyle,
     TextStyle pickerTextStyle,
     TextStyle dateTimePickerTextStyle,
-  }) : _primaryColor = primaryColor ?? CupertinoColors.activeBlue,
+  }) : _primaryColor = primaryColor ?? _kPrimaryColor,
        _brightness = brightness,
        _textStyle = textStyle,
        _actionTextStyle = actionTextStyle,
@@ -159,18 +131,15 @@ class CupertinoTextThemeData extends Diagnosticable {
 
   final Color _primaryColor;
   final Brightness _brightness;
-  bool get _isLight => _brightness != Brightness.dark;
 
   final TextStyle _textStyle;
   /// Typography of general text content for Cupertino widgets.
-  TextStyle get textStyle => _textStyle ?? (_isLight ? _kDefaultLightTextStyle : _kDefaultDarkTextStyle);
+  TextStyle get textStyle => _textStyle ?? _kDefaultTextStyle;
 
   final TextStyle _actionTextStyle;
   /// Typography of interactive text content such as text in a button without background.
   TextStyle get actionTextStyle {
-    return _actionTextStyle ?? _kDefaultActionTextStyle.copyWith(
-      color: _primaryColor,
-    );
+    return _actionTextStyle ?? _kDefaultActionTextStyle.copyWith(color: _primaryColor);
   }
 
   final TextStyle _tabLabelTextStyle;
@@ -180,15 +149,13 @@ class CupertinoTextThemeData extends Diagnosticable {
   final TextStyle _navTitleTextStyle;
   /// Typography of titles in standard navigation bars.
   TextStyle get navTitleTextStyle {
-    return _navTitleTextStyle ??
-        (_isLight ? _kDefaultMiddleTitleLightTextStyle : _kDefaultMiddleTitleDarkTextStyle);
+    return _navTitleTextStyle ?? _kDefaultMiddleTitleTextStyle;
   }
 
   final TextStyle _navLargeTitleTextStyle;
   /// Typography of large titles in sliver navigation bars.
   TextStyle get navLargeTitleTextStyle {
-    return _navLargeTitleTextStyle ??
-        (_isLight ? _kDefaultLargeTitleLightTextStyle : _kDefaultLargeTitleDarkTextStyle);
+    return _navLargeTitleTextStyle ?? _kDefaultLargeTitleTextStyle;
   }
 
   final TextStyle _navActionTextStyle;
@@ -202,15 +169,13 @@ class CupertinoTextThemeData extends Diagnosticable {
   final TextStyle _pickerTextStyle;
   /// Typography of pickers.
   TextStyle get pickerTextStyle {
-    return _pickerTextStyle ??
-        (_isLight ? _kDefaultPickerLightTextStyle : _kDefaultPickerDarkTextStyle);
+    return _pickerTextStyle ?? _kDefaultPickerTextStyle;
   }
 
   final TextStyle _dateTimePickerTextStyle;
   /// Typography of date time pickers.
   TextStyle get dateTimePickerTextStyle {
-    return _dateTimePickerTextStyle ??
-        (_isLight ? _kDefaultDateTimePickerLightTextStyle : _kDefaultDateTimePickerDarkTextStyle);
+    return _dateTimePickerTextStyle ?? _kDefaultDateTimePickerTextStyle;
   }
 
   /// Returns a copy of the current [CupertinoTextThemeData] with all the colors
