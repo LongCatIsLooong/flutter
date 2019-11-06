@@ -9,6 +9,42 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:vector_math/vector_math_64.dart';
 
+class TestTransform extends LeafRenderObjectWidget {
+  const TestTransform(this.needsCompositing) : super();
+
+  final bool needsCompositing;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => RenderTestTransform(needsCompositing);
+}
+
+class RenderTestTransform extends RenderConstrainedBox {
+  RenderTestTransform(this.needsCompositing)
+    : super(additionalConstraints: const BoxConstraints.tightFor(width: 100, height: 200));
+
+  @override
+  final bool needsCompositing;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    context.pushTransform(
+      needsCompositing,
+      offset,
+      MatrixUtils.createCylindricalProjectionTransform(
+        radius: 100,
+        angle: math.pi / 4,
+        perspective: 0.003,
+      ),
+      (PaintingContext context, Offset offset) {
+        context.canvas.drawRect(
+          (offset + const Offset(10, 10)) & const Size(10, 10),
+          Paint()..color = const Color(0xFFFF0000),
+        );
+      },
+    );
+  }
+}
+
 void main() {
   testWidgets('Transform origin', (WidgetTester tester) async {
     bool didReceiveTap = false;
