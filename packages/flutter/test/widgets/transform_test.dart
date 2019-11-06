@@ -4,11 +4,13 @@
 
 import 'dart:math' as math;
 
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:vector_math/vector_math_64.dart';
 
+import 'dart:ui' as ui;
 class TestTransform extends LeafRenderObjectWidget {
   const TestTransform(this.needsCompositing) : super();
 
@@ -16,19 +18,30 @@ class TestTransform extends LeafRenderObjectWidget {
 
   @override
   RenderObject createRenderObject(BuildContext context) => RenderTestTransform(needsCompositing);
+
+  @override
+  void updateRenderObject(BuildContext context, RenderTestTransform renderObject) {
+    renderObject.compositing = needsCompositing;
+  }
 }
 
 class RenderTestTransform extends RenderConstrainedBox {
-  RenderTestTransform(this.needsCompositing)
+  RenderTestTransform(this._compositing)
     : super(additionalConstraints: const BoxConstraints.tightFor(width: 100, height: 200));
 
-  @override
-  final bool needsCompositing;
+  bool get compositing => _compositing;
+  bool _compositing;
+  set compositing(bool newValue) {
+    if (newValue == compositing)
+      return;
+    _compositing = newValue;
+    markNeedsPaint();
+  }
 
   @override
   void paint(PaintingContext context, Offset offset) {
     context.pushTransform(
-      needsCompositing,
+      compositing,
       offset,
       MatrixUtils.createCylindricalProjectionTransform(
         radius: 100,
@@ -46,6 +59,25 @@ class RenderTestTransform extends RenderConstrainedBox {
 }
 
 void main() {
+  testWidgets('This should fail', (WidgetTester tester) async {
+    await tester.pumpWidget(const RepaintBoundary(child: TestTransform(true)));
+    final RenderBox renderBox = tester.binding.renderView.child;
+    debugDumpLayerTree();
+    final OffsetLayer layer = renderBox.layer;
+    final ui.Image trueImage = await layer.toImage(renderBox.paintBounds);
+
+    await tester.pumpWidget(const RepaintBoundary(child: TestTransform(false)));
+    debugDumpLayerTree();
+    final RenderBox newRenderBox = tester.binding.renderView.child;
+    final OffsetLayer newLayer = newRenderBox.layer;
+    final ui.Image falseImage = await newLayer.toImage(newRenderBox.paintBounds);
+    final ByteData trueData = await trueImage.toByteData(format: ui.ImageByteFormat.png);
+    final ByteData falseData = await falseImage.toByteData(format: ui.ImageByteFormat.png);
+    print(trueData.buffer.asUint8List());
+    print(falseData.buffer.asUint8List());
+    await expectLater(find.byType(RepaintBoundary), matchesReferenceImage(trueImage));
+  });
+
   testWidgets('Transform origin', (WidgetTester tester) async {
     bool didReceiveTap = false;
     await tester.pumpWidget(
