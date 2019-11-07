@@ -12,21 +12,24 @@ import 'package:vector_math/vector_math_64.dart';
 
 import 'dart:ui' as ui;
 class TestTransform extends LeafRenderObjectWidget {
-  const TestTransform(this.needsCompositing) : super();
+  const TestTransform(this.needsCompositing, this.angle) : super();
 
   final bool needsCompositing;
+  final double angle;
 
   @override
-  RenderObject createRenderObject(BuildContext context) => RenderTestTransform(needsCompositing);
+  RenderObject createRenderObject(BuildContext context) => RenderTestTransform(needsCompositing, angle);
 
   @override
   void updateRenderObject(BuildContext context, RenderTestTransform renderObject) {
-    renderObject.compositing = needsCompositing;
+    renderObject
+    ..compositing = needsCompositing
+    ..angle = angle;
   }
 }
 
 class RenderTestTransform extends RenderConstrainedBox {
-  RenderTestTransform(this._compositing)
+  RenderTestTransform(this._compositing, this._angle)
     : super(additionalConstraints: const BoxConstraints.tightFor(width: 100, height: 200));
 
   bool get compositing => _compositing;
@@ -35,6 +38,16 @@ class RenderTestTransform extends RenderConstrainedBox {
     if (newValue == compositing)
       return;
     _compositing = newValue;
+    markNeedsPaint();
+    markNeedsCompositingBitsUpdate();
+  }
+
+  double get angle => _angle;
+  double _angle;
+  set angle(double newValue) {
+    if (newValue == angle)
+      return;
+    _angle = newValue;
     markNeedsPaint();
   }
 
@@ -45,7 +58,7 @@ class RenderTestTransform extends RenderConstrainedBox {
       offset,
       MatrixUtils.createCylindricalProjectionTransform(
         radius: 100,
-        angle: math.pi / 4,
+        angle: angle,
         perspective: 0.003,
       ),
       (PaintingContext context, Offset offset) {
@@ -60,22 +73,20 @@ class RenderTestTransform extends RenderConstrainedBox {
 
 void main() {
   testWidgets('This should fail', (WidgetTester tester) async {
-    await tester.pumpWidget(const RepaintBoundary(child: TestTransform(true)));
-    final RenderBox renderBox = tester.binding.renderView.child;
-    debugDumpLayerTree();
-    final OffsetLayer layer = renderBox.layer;
-    final ui.Image trueImage = await layer.toImage(renderBox.paintBounds);
+    for (double angle = 0; angle <= math.pi/4; angle += 0.01) {
+      await tester.pumpWidget(RepaintBoundary(child: TestTransform(true, angle)));
+      final RenderBox renderBox = tester.binding.renderView.child;
+      final OffsetLayer layer = renderBox.layer;
+      final ui.Image trueImage = await layer.toImage(renderBox.paintBounds);
 
-    await tester.pumpWidget(const RepaintBoundary(child: TestTransform(false)));
-    debugDumpLayerTree();
-    final RenderBox newRenderBox = tester.binding.renderView.child;
-    final OffsetLayer newLayer = newRenderBox.layer;
-    final ui.Image falseImage = await newLayer.toImage(newRenderBox.paintBounds);
-    final ByteData trueData = await trueImage.toByteData(format: ui.ImageByteFormat.png);
-    final ByteData falseData = await falseImage.toByteData(format: ui.ImageByteFormat.png);
-    print(trueData.buffer.asUint8List());
-    print(falseData.buffer.asUint8List());
-    await expectLater(find.byType(RepaintBoundary), matchesReferenceImage(trueImage));
+      await tester.pumpWidget(RepaintBoundary(child: TestTransform(false, angle)));
+
+      try {
+        await expectLater(find.byType(RepaintBoundary), matchesReferenceImage(trueImage));
+      } catch (e) {
+        print(angle);
+      }
+    }
   });
 
   testWidgets('Transform origin', (WidgetTester tester) async {
