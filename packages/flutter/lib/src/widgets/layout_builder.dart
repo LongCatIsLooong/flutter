@@ -158,19 +158,31 @@ class _LayoutBuilderElement<ConstraintType extends Constraints> extends RenderOb
 /// Provides a callback that should be called at layout time, typically in
 /// [RenderObject.performLayout].
 mixin RenderConstrainedLayoutBuilder<ConstraintType extends Constraints, ChildType extends RenderObject> on RenderObjectWithChildMixin<ChildType> {
+  bool _updatingCallback = false;
   LayoutCallback<ConstraintType> _callback;
-  /// Change the layout callback.
+  /// Updates the layout callback.
   void updateCallback(LayoutCallback<ConstraintType> value) {
+    assert(!_updatingCallback);
+    _updatingCallback = true;
     if (value == _callback)
       return;
     _callback = value;
     markNeedsLayout();
+    _updatingCallback = false;
+    assert(!_updatingCallback);
   }
 
-  /// Invoke the layout callback.
-  void layoutAndBuildChild() {
+  /// Invokes the layout callback that builds the child widget.
+  void invokeBuildChildCallback() {
     assert(_callback != null);
     invokeLayoutCallback(_callback);
+  }
+
+  @override
+  void markParentNeedsLayout() {
+    if (_updatingCallback)
+      return;
+    super.markParentNeedsLayout();
   }
 }
 
@@ -237,7 +249,7 @@ class _RenderLayoutBuilder extends RenderBox with RenderObjectWithChildMixin<Ren
 
   @override
   void performLayout() {
-    layoutAndBuildChild();
+    invokeBuildChildCallback();
     if (child != null) {
       child.layout(constraints, parentUsesSize: true);
       size = constraints.constrain(child.size);
