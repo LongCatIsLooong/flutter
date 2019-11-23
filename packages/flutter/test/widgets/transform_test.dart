@@ -63,7 +63,7 @@ class RenderTestTransform extends RenderConstrainedBox {
       ),
       (PaintingContext context, Offset offset) {
         context.canvas.drawRect(
-          (offset + const Offset(10, 10)) & const Size(10, 10),
+          (offset + const Offset(200, 200)) & const Size(10, 10),
           Paint()..color = const Color(0xFFFF0000),
         );
       },
