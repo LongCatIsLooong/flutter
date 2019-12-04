@@ -386,3 +386,60 @@ class ScrollbarPainter extends ChangeNotifier implements CustomPainter {
   @override
   SemanticsBuilderCallback get semanticsBuilder => null;
 }
+
+
+class _RenderSliverScrollbar extends RenderSliver with RenderObjectWithChildMixin<RenderSliver> {
+  @override
+  void setupParentData(RenderObject child) {
+    if (child.parentData is! SliverPhysicalParentData)
+      child.parentData = SliverPhysicalParentData();
+  }
+
+  @override
+  void performLayout() {
+    assert(child != null);
+    child.layout(constraints, parentUsesSize: true);
+    geometry = child.geometry;
+  }
+
+  @override
+  bool hitTestChildren(SliverHitTestResult result, {double mainAxisPosition, double crossAxisPosition}) {
+    return child != null
+      && child.geometry.hitTestExtent > 0
+      && child.hitTest(
+        result,
+        mainAxisPosition: mainAxisPosition,
+        crossAxisPosition: crossAxisPosition,
+      );
+  }
+
+  @override
+  double childMainAxisPosition(RenderSliver child) {
+    assert(child != null);
+    assert(child == this.child);
+    return 0.0;
+  }
+
+  @override
+  void applyPaintTransform(RenderObject child, Matrix4 transform) {
+    assert(child != null);
+    final SliverPhysicalParentData childParentData = child.parentData;
+    childParentData.applyPaintTransform(transform);
+  }
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    assert(child != null);
+    if (!geometry.visible)
+      return;
+
+    final SliverPhysicalParentData childParentData = child.parentData;
+    child.paint(context, offset + childParentData.paintOffset);
+
+    // Skip painting if total content extent is not greater than 0.
+    if (geometry.maxPaintExtent <= 0)
+      return;
+
+    final double visiblePercentage = geometry.paintExtent / geometry.maxPaintExtent;
+  }
+}
