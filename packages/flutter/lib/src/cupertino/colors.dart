@@ -942,7 +942,7 @@ class CupertinoDynamicColor extends Color with DiagnosticableMixin implements Di
   /// thrown.
   CupertinoDynamicColor resolveFrom(BuildContext context, { bool nullOk = true }) {
     final Brightness brightness = _isPlatformBrightnessDependent
-      ? CupertinoTheme.brightnessOf(context, nullOk: nullOk) ?? Brightness.light
+      ? MediaQuery.of(context, nullOk: nullOk)?.platformBrightness ?? Brightness.light
       : Brightness.light;
 
     final bool isHighContrastEnabled = _isHighContrastDependent

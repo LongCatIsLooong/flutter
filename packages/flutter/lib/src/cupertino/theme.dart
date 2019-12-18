@@ -71,19 +71,6 @@ class CupertinoTheme extends StatelessWidget {
     return (inheritedTheme?.theme?.data ?? const CupertinoThemeData()).resolveFrom(context, nullOk: true);
   }
 
-  /// Retrieves the [Brightness] value from the closest ancestor [CupertinoTheme]
-  /// widget.
-  ///
-  /// If no [CupertinoTheme] ancestor with an explicit brightness value could be
-  /// found, this method will resort to the closest ancestor [MediaQuery] widget.
-  ///
-  /// Throws an exception if no such [CupertinoTheme] or [MediaQuery] widgets exist
-  /// in the ancestry tree, unless [nullOk] is set to true.
-  static Brightness brightnessOf(BuildContext context, { bool nullOk = false }) {
-    final _InheritedCupertinoTheme inheritedTheme = context.dependOnInheritedWidgetOfExactType<_InheritedCupertinoTheme>();
-    return inheritedTheme?.theme?.data?._brightness ?? MediaQuery.of(context, nullOk: nullOk)?.platformBrightness;
-  }
-
   /// The widget below this widget in the tree.
   ///
   /// {@macro flutter.widgets.child}
@@ -91,12 +78,20 @@ class CupertinoTheme extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return  _InheritedCupertinoTheme(
+    final Widget themedChild = _InheritedCupertinoTheme(
       theme: this,
       child: IconTheme(
         data: CupertinoIconThemeData(color: data.primaryColor),
         child: child,
       ),
+    );
+
+    final MediaQueryData existingData = MediaQuery.of(context, nullOk: true)
+                                     ?? const MediaQueryData(platformBrightness: null);
+
+    return MediaQuery(
+      data: existingData.copyWith(platformBrightness: data._brightness),
+      child: themedChild,
     );
   }
 

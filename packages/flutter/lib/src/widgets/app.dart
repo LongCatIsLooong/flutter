@@ -1442,8 +1442,10 @@ class _MediaQueryFromWindowsState extends State<_MediaQueryFromWindow> with Widg
 
   @override
   Widget build(BuildContext context) {
+    final Brightness brightnessOverride = MediaQuery.of(context, nullOk: true)?.platformBrightness;
+    final MediaQueryData windowData = MediaQueryData.fromWindow(WidgetsBinding.instance.window);
     return MediaQuery(
-      data: MediaQueryData.fromWindow(WidgetsBinding.instance.window),
+      data: windowData.copyWith(platformBrightness: brightnessOverride),
       child: widget.child,
     );
   }

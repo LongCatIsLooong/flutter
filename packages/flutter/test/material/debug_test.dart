@@ -146,6 +146,7 @@ void main() {
       '     IconTheme\n'
       '     IconTheme\n'
       '     _InheritedCupertinoTheme\n'
+      '     MediaQuery\n'
       '     CupertinoTheme\n'
       '     _InheritedTheme\n'
       '     Theme\n'

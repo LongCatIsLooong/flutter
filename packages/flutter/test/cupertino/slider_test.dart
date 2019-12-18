@@ -465,18 +465,15 @@ void main() {
     );
 
     Widget withTraits(Brightness brightness, CupertinoUserInterfaceLevelData level, bool highContrast) {
-      return CupertinoTheme(
-        data: CupertinoThemeData(brightness: brightness),
-        child: CupertinoUserInterfaceLevel(
-          data: level,
-          child: MediaQuery(
-            data: MediaQueryData(highContrast: highContrast),
-            child: Center(
-              child: CupertinoSlider(
-                activeColor: activeColor,
-                onChanged: (double value) { },
-                value: 0.5,
-              ),
+      return CupertinoUserInterfaceLevel(
+        data: level,
+        child: MediaQuery(
+          data: MediaQueryData(highContrast: highContrast, platformBrightness: brightness),
+          child: Center(
+            child: CupertinoSlider(
+              activeColor: activeColor,
+              onChanged: (double value) { },
+              value: 0.5,
             ),
           ),
         ),

@@ -238,12 +238,12 @@ void main() {
       expect(find.byType(DependentWidget), paints..rect(color: color0));
       expect(find.byType(DependentWidget), isNot(paints..rect(color: color1)));
 
-      // CupertinoTheme should take percedence over MediaQuery.
+      // The closest MediaQuery should take percedence over CupertinoTheme.
       await tester.pumpWidget(
         const CupertinoTheme(
-          data: CupertinoThemeData(brightness: Brightness.light),
+          data: CupertinoThemeData(brightness: Brightness.dark),
           child: MediaQuery(
-            data: MediaQueryData(platformBrightness: Brightness.dark),
+            data: MediaQueryData(platformBrightness: Brightness.light),
             child: DependentWidget(color: vibrancyDependentColor1),
           ),
         ),
@@ -505,18 +505,15 @@ void main() {
     setUp(() { color = null; });
 
     testWidgets('dynamic color works in cupertino override theme', (WidgetTester tester) async {
-      final CupertinoDynamicColor Function() typedColor = () => color as CupertinoDynamicColor;
-
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(
             cupertinoOverrideTheme: const CupertinoThemeData(
-              brightness: Brightness.dark,
               primaryColor: dynamicColor,
             ),
           ),
           home: MediaQuery(
-            data: const MediaQueryData(platformBrightness: Brightness.light, highContrast: false),
+            data: const MediaQueryData(platformBrightness: Brightness.dark, highContrast: false),
             child: CupertinoUserInterfaceLevel(
               data: CupertinoUserInterfaceLevelData.base,
               child: Builder(
@@ -531,17 +528,14 @@ void main() {
       );
 
       // Explicit brightness is respected.
-      expect(typedColor().value, dynamicColor.darkColor.value);
+      expect(color, isSameColorAs(dynamicColor.darkColor));
       color = null;
 
       // Changing dependencies works.
       await tester.pumpWidget(
         MaterialApp(
           theme: ThemeData(
-            cupertinoOverrideTheme: const CupertinoThemeData(
-              brightness: Brightness.dark,
-              primaryColor: dynamicColor,
-            ),
+            cupertinoOverrideTheme: const CupertinoThemeData(primaryColor: dynamicColor),
           ),
           home: MediaQuery(
             data: const MediaQueryData(platformBrightness: Brightness.dark, highContrast: true),
@@ -558,7 +552,7 @@ void main() {
         ),
       );
 
-      expect(typedColor().value, dynamicColor.darkHighContrastElevatedColor.value);
+      expect(color, isSameColorAs(dynamicColor.darkHighContrastElevatedColor));
     });
 
     testWidgets('dynamic color does not work in a material theme', (WidgetTester tester) async {
