@@ -5,6 +5,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 
 void verifyPaintPosition(GlobalKey key, Offset ideal) {
   final RenderObject target = key.currentContext.findRenderObject();
@@ -136,6 +137,128 @@ void main() {
 
     expect(tester.getTopLeft(find.byType(Container)), Offset.zero);
     expect(tester.getTopLeft(find.text('X')), const Offset(0.0, 250.0));
+  });
+
+  testWidgets(
+    'RenderSliverPersistentHeader.showOnScreen does not scroll all the way to the top, '
+    'unless the visible header height is less than minExtent',
+    (WidgetTester tester) async {
+      final ScrollController controller = ScrollController(initialScrollOffset: 1100);
+      final FocusNode focusNode = FocusNode();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CustomScrollView(
+              controller: controller,
+              slivers: <Widget>[
+                const SliverToBoxAdapter(child: SizedBox(height: 1000)),
+                SliverAppBar(
+                  pinned: true,
+                  expandedHeight: 300,
+                  title: SizedBox(
+                    height: 50,
+                    child: TextField(
+                      controller: TextEditingController(text: 'Title'),
+                      focusNode: focusNode,
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 1000)),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      focusNode.requestFocus();
+      await tester.pumpAndSettle();
+
+      expect(controller.offset, 1100);
+
+      // Move the viewport down so that the SliverAppBar is partially obstructed.
+      focusNode.unfocus();
+      controller.jumpTo(0);
+      await tester.pumpAndSettle();
+
+      focusNode.requestFocus();
+      await tester.pumpAndSettle();
+
+      // The TextField should be entirely visible.
+      expect(controller.offset, greaterThan(350));
+  });
+
+  testWidgets(
+    'RenderSliverPersistentHeader.showOnScreen works in a nested scroll view',
+    (WidgetTester tester) async {
+      final ScrollController outerController = ScrollController(initialScrollOffset: 0);
+      final ScrollController innerController = ScrollController(initialScrollOffset: 1100);
+
+      final FocusNode focusNode = FocusNode();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CustomScrollView(
+              controller: outerController,
+              slivers: <Widget>[
+                SliverToBoxAdapter(
+                  child: Container(
+                    height: 600,
+                    // The inner viewport is as large as the screen size.
+                    child: CustomScrollView(
+                      controller: innerController,
+                      slivers: <Widget>[
+                        const SliverToBoxAdapter(child: SizedBox(height: 1000)),
+                        SliverAppBar(
+                          pinned: true,
+                          expandedHeight: 300,
+                          title: SizedBox(
+                            height: 50,
+                            child: TextField(
+                              controller: TextEditingController(text: 'Title'),
+                              focusNode: focusNode,
+                            ),
+                          ),
+                        ),
+                        const SliverToBoxAdapter(child: SizedBox(height: 1000)),
+                      ],
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 1000)),
+              ],
+            ),
+          ),
+        ),
+      );
+
+      focusNode.requestFocus();
+      await tester.pumpAndSettle();
+
+      // Initially the TextField is visible. No scrolling needed.
+      expect(outerController.offset, 0);
+      expect(innerController.offset, 1100);
+
+      focusNode.unfocus();
+      // Set it up so that both viewports need to be scrolled to reveal the
+      // TextField.
+      outerController.jumpTo(800);
+      innerController.jumpTo(0);
+      await tester.pumpAndSettle();
+
+      expect(outerController.offset, 800);
+      expect(innerController.offset, 0);
+
+      focusNode.requestFocus();
+      await tester.pumpAndSettle();
+
+      // The TextField should be entirely visible, at the bottom of the inner
+      // viewport and the bottom of the outer viewport.
+      expect(outerController.offset, lessThan(800));
+      expect(innerController.offset, greaterThan(350));
+      expect(
+        tester.renderObject(find.text('Title')).paintBounds.expandToInclude(Offset.zero & const Size(800, 600)),
+        Offset.zero & const Size(800, 600),
+      );
   });
 }
 
