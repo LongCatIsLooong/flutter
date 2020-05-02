@@ -760,6 +760,7 @@ abstract class RenderViewportBase<ParentDataClass extends ContainerParentDataMix
     final RenderSliver sliver = child as RenderSliver;
     final double extentOfPinnedSlivers = maxScrollObstructionExtentBefore(sliver);
     leadingScrollOffset = scrollOffsetOf(sliver, leadingScrollOffset);
+
     switch (sliver.constraints.growthDirection) {
       case GrowthDirection.forward:
         leadingScrollOffset -= extentOfPinnedSlivers;
@@ -779,10 +780,14 @@ abstract class RenderViewportBase<ParentDataClass extends ContainerParentDataMix
         break;
     }
 
+    if (true) {
+      print('getRevealOffset final: $leadingScrollOffset - ${mainAxisExtent - targetMainAxisExtent}');
+    }
     final double targetOffset = leadingScrollOffset - (mainAxisExtent - targetMainAxisExtent) * alignment;
     final double offsetDifference = offset.pixels - targetOffset;
 
     final Matrix4 transform = target.getTransformTo(this);
+    //applyPaintTransform(child, transform);
     Rect targetRect = MatrixUtils.transformRect(transform, rect);
 
     switch (axisDirection) {
@@ -1037,6 +1042,8 @@ abstract class RenderViewportBase<ParentDataClass extends ContainerParentDataMix
     final RevealedOffset leadingEdgeOffset = viewport.getOffsetToReveal(descendant, 0.0, rect: rect);
     final RevealedOffset trailingEdgeOffset = viewport.getOffsetToReveal(descendant, 1.0, rect: rect);
     final double currentOffset = offset.pixels;
+
+    print('leading: $leadingEdgeOffset, trailing: $trailingEdgeOffset, $currentOffset');
 
     //           scrollOffset
     //                       0 +---------+

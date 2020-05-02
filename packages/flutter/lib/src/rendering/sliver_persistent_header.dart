@@ -39,6 +39,23 @@ class OverScrollHeaderStretchConfiguration {
   final AsyncCallback onStretchTrigger;
 }
 
+@immutable
+class _PersistentHeaderRevealExtents {
+  const _PersistentHeaderRevealExtents({
+    @required this.leadingExtent,
+    @required this.childExtent,
+    @required this.trailingExtent,
+  }) : assert(leadingExtent != null),
+       assert(childExtent != null && childExtent >= 0),
+       assert(trailingExtent != null);
+  final double leadingExtent;
+  final double childExtent;
+  final double trailingExtent;
+
+  @override
+  String toString() => '$leadingExtent | $childExtent | $trailingExtent';
+}
+
 /// A base class for slivers that have a [RenderBox] child which scrolls
 /// normally, except that when it hits the leading edge (typically the top) of
 /// the viewport, it shrinks to a minimum size ([minExtent]).
@@ -286,6 +303,52 @@ abstract class RenderSliverPersistentHeader extends RenderSliver with RenderObje
     properties.add(DoubleProperty.lazy('maxExtent', () => maxExtent));
     properties.add(DoubleProperty.lazy('child position', () => childMainAxisPosition(child)));
   }
+
+  _PersistentHeaderRevealExtents _revealExtentsFor({ RenderObject descendant, Rect rect }) {
+    final Rect bounds = descendant != null
+      ? MatrixUtils.transformRect(descendant.getTransformTo(child), rect ?? descendant?.paintBounds)
+      : rect;
+
+    // If `rect` is not specified, the method will report the current childExtent
+    // of this sliver as `childExtent`, so that `showOnScreen` brings the entire
+    // `descendant` into the viewport.
+    switch (applyGrowthDirectionToAxisDirection(constraints.axisDirection, constraints.growthDirection)) {
+      case AxisDirection.down:
+        final double rectExtent = bounds?.bottom ?? childExtent;
+        final double effectivePaintExtent = rectExtent.clamp(childExtent, maxExtent) as double;
+        return _PersistentHeaderRevealExtents(
+          leadingExtent: -(bounds?.top ?? 0),
+          childExtent: effectivePaintExtent,
+          trailingExtent: rectExtent - effectivePaintExtent,
+        );
+      case AxisDirection.right:
+        final double rectExtent = bounds?.right ?? childExtent;
+        final double effectivePaintExtent = rectExtent.clamp(childExtent, maxExtent) as double;
+        return _PersistentHeaderRevealExtents(
+          leadingExtent: -(bounds?.left ?? 0),
+          childExtent: effectivePaintExtent,
+          trailingExtent: rectExtent - effectivePaintExtent,
+        );
+      case AxisDirection.up:
+        final double rectExtent = childExtent - (bounds?.top ?? 0);
+        final double effectivePaintExtent = rectExtent.clamp(childExtent, maxExtent) as double;
+        return _PersistentHeaderRevealExtents(
+          leadingExtent: (bounds?.bottom ?? childExtent) - childExtent,
+          childExtent: effectivePaintExtent,
+          trailingExtent: rectExtent - effectivePaintExtent,
+        );
+      case AxisDirection.left:
+        final double rectExtent = childExtent - (bounds?.left ?? 0);
+        final double effectivePaintExtent = rectExtent.clamp(childExtent, maxExtent) as double;
+        return _PersistentHeaderRevealExtents(
+          leadingExtent: (bounds?.right ?? childExtent) - childExtent ,
+          childExtent: effectivePaintExtent,
+          trailingExtent: rectExtent - effectivePaintExtent,
+        );
+    }
+    assert(false, 'switch should be exhaustive');
+    return null;
+  }
 }
 
 /// A sliver with a [RenderBox] child which scrolls normally, except that when
@@ -351,6 +414,109 @@ abstract class RenderSliverScrollingPersistentHeader extends RenderSliverPersist
     assert(child == this.child);
     return _childPosition;
   }
+
+  @override
+  void showOnScreen({
+    RenderObject descendant,
+    Rect rect,
+    Duration duration = Duration.zero,
+    Curve curve = Curves.ease,
+  }) {
+    if (this.parent is! RenderViewportBase) {
+      return super.showOnScreen(
+        descendant: descendant,
+        rect: rect,
+        duration: duration,
+        curve: curve,
+      );
+    }
+    // `RenderViewportBase.getOffsetToReveal` assumes its slivers scroll linearly.
+    // This `RenderSliver` is pinned to the leading edge once it reaches the
+    // leading edge of the viewport so it must be handled differently.
+    //
+    // If `rect` is not specified, the method will bring `descendant` into the
+    // viewport if any part of the header is currently obstructed by the trailing
+    // edge, and will NOT adjust the offset of the viewport if `descendant` is
+    // completely in the viewport (even if its extent is shrunk to [minExtent, maxExtent)).
+    //
+    // if `rect` is specified, the method will try to expand to a size large
+    // enough to enclose the `rect`. If there're still remaining trailing extent
+    // in the `rect` that can't fit in `maxExtent`, the method will try to scroll
+    // the header away from the trailing edge if needed, so that the `rect` does
+    // not overlap the trailing edge of the viewport.
+    final Rect bounds = descendant != null
+      ? MatrixUtils.transformRect(descendant.getTransformTo(this), rect ?? descendant?.paintBounds)
+      : rect;
+    final RenderViewportBase<dynamic> parent = this.parent as RenderViewportBase<dynamic>;
+    final ViewportOffset offset = parent.offset;
+
+    final _PersistentHeaderRevealExtents targetExtents = _revealExtentsFor(descendant: descendant, rect: rect);
+
+    final double leadingEdgeOffset = parent.getOffsetToReveal(child, 0.0).offset;
+    final double trailingEdgeOffset = parent.getOffsetToReveal(child, 1.0).offset;
+
+    // Assumes the viewport moves linearly.
+  
+    final double targetScrollOffsetLower = trailingEdgeOffset + targetExtents.trailingExtent;
+    final double targetScrollOffsetUpper = math.min(
+      // The scrollOffset required for the minimum target childExtent.
+      targetExtents.childExtent == minExtent
+        ? double.infinity
+        : leadingEdgeOffset - (childExtent - targetExtents.childExtent),
+      leadingEdgeOffset - targetExtents.leadingExtent,
+    );
+
+    print('targetExtents: $targetExtents');
+    print('trailingEdgeOffset: $trailingEdgeOffset, leadingEdgeOffset: $leadingEdgeOffset @ childExtent $childExtent');
+    print('math.min(${targetExtents.childExtent == minExtent ? double.infinity
+        : leadingEdgeOffset + (childExtent - targetExtents.childExtent)}, ${leadingEdgeOffset - targetExtents.leadingExtent})');
+    print('offset range: [$targetScrollOffsetLower, $targetScrollOffsetUpper]');
+    final double targetScrollOffset = targetScrollOffsetLower > targetScrollOffsetUpper
+      ? offset.pixels.clamp(targetScrollOffsetUpper, targetScrollOffsetLower) as double
+      : offset.pixels.clamp(targetScrollOffsetLower, targetScrollOffsetUpper) as double;
+
+    final double rectLeadingOffset = offset.pixels - targetScrollOffset;
+    final double realChildExtent = (maxExtent - targetScrollOffset + leadingEdgeOffset).clamp(minExtent, maxExtent) as double;
+    final AbstractNode grandParent = parent.parent;
+
+    print('offsets: ${offset.pixels} => $targetScrollOffset, childExtent: $childExtent => $realChildExtent');
+
+    if (grandParent is RenderObject) {
+      Rect targetRect;
+      switch (applyGrowthDirectionToAxisDirection(constraints.axisDirection, constraints.growthDirection)) {
+        case AxisDirection.down:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset.zero & Size(constraints.crossAxisExtent, realChildExtent),
+          ).shift(Offset(0, rectLeadingOffset));
+          break;
+        case AxisDirection.right:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset.zero & Size(realChildExtent, constraints.crossAxisExtent),
+          ).shift(Offset(rectLeadingOffset, 0));
+          break;
+        case AxisDirection.up:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset(0, childExtent - realChildExtent) & Size(constraints.crossAxisExtent, realChildExtent),
+          ).shift(Offset(0, -rectLeadingOffset));
+          break;
+        case AxisDirection.left:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset(childExtent - realChildExtent, 0) & Size(realChildExtent, constraints.crossAxisExtent),
+          ).shift(Offset(-rectLeadingOffset, 0));
+          break;
+        }
+
+        print('bounds: $bounds, $rectLeadingOffset => $targetRect');
+        grandParent.showOnScreen(descendant: parent, rect: targetRect, duration: duration, curve: curve);
+      }
+
+    // Scroll up to reveal more if needed.
+    offset.moveTo(targetScrollOffset, duration: duration, curve: curve);
+  }
 }
 
 /// A sliver with a [RenderBox] child which never scrolls off the viewport in
@@ -396,7 +562,6 @@ abstract class RenderSliverPinnedPersistentHeader extends RenderSliverPersistent
   @override
   double childMainAxisPosition(RenderBox child) => 0.0;
 
-
   @override
   void showOnScreen({
     RenderObject descendant,
@@ -412,59 +577,92 @@ abstract class RenderSliverPinnedPersistentHeader extends RenderSliverPersistent
         curve: curve,
       );
     }
-
     // `RenderViewportBase.getOffsetToReveal` assumes its slivers scroll linearly.
     // This `RenderSliver` is pinned to the leading edge once it reaches the
-    // leading edge of the viewport.
-    final RenderObject target = descendant ?? this;
-    final Rect bounds = rect ?? target.paintBounds;
+    // leading edge of the viewport so it must be handled differently.
+    //
+    // If `rect` is not specified, the method will bring `descendant` into the
+    // viewport if any part of the header is currently obstructed by the trailing
+    // edge, and will NOT adjust the offset of the viewport if `descendant` is
+    // completely in the viewport (even if its extent is shrunk to [minExtent, maxExtent)).
+    //
+    // if `rect` is specified, the method will try to expand to a size large
+    // enough to enclose the `rect`. If there're still remaining trailing extent
+    // in the `rect` that can't fit in `maxExtent`, the method will try to scroll
+    // the header away from the trailing edge if needed, so that the `rect` does
+    // not overlap the trailing edge of the viewport.
+    final Rect bounds = descendant != null
+      ? MatrixUtils.transformRect(descendant.getTransformTo(this), rect ?? descendant?.paintBounds)
+      : rect;
     final RenderViewportBase<dynamic> parent = this.parent as RenderViewportBase<dynamic>;
     final ViewportOffset offset = parent.offset;
 
-    bool rectExceedsLeading;
-    switch (parent.axisDirection) {
-      case AxisDirection.down:
-        rectExceedsLeading = bounds.top < 0;
-        break;
-      case AxisDirection.left:
-        rectExceedsLeading = bounds.right > geometry.paintExtent + geometry.paintOrigin;
-        break;
-      case AxisDirection.up:
-        rectExceedsLeading = bounds.bottom > geometry.paintExtent + geometry.paintOrigin;
-        break;
-      case AxisDirection.right:
-        rectExceedsLeading = bounds.left < 0;
-        break;
-    }
+    final _PersistentHeaderRevealExtents targetExtents = _revealExtentsFor(descendant: descendant, rect: rect);
+    final double leadingEdgeOffset = parent.getOffsetToReveal(child, 0.0).offset;
+    final double trailingEdgeOffset = parent.getOffsetToReveal(child, 1.0).offset;
 
-    // If the rect extends beyong the leading edge of the persistent header, the
-    // pinning behavior doesn't apply.
-    if (rectExceedsLeading) {
-      return super.showOnScreen(
-        descendant: descendant,
-        rect: rect,
-        duration: duration,
-        curve: curve,
-      );
-    }
+    print('leadingEdgeOffset: $leadingEdgeOffset, trailingEdgeOffset: $trailingEdgeOffset');
+    // Assumes the viewport moves linearly.
+    final double targetScrollOffsetLowerBound = trailingEdgeOffset + targetExtents.trailingExtent;
+    final double targetScrollOffsetUpperBound = math.min(
+      // The scrollOffset required for the minimum target childExtent.
+      targetExtents.childExtent == minExtent
+        ? double.infinity
+        : leadingEdgeOffset - targetExtents.childExtent + childExtent,
+      // The header can't be scrolled off screen from the leading edge of the
+      // viewport.
+      targetExtents.leadingExtent > 0
+        ? leadingEdgeOffset - targetExtents.leadingExtent
+        : double.infinity,
+    );
 
-    final RevealedOffset trailing = parent.getOffsetToReveal(target, 1, rect: bounds);
+    print('targetExtents: $targetExtents');
+    print('offset range: [$targetScrollOffsetLowerBound, $targetScrollOffsetUpperBound]');
+    final double targetScrollOffset = targetScrollOffsetLowerBound > targetScrollOffsetUpperBound
+      ? offset.pixels.clamp(targetScrollOffsetUpperBound, targetScrollOffsetLowerBound) as double
+      : offset.pixels.clamp(targetScrollOffsetLowerBound, targetScrollOffsetUpperBound) as double;
 
+    final double rectLeadingOffset = math.min(offset.pixels, leadingEdgeOffset) - math.min(targetScrollOffset, leadingEdgeOffset);
+    final double realChildExtent = (maxExtent - targetScrollOffset + leadingEdgeOffset).clamp(minExtent, maxExtent) as double;
     final AbstractNode grandParent = parent.parent;
-    // Currently `descendant` is below the trailing edge.
-    if (offset.pixels < trailing.offset) {
-      offset.moveTo(trailing.offset, duration: duration, curve: curve);
-      if (grandParent is RenderObject)
-        grandParent.showOnScreen(rect: trailing.rect, duration: duration, curve: curve);
-      return;
-    }
 
-    // Otherwise, the sliver is currently either pinned at the leading edge or
-    // within the viewport.
+    print('offsets: ${offset.pixels} => $targetScrollOffset, childExtent: $childExtent => $realChildExtent');
+
     if (grandParent is RenderObject) {
-      final Rect targetRect = MatrixUtils.transformRect(target.getTransformTo(parent), bounds);
-      grandParent.showOnScreen(rect: targetRect, duration: duration, curve: curve);
-    }
+      Rect targetRect;
+      switch (applyGrowthDirectionToAxisDirection(constraints.axisDirection, constraints.growthDirection)) {
+        case AxisDirection.down:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset.zero & Size(constraints.crossAxisExtent, realChildExtent),
+          ).shift(Offset(0, rectLeadingOffset));
+          break;
+        case AxisDirection.right:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset.zero & Size(realChildExtent, constraints.crossAxisExtent),
+          ).shift(Offset(rectLeadingOffset, 0));
+          break;
+        case AxisDirection.up:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset(0, childExtent - realChildExtent) & Size(constraints.crossAxisExtent, realChildExtent),
+          ).shift(Offset(0, -rectLeadingOffset));
+          break;
+        case AxisDirection.left:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset(childExtent - realChildExtent, 0) & Size(realChildExtent, constraints.crossAxisExtent),
+          ).shift(Offset(-rectLeadingOffset, 0));
+          break;
+        }
+
+        print('bounds: $bounds, $rectLeadingOffset => $targetRect');
+        grandParent.showOnScreen(descendant: parent, rect: targetRect, duration: duration, curve: curve);
+      }
+
+    // Scroll up to reveal more if needed.
+    offset.moveTo(targetScrollOffset, duration: duration, curve: curve);
   }
 }
 
@@ -672,42 +870,6 @@ abstract class RenderSliverFloatingPersistentHeader extends RenderSliverPersiste
     Curve curve = Curves.ease,
   }) {
     if (this.parent is! RenderViewportBase) {
-      super.showOnScreen(
-        descendant: descendant,
-        rect: rect,
-        duration: duration,
-        curve: curve,
-      );
-    }
-
-    // `RenderViewportBase.getOffsetToReveal` assumes its slivers scroll linearly.
-    // This `RenderSliver` is pinned to the leading edge once it reaches the
-    // leading edge of the viewport.
-    final RenderObject target = descendant ?? this;
-    final Rect bounds = rect ?? target.paintBounds;
-    final RenderViewportBase<dynamic> parent = this.parent as RenderViewportBase<dynamic>;
-    final ViewportOffset offset = parent.offset;
-
-    bool rectExceedsLeading;
-    switch (parent.axisDirection) {
-      case AxisDirection.down:
-        rectExceedsLeading = bounds.top < 0;
-        break;
-      case AxisDirection.left:
-        rectExceedsLeading = bounds.right > geometry.paintExtent + geometry.paintOrigin;
-        break;
-      case AxisDirection.up:
-        rectExceedsLeading = bounds.bottom > geometry.paintExtent + geometry.paintOrigin;
-        break;
-      case AxisDirection.right:
-        rectExceedsLeading = bounds.left < 0;
-        break;
-    }
-
-    // If the rect extends beyong the leading edge of the persistent header, the
-    // pinning behavior doesn't apply.
-    if (rectExceedsLeading) {
-      print('!!!! Rect Exceeds Leading');
       return super.showOnScreen(
         descendant: descendant,
         rect: rect,
@@ -715,55 +877,126 @@ abstract class RenderSliverFloatingPersistentHeader extends RenderSliverPersiste
         curve: curve,
       );
     }
+    // If `rect` is not specified, the method will bring `descendant` into the
+    // viewport if it's currently partially or entirely below the trailing edge,
+    // and not adjust the offset of the viewport if `descendant` is completely
+    // in the viewport (even if it's shrinked).
+    //
+    // if `rect` is specified, the part of it that exceeds BOTH the leading edge
+    // of the sliver and the leading edge of the child RenderBox will be ignored.
+    // The method will try to expand to a size that's large enough to enclose the
+    // `rect`. If there're still remaining trailing extent in the `rect` that
+    // can't fit in `maxExtent`, the method will try to scroll the header away
+    // from the trailing edge if needed, so that the `rect` does not overlap the
+    // trailing edge of the viewport.
 
-    final RevealedOffset trailing = parent.getOffsetToReveal(target, 1, rect: bounds);
 
-    final AbstractNode grandParent = parent.parent;
+    // If the child is _entirely_ behind the leading edge of the viewport, the
+    // viewport will immediately align the trailing edge of the child to the
+    // leading edge, once the "scroll to reveal" behavior kicks in (so that it
+    // does not have a "slope"). For this reason the child may not move linearly,
+    // and we'll have to make adjustments to the result of transformRect, so that
+    // in case when the child is deep behind of the leading edge of the viewport
+    // and entirely invisible, we'll move it so that its trailing edge aligns with
+    // the viewport's leading edge.
+    final Rect bounds = descendant != null
+      ? MatrixUtils.transformRect(descendant.getTransformTo(this), rect ?? descendant?.paintBounds)
+      : null;
 
-    // Currently `descendant` is below the trailing edge.
-    if (offset.pixels < trailing.offset) {
-      offset.moveTo(trailing.offset, duration: duration, curve: curve);
-      if (grandParent is RenderObject)
-        grandParent.showOnScreen(rect: trailing.rect, duration: duration, curve: curve);
-      return;
-    }
+    final RenderViewportBase<dynamic> parent = this.parent as RenderViewportBase<dynamic>;
+    final ViewportOffset offset = parent.offset;
 
-    // The sliver is currently pinned at the leading edge, but may need to expand
-    // itself to show `descendant`/`rect`.
-    final Rect localRect = MatrixUtils.transformRect(target.getTransformTo(this), bounds);
+    final _PersistentHeaderRevealExtents targetExtents = _revealExtentsFor(descendant: descendant, rect: rect);
 
-    double extraScrollOffsetNeeded;
-    switch (constraints.axisDirection) {
-      case AxisDirection.up:
-        extraScrollOffsetNeeded = -localRect.top;
-        break;
-      case AxisDirection.down:
-        extraScrollOffsetNeeded = localRect.bottom - geometry.paintExtent - geometry.paintOrigin;
-        break;
-      case AxisDirection.left:
-        extraScrollOffsetNeeded = -localRect.left;
-        break;
-      case AxisDirection.right:
-        extraScrollOffsetNeeded = localRect.right - geometry.paintExtent - geometry.paintOrigin;
-        break;
-    }
+    // leadingEdgeOffset and trailingEdgeOffset assume childExtent remain the same.
+    final double leadingEdgeOffset = parent.getOffsetToReveal(child, 0.0).offset;
+    final double trailingEdgeOffset = parent.getOffsetToReveal(child, 1.0).offset;
 
-    // Expands with animation.
-    if (extraScrollOffsetNeeded > 0) {
-      _controller.duration = duration;
-      _animation = _controller
+    print('leadingEdgeOffset: $leadingEdgeOffset, trailingEdgeOffset: $trailingEdgeOffset');
+    // Assumes the viewport moves linearly.
+    final double targetScrollOffsetLowerBound = trailingEdgeOffset
+      + targetExtents.childExtent - childExtent
+      + targetExtents.trailingExtent;
+    // The header can be scrolled back immediately from the leading edge of the
+    // viewport.
+    final double targetScrollOffsetUpperBound = targetExtents.leadingExtent > 0
+      ? leadingEdgeOffset - targetExtents.leadingExtent
+      : double.infinity;
+
+    print('targetExtents: $targetExtents');
+    print('offset range: [$targetScrollOffsetLowerBound, $targetScrollOffsetUpperBound]');
+    final double targetScrollOffset = targetScrollOffsetLowerBound > targetScrollOffsetUpperBound
+      ? offset.pixels.clamp(targetScrollOffsetUpperBound, targetScrollOffsetLowerBound) as double
+      : offset.pixels.clamp(targetScrollOffsetLowerBound, targetScrollOffsetUpperBound) as double;
+
+    final double rectLeadingOffset = math.min(offset.pixels, leadingEdgeOffset)
+      - math.min(targetScrollOffset, leadingEdgeOffset);
+    print('geometry: $geometry, childExtent: $childExtent, effectiveSO: $_effectiveScrollOffset, SO: ${constraints.scrollOffset}');
+
+    // Expands the header if needed, with animation if possible.
+    if (targetExtents.childExtent > childExtent) {
+      if (snapConfiguration != null) {
+        _controller ??= AnimationController(vsync: snapConfiguration.vsync, duration: duration);
+        _controller.duration = duration;
+        _animation = _controller
         .drive(
           Tween<double>(
             begin: _effectiveScrollOffset,
-            end: math.max(0, _effectiveScrollOffset - extraScrollOffsetNeeded),
+            end: maxExtent - targetExtents.childExtent ,
           ).chain(CurveTween(curve: curve)),
         );
+      } else {
+        _effectiveScrollOffset = maxExtent - targetExtents.childExtent;
+        markNeedsLayout();
+      }
     }
 
+    final AbstractNode grandParent = parent.parent;
+
+    print('offsets: ${offset.pixels} => $targetScrollOffset, childExtent: $childExtent => ${targetExtents.childExtent}');
     if (grandParent is RenderObject) {
-      final Rect targetRect = MatrixUtils.transformRect(target.getTransformTo(parent), bounds);
-      grandParent.showOnScreen(rect: targetRect, duration: duration, curve: curve);
+      Rect targetRect;
+      switch (applyGrowthDirectionToAxisDirection(constraints.axisDirection, constraints.growthDirection)) {
+        case AxisDirection.down:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset.zero & Size(
+              constraints.crossAxisExtent,
+              targetExtents.childExtent,
+            )).shift(Offset(0, rectLeadingOffset));
+          break;
+        case AxisDirection.right:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset.zero & Size(
+              targetExtents.childExtent,
+              constraints.crossAxisExtent,
+            )).shift(Offset(rectLeadingOffset, 0));
+          break;
+        case AxisDirection.up:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset(0, childExtent - targetExtents.childExtent) & Size(
+              constraints.crossAxisExtent, targetExtents.childExtent,
+            )).shift(Offset(0, -rectLeadingOffset));
+          break;
+        case AxisDirection.left:
+          targetRect = MatrixUtils.transformRect(
+            getTransformTo(parent),
+            bounds ?? Offset(childExtent - targetExtents.childExtent, 0) & Size(
+              targetExtents.childExtent,
+              constraints.crossAxisExtent,
+            )).shift(Offset(-rectLeadingOffset, 0));
+          break;
+      }
+
+      print('bounds: $bounds => $rectLeadingOffset = $targetRect');
+      grandParent.showOnScreen(descendant: parent, rect: targetRect, duration: duration, curve: curve);
     }
+
+    // Scroll up to reveal more if needed.
+    print('inner viewport moves from ${offset.pixels} => $targetScrollOffset');
+    offset.moveTo(targetScrollOffset, duration: duration, curve: curve);
   }
 
   @override
