@@ -138,6 +138,47 @@ void main() {
     );
   }
 
+  void verifyInBounds(WidgetTester tester, { Finder target, Rect rect }) {
+      final EdgeInsets innerInsets = getInsets(tester, within: innerViewportContainer, rect: rect);
+      final EdgeInsets outerInsets = getInsets(tester, within: outerViewportContainer, rect: rect);
+      print('>> inner: $innerInsets, outer: $outerInsets');
+      // Should move to the bottom right of the screen.
+      switch (innerScrollDirection) {
+        case Axis.vertical:
+          expect(innerInsets.top, greaterThanOrEqualTo(innerReversed ? 0 : 10));
+          expect(innerInsets.bottom, greaterThanOrEqualTo(innerReversed ? 10 : 0));
+          break;
+        case Axis.horizontal:
+          expect(innerInsets.left, greaterThanOrEqualTo(innerReversed ? 0 : 10));
+          expect(innerInsets.right, greaterThanOrEqualTo(innerReversed ? 10 : 0));
+          break;
+      }
+
+      switch (outerScrollDirection) {
+        case Axis.vertical:
+          expect(outerInsets.top, greaterThanOrEqualTo(outerReversed ? 0 : 10));
+          expect(outerInsets.bottom, greaterThanOrEqualTo(outerReversed ? 10 : 0));
+          break;
+        case Axis.horizontal:
+          expect(outerInsets.left, greaterThanOrEqualTo(outerReversed ? 0 : 10));
+          expect(outerInsets.right, greaterThanOrEqualTo(outerReversed ? 10 : 0));
+          break;
+      }
+  }
+
+  double getChildExtent(WidgetTester tester, { Finder target }) {
+    target ??= find.byKey(headerKey, skipOffstage: false);
+    final RenderBox targetRenderBox = tester.renderObject(target);
+
+    switch (innerScrollDirection) {
+      case Axis.vertical:
+        return targetRenderBox.size.height;
+      case Axis.horizontal:
+        return targetRenderBox.size.width;
+    }
+    return null;
+  }
+
   setUp(() {
     innerScrollDirection = Axis.vertical;
     outerScrollDirection = Axis.vertical;
@@ -167,14 +208,9 @@ void main() {
         renderObjectOfInterest.showOnScreen(rect: rectOfInterest);
         await tester.pumpAndSettle();
 
-        final Rect rect = MatrixUtils.transformRect(
-          renderObjectOfInterest.getTransformTo(outerViewportContainer),
-          rectOfInterest,
-        );
-
-        // Should move to bottom of the screen.
-        expect(rect.size, const Size(150, 150));
-        expect(rect.bottomLeft, const Offset(0, 600));
+        verifyInBounds(tester, rect: rectOfInterest);
+        // Fully expanded.
+        expect(getChildExtent(tester), 200);
 
         // Scroll to a random offset that the rect is still entirely visible.
         innerScrollController.jumpTo(400);
@@ -184,32 +220,44 @@ void main() {
 
         // Should not scroll the inner viewport.
         expect(innerScrollController.offset, 400);
+        verifyInBounds(tester, rect: rectOfInterest);
+        expect(getChildExtent(tester), 200);
 
-        print(getInsets(tester, within: innerViewportContainer));
-        print(getInsets(tester, within: outerViewportContainer));
-
-        // Scroll the sliver out of the viewport.
+        // Scroll the sliver out of the viewport from the leading edge.
         innerScrollController.jumpTo(800);
         await tester.pumpAndSettle();
 
-        print('---' * 20);
-        print(innerScrollController.offset);
-        print(getInsets(tester, within: innerViewportContainer, rect: rectOfInterest));
-        print(getInsets(tester, within: outerViewportContainer, rect: rectOfInterest));
         renderObjectOfInterest.showOnScreen(rect: rectOfInterest);
         await tester.pumpAndSettle();
 
         // Should scroll the persistent header back into the viewport.
-        print(getInsets(tester, within: innerViewportContainer, rect: rectOfInterest));
-        print(getInsets(tester, within: outerViewportContainer, rect: rectOfInterest));
-        expect(
-          innerScrollController.offset,
-          600 + 10,  // leading padding + pinned padding
-        );
+        verifyInBounds(tester, rect: rectOfInterest);
+        expect(getChildExtent(tester), 200);
     });
 
     testWidgets(
-      "Nested viewports persistent header showOnScreen, when the rect exceeds the renderObject's bounds",
+      'Nested viewports persistent header showOnScreen, not fully expanded',
+      (WidgetTester tester) async {
+        minimumExtent = 100;
+        maximumExtent = 200;
+
+        // Scroll to an offset that the rect is entirely visible but not fully
+        // expanded, at leading edge.
+        await buildNestedScroller(tester: tester, innerScrollOffset: 650);
+        final RenderObject renderObjectOfInterest = tester.renderObject(find.byKey(headerKey, skipOffstage: false));
+
+        renderObjectOfInterest.showOnScreen();
+        await tester.pumpAndSettle();
+        verifyInBounds(tester);
+
+        // Should not scroll the inner viewport.
+        expect(innerScrollController.offset, 650);
+        verifyInBounds(tester);
+        expect(getChildExtent(tester), 100);
+    });
+
+    testWidgets(
+      "Nested viewports persistent header showOnScreen, when rect exceeds the renderObject's bounds",
       (WidgetTester tester) async {
         minimumExtent = 100;
         maximumExtent = 200;
@@ -220,26 +268,23 @@ void main() {
         final Rect rectOfInterest = const Offset(-50, -50) & const Size(300, 300);
 
         renderObjectOfInterest.showOnScreen(rect: rectOfInterest);
-
         await tester.pumpAndSettle();
 
-        final Rect rect = MatrixUtils.transformRect(
-          renderObjectOfInterest.getTransformTo(outerViewportContainer),
-          rectOfInterest,
-        );
-
         // Should move to bottom of the screen.
-        expect(rect.size, const Size(300, 300));
-        expect(rect.bottomLeft, const Offset(-50, 600));
+        verifyInBounds(tester, rect: rectOfInterest);
+        expect(getChildExtent(tester), 200);
 
         // Scroll to a random offset that the rect is still entirely visible.
         innerScrollController.jumpTo(400);
+        await tester.pumpAndSettle();
 
         renderObjectOfInterest.showOnScreen(rect: rectOfInterest);
         await tester.pumpAndSettle();
 
         // Should not scroll the inner viewport.
         expect(innerScrollController.offset, 400);
+        verifyInBounds(tester, rect: rectOfInterest);
+        expect(getChildExtent(tester), 200);
 
         // Scroll the sliver so it moves past the leading edge.
         innerScrollController.jumpTo(900);
@@ -249,12 +294,6 @@ void main() {
         await tester.pumpAndSettle();
 
         // The inner viewport SHOULD scroll.
-        final Rect newRect = MatrixUtils.transformRect(
-          renderObjectOfInterest.getTransformTo(outerViewportContainer),
-          rectOfInterest,
-        );
-
-        print(newRect);
         final EdgeInsets innerInsets = getInsets(tester, within: innerViewportContainer, rect: rectOfInterest);
         final EdgeInsets outerInsets = getInsets(tester, within: outerViewportContainer, rect: rectOfInterest);
         expect(innerInsets.left, -50);
@@ -262,6 +301,7 @@ void main() {
 
         expect(innerInsets.top, 10);
         expect(outerInsets.top, 10);
+        expect(getChildExtent(tester), 200);
     });
 
     testWidgets(
@@ -278,51 +318,29 @@ void main() {
         final Rect rectOfInterest = Offset.zero & const Size(160, 160);
 
         renderObjectOfInterest.showOnScreen(rect: rectOfInterest);
-
         await tester.pumpAndSettle();
 
-        final Rect rect = MatrixUtils.transformRect(
-          renderObjectOfInterest.getTransformTo(outerViewportContainer),
-          rectOfInterest,
-        );
-
-        // Should move to bottom of the screen.
-        //expect(rect.size, const Size(150, 150));
-        expect(rect.bottomLeft, const Offset(0, 600));
+        verifyInBounds(tester, rect: rectOfInterest);
 
         // Scroll to a random offset that the rect is still entirely visible.
         innerScrollController.jumpTo(400);
+        await tester.pumpAndSettle();
 
         renderObjectOfInterest.showOnScreen(rect: rectOfInterest);
         await tester.pumpAndSettle();
 
         // Should not scroll the inner viewport.
         expect(innerScrollController.offset, 400);
+        verifyInBounds(tester, rect: rectOfInterest);
 
         // Scroll the sliver out of the viewport.
         innerScrollController.jumpTo(800);
         await tester.pumpAndSettle();
 
-        print(MatrixUtils.transformRect(
-            renderObjectOfInterest.getTransformTo(outerViewportContainer),
-            rectOfInterest,
-        ));
-        print(innerScrollController.offset);
         renderObjectOfInterest.showOnScreen(rect: rectOfInterest);
         await tester.pumpAndSettle();
 
-        print(MatrixUtils.transformRect(
-            renderObjectOfInterest.getTransformTo(outerViewportContainer),
-            rectOfInterest,
-        ));
-
-        final EdgeInsets innerInsets = getInsets(tester, within: innerViewportContainer, rect: rectOfInterest);
-        final EdgeInsets outerInsets = getInsets(tester, within: outerViewportContainer, rect: rectOfInterest);
-
-        print(innerInsets);
-        print(outerInsets);
-        // Should scroll the persistent header back into the viewport.
-        expect(innerScrollController.offset, 600);
+        verifyInBounds(tester, rect: rectOfInterest);
     });
 
     testWidgets(
@@ -339,31 +357,20 @@ void main() {
         final Rect rectOfInterest = Offset.zero & const Size(150, 150);
 
         renderObjectOfInterest.showOnScreen(rect: rectOfInterest);
-
         await tester.pumpAndSettle();
 
-        final Rect rect = MatrixUtils.transformRect(
-          renderObjectOfInterest.getTransformTo(outerViewportContainer),
-          rectOfInterest,
-        );
-
-        print(getInsets(tester, within: innerViewportContainer, rect: rectOfInterest));
-        print(getInsets(tester, within: outerViewportContainer, rect: rectOfInterest));
-        // Should move to the bottom right of the screen.
-        print(MatrixUtils.transformRect(
-          renderObjectOfInterest.getTransformTo(innerViewportContainer),
-          rectOfInterest,
-        ));
-        expect(rect.bottomRight, const Offset(600, 600));
+        verifyInBounds(tester, rect: rectOfInterest);
 
         // Scroll to a random offset that the rect is still entirely visible.
         innerScrollController.jumpTo(400);
+        await tester.pumpAndSettle();
 
         renderObjectOfInterest.showOnScreen(rect: rectOfInterest);
         await tester.pumpAndSettle();
 
         // Should not scroll the inner viewport.
         expect(innerScrollController.offset, 400);
+        verifyInBounds(tester, rect: rectOfInterest);
 
         // Scroll the sliver out of the viewport.
         innerScrollController.jumpTo(900);
@@ -373,7 +380,7 @@ void main() {
         await tester.pumpAndSettle();
 
         // Should scroll the persistent header back into the viewport.
-        expect(innerScrollController.offset, 600);
+        verifyInBounds(tester, rect: rectOfInterest);
     });
   });
 

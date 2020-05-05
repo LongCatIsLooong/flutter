@@ -780,9 +780,6 @@ abstract class RenderViewportBase<ParentDataClass extends ContainerParentDataMix
         break;
     }
 
-    if (true) {
-      print('getRevealOffset final: $leadingScrollOffset - ${mainAxisExtent - targetMainAxisExtent}');
-    }
     final double targetOffset = leadingScrollOffset - (mainAxisExtent - targetMainAxisExtent) * alignment;
     final double offsetDifference = offset.pixels - targetOffset;
 

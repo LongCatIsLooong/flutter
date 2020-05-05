@@ -430,20 +430,7 @@ abstract class RenderSliverScrollingPersistentHeader extends RenderSliverPersist
         curve: curve,
       );
     }
-    // `RenderViewportBase.getOffsetToReveal` assumes its slivers scroll linearly.
-    // This `RenderSliver` is pinned to the leading edge once it reaches the
-    // leading edge of the viewport so it must be handled differently.
-    //
-    // If `rect` is not specified, the method will bring `descendant` into the
-    // viewport if any part of the header is currently obstructed by the trailing
-    // edge, and will NOT adjust the offset of the viewport if `descendant` is
-    // completely in the viewport (even if its extent is shrunk to [minExtent, maxExtent)).
-    //
-    // if `rect` is specified, the method will try to expand to a size large
-    // enough to enclose the `rect`. If there're still remaining trailing extent
-    // in the `rect` that can't fit in `maxExtent`, the method will try to scroll
-    // the header away from the trailing edge if needed, so that the `rect` does
-    // not overlap the trailing edge of the viewport.
+
     final Rect bounds = descendant != null
       ? MatrixUtils.transformRect(descendant.getTransformTo(this), rect ?? descendant?.paintBounds)
       : rect;
@@ -452,70 +439,60 @@ abstract class RenderSliverScrollingPersistentHeader extends RenderSliverPersist
 
     final _PersistentHeaderRevealExtents targetExtents = _revealExtentsFor(descendant: descendant, rect: rect);
 
-    final double leadingEdgeOffset = parent.getOffsetToReveal(child, 0.0).offset;
-    final double trailingEdgeOffset = parent.getOffsetToReveal(child, 1.0).offset;
-
     // Assumes the viewport moves linearly.
-  
-    final double targetScrollOffsetLower = trailingEdgeOffset + targetExtents.trailingExtent;
-    final double targetScrollOffsetUpper = math.min(
-      // The scrollOffset required for the minimum target childExtent.
-      targetExtents.childExtent == minExtent
-        ? double.infinity
-        : leadingEdgeOffset - (childExtent - targetExtents.childExtent),
-      leadingEdgeOffset - targetExtents.leadingExtent,
-    );
+    //
+    // In case there's any leading slivers that increase overlap, we have to make
+    // sure their scrollOffset is 0
+    // As long as the scrollOffset is small enough, the sliver will not be obstructed by the
+    // leading edge. This is the only case we can safely increase the offset.
+    final double obstructedExtent = constraints.scrollOffset - geometry.paintOrigin;
+    //final bool isUnderLeadingEdge = obstructedExtent - targetExtents.
+    if (constraints.scrollOffset <= 0 && constraints.remainingPaintExtent > 0) {
+      final double targetExtent = math.max(
+        childExtent,
+        math.min(
+          targetExtents.childExtent,
+          constraints.remainingPaintExtent - constraints.overlap,
+        ),
+      );
 
-    print('targetExtents: $targetExtents');
-    print('trailingEdgeOffset: $trailingEdgeOffset, leadingEdgeOffset: $leadingEdgeOffset @ childExtent $childExtent');
-    print('math.min(${targetExtents.childExtent == minExtent ? double.infinity
-        : leadingEdgeOffset + (childExtent - targetExtents.childExtent)}, ${leadingEdgeOffset - targetExtents.leadingExtent})');
-    print('offset range: [$targetScrollOffsetLower, $targetScrollOffsetUpper]');
-    final double targetScrollOffset = targetScrollOffsetLower > targetScrollOffsetUpper
-      ? offset.pixels.clamp(targetScrollOffsetUpper, targetScrollOffsetLower) as double
-      : offset.pixels.clamp(targetScrollOffsetLower, targetScrollOffsetUpper) as double;
+      print('childExtent: $childExtent => $targetExtent, offset: ${offset.pixels} => ${offset.pixels - targetExtent + childExtent}');
+      assert(targetExtent <= maxExtent);
+      offset.moveTo(offset.pixels - targetExtent + childExtent, duration: duration, curve: curve);
 
-    final double rectLeadingOffset = offset.pixels - targetScrollOffset;
-    final double realChildExtent = (maxExtent - targetScrollOffset + leadingEdgeOffset).clamp(minExtent, maxExtent) as double;
-    final AbstractNode grandParent = parent.parent;
-
-    print('offsets: ${offset.pixels} => $targetScrollOffset, childExtent: $childExtent => $realChildExtent');
-
-    if (grandParent is RenderObject) {
-      Rect targetRect;
-      switch (applyGrowthDirectionToAxisDirection(constraints.axisDirection, constraints.growthDirection)) {
-        case AxisDirection.down:
-          targetRect = MatrixUtils.transformRect(
-            getTransformTo(parent),
-            bounds ?? Offset.zero & Size(constraints.crossAxisExtent, realChildExtent),
-          ).shift(Offset(0, rectLeadingOffset));
-          break;
-        case AxisDirection.right:
-          targetRect = MatrixUtils.transformRect(
-            getTransformTo(parent),
-            bounds ?? Offset.zero & Size(realChildExtent, constraints.crossAxisExtent),
-          ).shift(Offset(rectLeadingOffset, 0));
-          break;
-        case AxisDirection.up:
-          targetRect = MatrixUtils.transformRect(
-            getTransformTo(parent),
-            bounds ?? Offset(0, childExtent - realChildExtent) & Size(constraints.crossAxisExtent, realChildExtent),
-          ).shift(Offset(0, -rectLeadingOffset));
-          break;
-        case AxisDirection.left:
-          targetRect = MatrixUtils.transformRect(
-            getTransformTo(parent),
-            bounds ?? Offset(childExtent - realChildExtent, 0) & Size(realChildExtent, constraints.crossAxisExtent),
-          ).shift(Offset(-rectLeadingOffset, 0));
-          break;
+      final AbstractNode grandParent = parent.parent;
+      if (grandParent is RenderObject) {
+        Rect newRect = bounds;
+        switch (applyGrowthDirectionToAxisDirection(constraints.axisDirection, constraints.growthDirection)) {
+          case AxisDirection.up:
+            newRect ??= Offset.zero & Size(constraints.crossAxisExtent, childExtent);
+            newRect = EdgeInsets.only(top: targetExtent - childExtent).inflateRect(newRect);
+            break;
+          case AxisDirection.right:
+            newRect ??= Offset.zero & Size(childExtent, constraints.crossAxisExtent);
+            newRect = EdgeInsets.only(right: targetExtent - childExtent).inflateRect(newRect);
+            break;
+          case AxisDirection.down:
+            newRect ??= Offset.zero & Size(constraints.crossAxisExtent, childExtent);
+            newRect = EdgeInsets.only(bottom: targetExtent - childExtent).inflateRect(newRect);
+            break;
+          case AxisDirection.left:
+            newRect ??= Offset.zero & Size(childExtent, constraints.crossAxisExtent);
+            newRect = EdgeInsets.only(left: targetExtent - childExtent).inflateRect(newRect);
+            break;
         }
 
-        print('bounds: $bounds, $rectLeadingOffset => $targetRect');
-        grandParent.showOnScreen(descendant: parent, rect: targetRect, duration: duration, curve: curve);
+        print('grandParent $grandParent rect: ${MatrixUtils.transformRect(getTransformTo(parent), newRect)}');
+        return grandParent.showOnScreen(
+          descendant: parent,
+          rect: MatrixUtils.transformRect(getTransformTo(parent), newRect),
+          duration: duration,
+          curve: curve,
+        );
       }
+    }
 
-    // Scroll up to reveal more if needed.
-    offset.moveTo(targetScrollOffset, duration: duration, curve: curve);
+    return super.showOnScreen(descendant: descendant, rect: rect, curve: curve, duration: duration);
   }
 }
 
