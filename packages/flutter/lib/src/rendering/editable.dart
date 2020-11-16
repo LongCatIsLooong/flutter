@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 import 'dart:math' as math;
-import 'dart:ui' as ui show TextBox, lerpDouble, BoxHeightStyle, BoxWidthStyle;
+import 'dart:ui' as ui show TextBox, BoxHeightStyle, BoxWidthStyle;
 
 import 'package:characters/characters.dart';
 import 'package:flutter/foundation.dart';
@@ -12,19 +12,14 @@ import 'package:flutter/semantics.dart';
 import 'package:flutter/services.dart';
 
 import 'box.dart';
+import 'custom_paint.dart';
 import 'layer.dart';
 import 'object.dart';
+import 'proxy_box.dart';
 import 'viewport_offset.dart';
 
 const double _kCaretGap = 1.0; // pixels
 const double _kCaretHeightOffset = 2.0; // pixels
-
-// The additional size on the x and y axis with which to expand the prototype
-// cursor to render the floating cursor in pixels.
-const Offset _kFloatingCaretSizeIncrease = Offset(0.5, 1.0);
-
-// The corner radius of the floating cursor in pixels.
-const double _kFloatingCaretRadius = 1.0;
 
 /// Signature for the callback that reports when the user changes the selection
 /// (including the cursor location).
@@ -140,6 +135,21 @@ bool _isWhitespace(int codeUnit) {
   return true;
 }
 
+abstract class RenderEditablePainter extends ChangeNotifier implements CustomPainter {
+  RenderEditable? renderEditable;
+
+  RenderBox? owner;
+
+  @override
+  bool? hitTest(Offset position) => null;
+
+  @override
+  SemanticsBuilderCallback? get semanticsBuilder => null;
+
+  @override
+  bool shouldRebuildSemantics(covariant RenderEditablePainter oldDelegate) => shouldRepaint(oldDelegate);
+}
+
 /// Displays some text in a scrollable container with a potentially blinking
 /// cursor and with gesture recognizers.
 ///
@@ -164,7 +174,7 @@ bool _isWhitespace(int codeUnit) {
 /// Keyboard handling, IME handling, scrolling, toggling the [showCursor] value
 /// to actually blink the cursor, and other features not mentioned above are the
 /// responsibility of higher layers and not handled by this object.
-class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
+class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin, RenderObjectWithChildMixin<_RenderEditableCustomPaint> {
   /// Creates a render object that implements the visual aspects of a text field.
   ///
   /// The [textAlign] argument must not be null. It defaults to [TextAlign.start].
@@ -221,6 +231,8 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     Color? promptRectColor,
     Clip clipBehavior = Clip.hardEdge,
     required this.textSelectionDelegate,
+    RenderEditablePainter? painter,
+    RenderEditablePainter? foregroundPainter,
   }) : assert(textAlign != null),
        assert(textDirection != null, 'RenderEditable created without a textDirection.'),
        assert(maxLines == null || maxLines > 0),
@@ -263,7 +275,6 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
          textWidthBasis: textWidthBasis,
        ),
        _cursorColor = cursorColor,
-       _backgroundCursorColor = backgroundCursorColor,
        _showCursor = showCursor ?? ValueNotifier<bool>(false),
        _maxLines = maxLines,
        _minLines = minLines,
@@ -287,13 +298,11 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
        _obscureText = obscureText,
        _readOnly = readOnly,
        _forceLine = forceLine,
-       _promptRectRange = promptRectRange,
        _clipBehavior = clipBehavior {
     assert(_showCursor != null);
     assert(!_showCursor.value || cursorColor != null);
     this.hasFocus = hasFocus ?? false;
-    if (promptRectColor != null)
-      _promptRectPaint.color = promptRectColor;
+    child = _RenderEditableCustomPaint(foregroundPainter: foregroundPainter, painter: painter);
   }
 
   /// Called when the selection changes.
@@ -953,19 +962,6 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     markNeedsPaint();
   }
 
-  /// The color to use when painting the cursor aligned to the text while
-  /// rendering the floating cursor.
-  ///
-  /// The default is light grey.
-  Color? get backgroundCursorColor => _backgroundCursorColor;
-  Color? _backgroundCursorColor;
-  set backgroundCursorColor(Color? value) {
-    if (backgroundCursorColor == value)
-      return;
-    _backgroundCursorColor = value;
-    markNeedsPaint();
-  }
-
   /// Whether to paint the cursor.
   ValueNotifier<bool> get showCursor => _showCursor;
   ValueNotifier<bool> _showCursor;
@@ -1238,10 +1234,6 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     markNeedsPaint();
   }
 
-  bool _floatingCursorOn = false;
-  late Offset _floatingCursorOffset;
-  late TextPosition _floatingCursorTextPosition;
-
   /// Controls how tall the selection highlight boxes are computed to be.
   ///
   /// See [ui.BoxHeightStyle] for details on available styles.
@@ -1313,43 +1305,6 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   /// false to unconditionally disable interactive selection.
   bool get selectionEnabled {
     return enableInteractiveSelection ?? !obscureText;
-  }
-
-  /// The color used to paint the prompt rectangle.
-  ///
-  /// The prompt rectangle will only be requested on non-web iOS applications.
-  // TODO(ianh): We should change the getter to return null when _promptRectRange is null
-  // (otherwise, if you set it to null and then get it, you get back non-null).
-  // Alternatively, we could stop supporting setting this to null.
-  Color? get promptRectColor => _promptRectPaint.color;
-  set promptRectColor(Color? newValue) {
-    // Painter.color cannot be null.
-    if (newValue == null) {
-      setPromptRectRange(null);
-      return;
-    }
-
-    if (promptRectColor == newValue)
-      return;
-
-    _promptRectPaint.color = newValue;
-    if (_promptRectRange != null)
-      markNeedsPaint();
-  }
-
-  TextRange? _promptRectRange;
-  /// Dismisses the currently displayed prompt rectangle and displays a new prompt rectangle
-  /// over [newRange] in the given color [promptRectColor].
-  ///
-  /// The prompt rectangle will only be requested on non-web iOS applications.
-  ///
-  /// When set to null, the currently displayed prompt rectangle (if any) will be dismissed.
-  void setPromptRectRange(TextRange? newRange) {
-    if (_promptRectRange == newRange)
-      return;
-
-    _promptRectRange = newRange;
-    markNeedsPaint();
   }
 
   /// The maximum amount the text is allowed to scroll.
@@ -1568,6 +1523,16 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   // We need to check the paint offset here because during animation, the start of
   // the text may position outside the visible region even when the text fits.
   bool get _hasVisualOverflow => _maxScrollExtent > 0 || _paintOffset != Offset.zero;
+
+  List<TextBox> getBoxesForSelection(
+    TextSelection selection, {
+    ui.BoxHeightStyle boxHeightStyle = ui.BoxHeightStyle.tight,
+    ui.BoxWidthStyle boxWidthStyle = ui.BoxWidthStyle.tight,
+  }) {
+    assert(constraints != null);
+    _layoutText(minWidth: constraints.minWidth, maxWidth: constraints.maxWidth);
+    return _textPainter.getBoxesForSelection(selection, boxHeightStyle: boxHeightStyle, boxWidthStyle: boxWidthStyle);
+  }
 
   /// Returns the local coordinates of the endpoints of the given selection.
   ///
@@ -2027,6 +1992,51 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     }
   }
 
+  /// Computes the offset to apply to the given [caretRect] so it perfectly
+  Offset integralOffset(Offset sourceOffset) {
+    final Offset globalOffset = localToGlobal(sourceOffset);
+    final double pixelMultiple = 1.0 / _devicePixelRatio;
+    return Offset(
+      globalOffset.dx.isFinite
+        ? (globalOffset.dx / pixelMultiple).round() * pixelMultiple
+        : globalOffset.dx,
+      globalOffset.dy.isFinite
+        ? (globalOffset.dy / pixelMultiple).round() * pixelMultiple
+        : globalOffset.dy
+      ) - globalOffset + sourceOffset;
+  }
+
+  /// Returns the offset at which to paint the caret.
+  ///
+  /// Valid only after [layout] has been called.
+  Offset getOffsetForCaret(TextPosition position, Rect caretPrototype) {
+    return _textPainter.getOffsetForCaret(position, _caretPrototype) + _paintOffset;
+  }
+
+  double? getFullHeightForCaret(TextPosition position, Rect caretPrototype) {
+    return _textPainter.getFullHeightForCaret(position, caretPrototype);
+  }
+
+  @override
+  _RenderEditableCustomPaint? get child => super.child as _RenderEditableCustomPaint?;
+
+  @override
+  void adoptChild(_RenderEditableCustomPaint child) {
+    super.adoptChild(child);
+    child.painter?.renderEditable = this;
+    child.foregroundPainter?.renderEditable = this;
+  }
+
+  @override
+  void dropChild(_RenderEditableCustomPaint child) {
+    child.foregroundPainter?.renderEditable = null;
+    child.painter?.renderEditable = null;
+    super.dropChild(child);
+  }
+
+  void setForegroundPainter(RenderEditablePainter? newValue) => child?.foregroundPainter = newValue;
+  void setPainter(RenderEditablePainter? newValue) => child?.painter = newValue;
+
   @override
   void performLayout() {
     final BoxConstraints constraints = this.constraints;
@@ -2046,7 +2056,9 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         .constrainWidth(_textPainter.size.width + _caretMargin);
     size = Size(width, constraints.constrainHeight(_preferredHeight(constraints.maxWidth)));
     final Size contentSize = Size(textPainterSize.width + _caretMargin, textPainterSize.height);
+    child?.layout(BoxConstraints.tight(size));
     _maxScrollExtent = _getMaxScrollExtent(contentSize);
+
     offset.applyViewportDimension(_viewportExtent);
     offset.applyContentDimensions(0.0, _maxScrollExtent);
   }
@@ -2074,7 +2086,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     // If the floating cursor is enabled, the text cursor's color is [backgroundCursorColor] while
     // the floating cursor's color is _cursorColor;
     final Paint paint = Paint()
-      ..color = (_floatingCursorOn ? backgroundCursorColor : _cursorColor)!;
+      ..color = _cursorColor!;
     final Offset caretOffset = _textPainter.getOffsetForCaret(textPosition, _caretPrototype) + effectiveOffset;
     Rect caretRect = _caretPrototype.shift(caretOffset);
     if (_cursorOffset != null)
@@ -2122,121 +2134,8 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
     if (caretRect != _lastCaretRect) {
       _lastCaretRect = caretRect;
-      if (onCaretChanged != null)
-        onCaretChanged!(caretRect);
+      onCaretChanged?.call(caretRect);
     }
-  }
-
-  /// Sets the screen position of the floating cursor and the text position
-  /// closest to the cursor.
-  void setFloatingCursor(FloatingCursorDragState state, Offset boundedOffset, TextPosition lastTextPosition, { double? resetLerpValue }) {
-    assert(state != null);
-    assert(boundedOffset != null);
-    assert(lastTextPosition != null);
-    if (state == FloatingCursorDragState.Start) {
-      _relativeOrigin = const Offset(0, 0);
-      _previousOffset = null;
-      _resetOriginOnBottom = false;
-      _resetOriginOnTop = false;
-      _resetOriginOnRight = false;
-      _resetOriginOnBottom = false;
-    }
-    _floatingCursorOn = state != FloatingCursorDragState.End;
-    _resetFloatingCursorAnimationValue = resetLerpValue;
-    if (_floatingCursorOn) {
-      _floatingCursorOffset = boundedOffset;
-      _floatingCursorTextPosition = lastTextPosition;
-    }
-    markNeedsPaint();
-  }
-
-  void _paintFloatingCaret(Canvas canvas, Offset effectiveOffset) {
-    assert(_textLayoutLastMaxWidth == constraints.maxWidth &&
-           _textLayoutLastMinWidth == constraints.minWidth,
-      'Last width ($_textLayoutLastMinWidth, $_textLayoutLastMaxWidth) not the same as max width constraint (${constraints.minWidth}, ${constraints.maxWidth}).');
-    assert(_floatingCursorOn);
-
-    // We always want the floating cursor to render at full opacity.
-    final Paint paint = Paint()..color = _cursorColor!.withOpacity(0.75);
-
-    double sizeAdjustmentX = _kFloatingCaretSizeIncrease.dx;
-    double sizeAdjustmentY = _kFloatingCaretSizeIncrease.dy;
-
-    if (_resetFloatingCursorAnimationValue != null) {
-      sizeAdjustmentX = ui.lerpDouble(sizeAdjustmentX, 0, _resetFloatingCursorAnimationValue!)!;
-      sizeAdjustmentY = ui.lerpDouble(sizeAdjustmentY, 0, _resetFloatingCursorAnimationValue!)!;
-    }
-
-    final Rect floatingCaretPrototype = Rect.fromLTRB(
-      _caretPrototype.left - sizeAdjustmentX,
-      _caretPrototype.top - sizeAdjustmentY,
-      _caretPrototype.right + sizeAdjustmentX,
-      _caretPrototype.bottom + sizeAdjustmentY,
-    );
-
-    final Rect caretRect = floatingCaretPrototype.shift(effectiveOffset);
-    const Radius floatingCursorRadius = Radius.circular(_kFloatingCaretRadius);
-    final RRect caretRRect = RRect.fromRectAndRadius(caretRect, floatingCursorRadius);
-    canvas.drawRRect(caretRRect, paint);
-  }
-
-  // The relative origin in relation to the distance the user has theoretically
-  // dragged the floating cursor offscreen. This value is used to account for the
-  // difference in the rendering position and the raw offset value.
-  Offset _relativeOrigin = const Offset(0, 0);
-  Offset? _previousOffset;
-  bool _resetOriginOnLeft = false;
-  bool _resetOriginOnRight = false;
-  bool _resetOriginOnTop = false;
-  bool _resetOriginOnBottom = false;
-  double? _resetFloatingCursorAnimationValue;
-
-  /// Returns the position within the text field closest to the raw cursor offset.
-  Offset calculateBoundedFloatingCursorOffset(Offset rawCursorOffset) {
-    Offset deltaPosition = const Offset(0, 0);
-    final double topBound = -floatingCursorAddedMargin.top;
-    final double bottomBound = _textPainter.height - preferredLineHeight + floatingCursorAddedMargin.bottom;
-    final double leftBound = -floatingCursorAddedMargin.left;
-    final double rightBound = _textPainter.width + floatingCursorAddedMargin.right;
-
-    if (_previousOffset != null)
-      deltaPosition = rawCursorOffset - _previousOffset!;
-
-    // If the raw cursor offset has gone off an edge, we want to reset the relative
-    // origin of the dragging when the user drags back into the field.
-    if (_resetOriginOnLeft && deltaPosition.dx > 0) {
-      _relativeOrigin = Offset(rawCursorOffset.dx - leftBound, _relativeOrigin.dy);
-      _resetOriginOnLeft = false;
-    } else if (_resetOriginOnRight && deltaPosition.dx < 0) {
-      _relativeOrigin = Offset(rawCursorOffset.dx - rightBound, _relativeOrigin.dy);
-      _resetOriginOnRight = false;
-    }
-    if (_resetOriginOnTop && deltaPosition.dy > 0) {
-      _relativeOrigin = Offset(_relativeOrigin.dx, rawCursorOffset.dy - topBound);
-      _resetOriginOnTop = false;
-    } else if (_resetOriginOnBottom && deltaPosition.dy < 0) {
-      _relativeOrigin = Offset(_relativeOrigin.dx, rawCursorOffset.dy - bottomBound);
-      _resetOriginOnBottom = false;
-    }
-
-    final double currentX = rawCursorOffset.dx - _relativeOrigin.dx;
-    final double currentY = rawCursorOffset.dy - _relativeOrigin.dy;
-    final double adjustedX = math.min(math.max(currentX, leftBound), rightBound);
-    final double adjustedY = math.min(math.max(currentY, topBound), bottomBound);
-    final Offset adjustedOffset = Offset(adjustedX, adjustedY);
-
-    if (currentX < leftBound && deltaPosition.dx < 0)
-      _resetOriginOnLeft = true;
-    else if (currentX > rightBound && deltaPosition.dx > 0)
-      _resetOriginOnRight = true;
-    if (currentY < topBound && deltaPosition.dy < 0)
-      _resetOriginOnTop = true;
-    else if (currentY > bottomBound && deltaPosition.dy > 0)
-      _resetOriginOnBottom = true;
-
-    _previousOffset = rawCursorOffset;
-
-    return adjustedOffset;
   }
 
   void _paintSelection(Canvas canvas, Offset effectiveOffset) {
@@ -2249,24 +2148,6 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       canvas.drawRect(box.toRect().shift(effectiveOffset), paint);
   }
 
-  final Paint _promptRectPaint = Paint();
-  void _paintPromptRectIfNeeded(Canvas canvas, Offset effectiveOffset) {
-    if (_promptRectRange == null || promptRectColor == null) {
-      return;
-    }
-
-    final List<TextBox> boxes = _textPainter.getBoxesForSelection(
-      TextSelection(
-        baseOffset: _promptRectRange!.start,
-        extentOffset: _promptRectRange!.end,
-      ),
-    );
-
-    for (final TextBox box in boxes) {
-      canvas.drawRect(box.toRect().shift(effectiveOffset), _promptRectPaint);
-    }
-  }
-
   void _paintContents(PaintingContext context, Offset offset) {
     assert(_textLayoutLastMaxWidth == constraints.maxWidth &&
            _textLayoutLastMinWidth == constraints.minWidth,
@@ -2276,7 +2157,11 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     bool showSelection = false;
     bool showCaret = false;
 
-    if (selection != null && !_floatingCursorOn) {
+    if (child != null) {
+      context.paintChild(child!, offset);
+    }
+
+    if (selection != null) {
       if (selection!.isCollapsed && _showCursor.value && cursorColor != null)
         showCaret = true;
       else if (!selection!.isCollapsed && _selectionColor != null)
@@ -2290,8 +2175,6 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       _paintSelection(context.canvas, effectiveOffset);
     }
 
-    _paintPromptRectIfNeeded(context.canvas, effectiveOffset);
-
     // On iOS, the cursor is painted over the text, on Android, it's painted
     // under it.
     if (paintCursorAboveText)
@@ -2304,12 +2187,6 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
 
     if (!paintCursorAboveText)
       _textPainter.paint(context.canvas, effectiveOffset);
-
-    if (_floatingCursorOn) {
-      if (_resetFloatingCursorAnimationValue == null)
-        _paintCaret(context.canvas, effectiveOffset, _floatingCursorTextPosition);
-      _paintFloatingCaret(context.canvas, _floatingCursorOffset);
-    }
   }
 
   void _paintHandleLayers(PaintingContext context, List<TextSelectionPoint> endpoints) {
@@ -2336,6 +2213,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       );
     }
   }
+
   @override
   void paint(PaintingContext context, Offset offset) {
     _layoutText(minWidth: constraints.minWidth, maxWidth: constraints.maxWidth);
@@ -2377,6 +2255,49 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
           name: 'text',
           style: DiagnosticsTreeStyle.transition,
         ),
+      ...super.debugDescribeChildren(),
     ];
+  }
+}
+
+class _RenderEditableCustomPaint extends RenderCustomPaint {
+  _RenderEditableCustomPaint({
+    RenderEditablePainter? painter,
+    RenderEditablePainter? foregroundPainter,
+    //this.isComplex = false,
+    //this.willChange = false,
+  }) : super(painter: painter, foregroundPainter: foregroundPainter);
+
+  @override
+  RenderEditable? get parent => super.parent as RenderEditable?;
+
+  @override
+  RenderEditablePainter? get foregroundPainter => super.foregroundPainter as RenderEditablePainter?;
+  @override
+  set foregroundPainter(RenderEditablePainter? newValue) {
+    if (newValue == foregroundPainter)
+      return;
+    if (foregroundPainter?.renderEditable == parent || foregroundPainter?.owner == this) {
+      foregroundPainter?.renderEditable = null;
+      foregroundPainter?.owner = null;
+    }
+    newValue?.renderEditable = parent;
+    newValue?.owner = this;
+    super.foregroundPainter = newValue;
+  }
+
+  @override
+  RenderEditablePainter? get painter => super.painter as RenderEditablePainter?;
+  @override
+  set painter(RenderEditablePainter? newValue) {
+    if (newValue == painter)
+      return;
+    if (painter?.renderEditable == parent || painter?.owner == this) {
+      painter?.renderEditable = null;
+      painter?.owner = null;
+    }
+    newValue?.renderEditable = parent;
+    newValue?.owner = this;
+    super.painter = newValue;
   }
 }

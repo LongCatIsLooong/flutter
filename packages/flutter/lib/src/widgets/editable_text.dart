@@ -12,6 +12,7 @@ import 'package:flutter/painting.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/src/widgets/caret_painter.dart';
 
 import 'autofill.dart';
 import 'automatic_keep_alive.dart';
@@ -1433,7 +1434,7 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
   TextInputConnection? _textInputConnection;
   TextSelectionOverlay? _selectionOverlay;
 
-  ScrollController? _scrollController;
+  late ScrollController _scrollController = widget.scrollController ?? ScrollController();
 
   late AnimationController _cursorBlinkOpacityController;
 
@@ -1508,13 +1509,22 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
     widget.controller.addListener(_didChangeTextEditingValue);
     _focusAttachment = widget.focusNode.attach(context);
     widget.focusNode.addListener(_handleFocusChanged);
-    _scrollController = widget.scrollController ?? ScrollController();
-    _scrollController!.addListener(() { _selectionOverlay?.updateForScroll(); });
+    _scrollController.addListener(() { _selectionOverlay?.updateForScroll(); });
     _cursorBlinkOpacityController = AnimationController(vsync: this, duration: _fadeDuration);
     _cursorBlinkOpacityController.addListener(_onCursorColorTick);
     _floatingCursorResetController = AnimationController(vsync: this);
     _floatingCursorResetController.addListener(_onFloatingCursorResetTick);
-    _cursorVisibilityNotifier.value = widget.showCursor;
+    caretPainter = IOSCaretPainter(
+      color: _cursorColor,
+      floatingCursorPlaceholderColor: widget.backgroundCursorColor,
+      cursorHeight: widget.cursorHeight,
+      cursorRadius: widget.cursorRadius,
+    );
+    _cursorVisibilityNotifier.value = widget.showCursor && caretPainter == null;
+    final bool shouldPaintCaret = textEditingValue.selection.isCollapsed && textEditingValue.selection.isValid;
+    caretPainter?.textPosition = shouldPaintCaret
+      ? TextPosition(offset: textEditingValue.selection.start)
+      : null;
   }
 
   @override
@@ -1591,6 +1601,11 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
     if (widget.selectionEnabled && pasteEnabled && widget.selectionControls?.canPaste(this) == true) {
       _clipboardStatus?.update();
     }
+
+    caretPainter
+      ?..floatingCursorPlaceholderColor = widget.backgroundCursorColor
+      ..cursorHeight = widget.cursorHeight
+      ..cursorRadius = widget.cursorRadius;
   }
 
   @override
@@ -1718,15 +1733,19 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
     widget.onAppPrivateCommand!(action, data);
   }
 
-  // The original position of the caret on FloatingCursorDragState.start.
-  Rect? _startCaretRect;
+  // The last known Rect of the iOS force touch floating cursor, in this
+  // widget's local coordinate system.
+  Rect? _previousFloatingCursorRect;
+
+  // The last known Offset of the iOS force touch floating cursor, as reported
+  // by the iOS text input plugin. The Offset has an unknown (but consistent)
+  // Cartesian coordinate system, so it's only useful for calculating the diff
+  // between touch events.
+  Offset? _previousForceTouchOffset;
 
   // The most recent text position as determined by the location of the floating
   // cursor.
   TextPosition? _lastTextPosition;
-
-  // The offset of the floating cursor as determined from the start call.
-  Offset? _pointOffsetOrigin;
 
   // The most recent position of the floating cursor.
   Offset? _lastBoundedOffset;
@@ -1736,36 +1755,69 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
   // on, we need this offset to correctly render and move the cursor.
   Offset get _floatingCursorOffset => Offset(0, renderEditable.preferredLineHeight / 2);
 
+  Offset get _viewportOffset => (_isMultiline ? const Offset(0, 1) : const Offset(1, 0)) * _scrollController.offset;
+
+  late final IOSCaretPainter? caretPainter;
+
   @override
   void updateFloatingCursor(RawFloatingCursorPoint point) {
+    assert(mounted);
+    assert(renderEditable.hasSize);
+    final IOSCaretPainter? caretPainter = this.caretPainter;
+    if (caretPainter == null)
+      return;
+    if (_floatingCursorResetController.isAnimating) {
+      _floatingCursorResetController.stop();
+    }
+    // The iOS text input plugin can easily get into a broken state when the
+    // client changes. So make no assumption about what the current floating
+    // cursor state the client is in.
     switch(point.state){
       case FloatingCursorDragState.Start:
-        if (_floatingCursorResetController.isAnimating) {
-          _floatingCursorResetController.stop();
-          _onFloatingCursorResetTick();
-        }
+
+        final TextSelection? selection= renderEditable.selection;
+        if (selection == null)
+          return;
+        final int startOffset = math.min(selection.baseOffset, selection.extentOffset);
+        if (startOffset < 0)
+          return;
+
         // We want to send in points that are centered around a (0,0) origin, so
         // we cache the position.
-        _pointOffsetOrigin = point.offset;
+        _previousForceTouchOffset = point.offset;
+        final TextPosition currentTextPosition = TextPosition(offset: startOffset);
+        final Rect localCaretRect = caretPainter.caretRectFor(currentTextPosition).shift(-_viewportOffset);
+        _previousFloatingCursorRect = localCaretRect;
 
-        final TextPosition currentTextPosition = TextPosition(offset: renderEditable.selection!.baseOffset);
-        _startCaretRect = renderEditable.getLocalRectForCaret(currentTextPosition);
-
-        _lastBoundedOffset = _startCaretRect!.center - _floatingCursorOffset;
         _lastTextPosition = currentTextPosition;
-        renderEditable.setFloatingCursor(point.state, _lastBoundedOffset!, _lastTextPosition!);
+        _onFloatingCursorUpdate(currentTextPosition, localCaretRect, caretPainter);
+        caretPainter.floatingCursorRect = localCaretRect;
+        caretPainter.floatingCursorRestAnimationProgress = null;
         break;
       case FloatingCursorDragState.Update:
-        final Offset centeredPoint = point.offset! - _pointOffsetOrigin!;
-        final Offset rawCursorOffset = _startCaretRect!.center + centeredPoint - _floatingCursorOffset;
+        final Offset? previousOffset = _previousForceTouchOffset;
+        final Offset? newOffset = point.offset;
+        final Rect? previousFloatingCursorRect = _previousFloatingCursorRect;
+        if (previousOffset == null || previousFloatingCursorRect == null || newOffset == null)
+          return;
 
-        _lastBoundedOffset = renderEditable.calculateBoundedFloatingCursorOffset(rawCursorOffset);
-        _lastTextPosition = renderEditable.getPositionForPoint(renderEditable.localToGlobal(_lastBoundedOffset! + _floatingCursorOffset));
-        renderEditable.setFloatingCursor(point.state, _lastBoundedOffset!, _lastTextPosition!);
+        final Offset delta = newOffset - previousOffset;
+        _previousForceTouchOffset = newOffset;
+        final Rect newFloatingCursorRect = caretPainter.newFloatingCursorRect(delta, previousFloatingCursorRect);
+
+        _onFloatingCursorUpdate(
+          renderEditable.getPositionForPoint(
+            renderEditable.localToGlobal(newFloatingCursorRect.topLeft + _floatingCursorOffset),
+          ),
+          newFloatingCursorRect, caretPainter);
+        caretPainter.floatingCursorRect = newFloatingCursorRect;
+        caretPainter.floatingCursorRestAnimationProgress = null;
         break;
       case FloatingCursorDragState.End:
         // We skip animation if no update has happened.
-        if (_lastTextPosition != null && _lastBoundedOffset != null) {
+        if (_previousForceTouchOffset != null || _previousFloatingCursorRect != null) {
+          _previousForceTouchOffset = null;
+          _previousFloatingCursorRect = null;
           _floatingCursorResetController.value = 0.0;
           _floatingCursorResetController.animateTo(1.0, duration: _floatingCursorResetTime, curve: Curves.decelerate);
         }
@@ -1773,23 +1825,24 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
     }
   }
 
-  void _onFloatingCursorResetTick() {
-    final Offset finalPosition = renderEditable.getLocalRectForCaret(_lastTextPosition!).centerLeft - _floatingCursorOffset;
-    if (_floatingCursorResetController.isCompleted) {
-      renderEditable.setFloatingCursor(FloatingCursorDragState.End, finalPosition, _lastTextPosition!);
-      if (_lastTextPosition!.offset != renderEditable.selection!.baseOffset)
-        // The cause is technically the force cursor, but the cause is listed as tap as the desired functionality is the same.
-        _handleSelectionChanged(TextSelection.collapsed(offset: _lastTextPosition!.offset), renderEditable, SelectionChangedCause.forcePress);
-      _startCaretRect = null;
-      _lastTextPosition = null;
-      _pointOffsetOrigin = null;
-      _lastBoundedOffset = null;
-    } else {
-      final double lerpValue = _floatingCursorResetController.value;
-      final double lerpX = ui.lerpDouble(_lastBoundedOffset!.dx, finalPosition.dx, lerpValue)!;
-      final double lerpY = ui.lerpDouble(_lastBoundedOffset!.dy, finalPosition.dy, lerpValue)!;
+  void _onFloatingCursorUpdate(TextPosition newSelectionPosition, Rect newFloatingCursorRect, IOSCaretPainter caretPainter) {
+    if (!_value.selection.isCollapsed || !_value.selection.isValid || newSelectionPosition.offset != _value.selection.start) {
+      _handleSelectionChanged(TextSelection.collapsed(offset: newSelectionPosition.offset), renderEditable, SelectionChangedCause.forcePress);
+    }
+  }
 
-      renderEditable.setFloatingCursor(FloatingCursorDragState.Update, Offset(lerpX, lerpY), _lastTextPosition!, resetLerpValue: lerpValue);
+  void _onFloatingCursorResetTick() {
+    assert(mounted);
+    assert(renderEditable.hasSize);
+    final IOSCaretPainter? caretPainter = this.caretPainter;
+    if (caretPainter == null)
+      return;
+
+    if (_floatingCursorResetController.isCompleted) {
+      caretPainter.floatingCursorRestAnimationProgress = null;
+      caretPainter.floatingCursorRect = null;
+    } else {
+      caretPainter.floatingCursorRestAnimationProgress = _floatingCursorResetController.value;
     }
   }
 
@@ -1903,8 +1956,8 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
   // `renderEditable.preferredLineHeight`, before the target scroll offset is
   // calculated.
   RevealedOffset _getOffsetToRevealCaret(Rect rect) {
-    if (!_scrollController!.position.allowImplicitScrolling)
-      return RevealedOffset(offset: _scrollController!.offset, rect: rect);
+    if (!_scrollController.position.allowImplicitScrolling)
+      return RevealedOffset(offset: _scrollController.offset, rect: rect);
 
     final Size editableSize = renderEditable.size;
     final double additionalOffset;
@@ -1936,13 +1989,13 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
 
     // No overscrolling when encountering tall fonts/scripts that extend past
     // the ascent.
-    final double targetOffset = (additionalOffset + _scrollController!.offset)
+    final double targetOffset = (additionalOffset + _scrollController.offset)
       .clamp(
-        _scrollController!.position.minScrollExtent,
-        _scrollController!.position.maxScrollExtent,
+        _scrollController.position.minScrollExtent,
+        _scrollController.position.maxScrollExtent,
       );
 
-    final double offsetDelta = _scrollController!.offset - targetOffset;
+    final double offsetDelta = _scrollController.offset - targetOffset;
     return RevealedOffset(rect: rect.shift(unitOffset * offsetDelta), offset: targetOffset);
   }
 
@@ -2109,7 +2162,6 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
   static const Curve _caretAnimationCurve = Curves.fastOutSlowIn;
 
   bool _showCaretOnScreenScheduled = false;
-
   void _showCaretOnScreen() {
     if (_showCaretOnScreenScheduled) {
       return;
@@ -2117,7 +2169,7 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
     _showCaretOnScreenScheduled = true;
     SchedulerBinding.instance!.addPostFrameCallback((Duration _) {
       _showCaretOnScreenScheduled = false;
-      if (_currentCaretRect == null || !_scrollController!.hasClients) {
+      if (_currentCaretRect == null || !_scrollController.hasClients) {
         return;
       }
 
@@ -2150,7 +2202,7 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
 
       final RevealedOffset targetOffset = _getOffsetToRevealCaret(_currentCaretRect!);
 
-      _scrollController!.animateTo(
+      _scrollController.animateTo(
         targetOffset.offset,
         duration: _caretAnimationDuration,
         curve: _caretAnimationCurve,
@@ -2221,8 +2273,10 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
   }
 
   void _onCursorColorTick() {
-    renderEditable.cursorColor = widget.cursorColor.withOpacity(_cursorBlinkOpacityController.value);
-    _cursorVisibilityNotifier.value = widget.showCursor && _cursorBlinkOpacityController.value > 0;
+    final Color cursorColor = widget.cursorColor.withOpacity(_cursorBlinkOpacityController.value);
+    renderEditable.cursorColor = cursorColor;
+    _cursorVisibilityNotifier.value = widget.showCursor && _cursorBlinkOpacityController.value > 0 && caretPainter == null;
+    caretPainter?.color = cursorColor;
   }
 
   /// Whether the blinking cursor is actually visible at this precise moment
@@ -2311,6 +2365,15 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
     _startOrStopCursorTimerIfNeeded();
     _updateOrDisposeSelectionOverlayIfNeeded();
     _textChangedSinceLastCaretUpdate = true;
+
+    final BaseCaretPainter? caretPainter = this.caretPainter;
+    if (caretPainter != null) {
+      final bool shouldPaintCaret = textEditingValue.selection.isCollapsed && textEditingValue.selection.isValid;
+      caretPainter.textPosition = shouldPaintCaret
+        ? TextPosition(offset: textEditingValue.selection.start)
+        : null;
+    }
+
     // TODO(abarth): Teach RenderEditable about ValueNotifier<TextEditingValue>
     // to avoid this setState().
     setState(() { /* We use widget.controller.value in build(). */ });
@@ -2399,7 +2462,7 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
     final Rect localRect = renderEditable.getLocalRectForCaret(position);
     final RevealedOffset targetOffset = _getOffsetToRevealCaret(localRect);
 
-    _scrollController!.jumpTo(targetOffset.offset);
+    _scrollController.jumpTo(targetOffset.offset);
     renderEditable.showOnScreen(rect: targetOffset.rect);
   }
 
@@ -2567,9 +2630,14 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
                 enableInteractiveSelection: widget.enableInteractiveSelection,
                 textSelectionDelegate: this,
                 devicePixelRatio: _devicePixelRatio,
-                promptRectRange: _currentPromptRectRange,
-                promptRectColor: widget.autocorrectionTextRectColor,
                 clipBehavior: widget.clipBehavior,
+                painter: _CompositeRenderEditablePainter(
+                  painters: <RenderEditablePainter>[
+                    if (widget.autocorrectionTextRectColor != null) _TextHighlightPainter(highlightedRange: _currentPromptRectRange, highlightColor: widget.autocorrectionTextRectColor!),
+                    if (caretPainter != null) caretPainter!,
+                  ]
+                ),
+                //painter: caretPainter,
               ),
             ),
           );
@@ -2650,9 +2718,9 @@ class _Editable extends LeafRenderObjectWidget {
     this.enableInteractiveSelection = true,
     required this.textSelectionDelegate,
     required this.devicePixelRatio,
-    this.promptRectRange,
-    this.promptRectColor,
     required this.clipBehavior,
+    this.painter,
+    this.foregroundPainter,
   }) : assert(textDirection != null),
        assert(rendererIgnoresPointer != null),
        super(key: key);
@@ -2698,9 +2766,9 @@ class _Editable extends LeafRenderObjectWidget {
   final bool enableInteractiveSelection;
   final TextSelectionDelegate textSelectionDelegate;
   final double devicePixelRatio;
-  final TextRange? promptRectRange;
-  final Color? promptRectColor;
   final Clip clipBehavior;
+  final RenderEditablePainter? painter;
+  final RenderEditablePainter? foregroundPainter;
 
   @override
   RenderEditable createRenderObject(BuildContext context) {
@@ -2742,9 +2810,9 @@ class _Editable extends LeafRenderObjectWidget {
       enableInteractiveSelection: enableInteractiveSelection,
       textSelectionDelegate: textSelectionDelegate,
       devicePixelRatio: devicePixelRatio,
-      promptRectRange: promptRectRange,
-      promptRectColor: promptRectColor,
       clipBehavior: clipBehavior,
+      painter: painter,
+      foregroundPainter: foregroundPainter,
     );
   }
 
@@ -2786,9 +2854,9 @@ class _Editable extends LeafRenderObjectWidget {
       ..textSelectionDelegate = textSelectionDelegate
       ..devicePixelRatio = devicePixelRatio
       ..paintCursorAboveText = paintCursorAboveText
-      ..promptRectColor = promptRectColor
       ..clipBehavior = clipBehavior
-      ..setPromptRectRange(promptRectRange);
+      ..setPainter(painter)
+      ..setForegroundPainter(foregroundPainter);
   }
 }
 
@@ -2972,3 +3040,154 @@ class _WhitespaceDirectionalityFormatter extends TextInputFormatter {
     return _ltrRegExp.hasMatch(String.fromCharCode(value)) ? TextDirection.ltr : TextDirection.rtl;
   }
 }
+
+class _CompositeRenderEditablePainter extends RenderEditablePainter {
+  _CompositeRenderEditablePainter({ required this.painters }) {
+    for (final RenderEditablePainter painter in painters)
+      addListener(painter.notifyListeners);
+  }
+
+  @override
+  RenderEditable? get renderEditable => _renderEditable;
+  RenderEditable? _renderEditable;
+  @override
+  set renderEditable(RenderEditable? newValue) {
+    if (newValue == _renderEditable)
+      return;
+
+    _renderEditable = newValue;
+    for (final RenderEditablePainter painter in painters)
+      painter.renderEditable = _renderEditable;
+  }
+
+  @override
+  RenderBox? get owner => _owner;
+  RenderBox? _owner;
+  @override
+  set owner(RenderBox? newValue) {
+    if (owner == _owner)
+      return;
+    _owner = newValue;
+    for (final RenderEditablePainter painter in painters)
+      painter.owner = _owner;
+  }
+
+  final List<RenderEditablePainter> painters;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (final RenderEditablePainter painter in painters)
+      painter.paint(canvas, size);
+  }
+
+  late final List<SemanticsBuilderCallback> _cachedBuilders = <SemanticsBuilderCallback>[
+    for (final RenderEditablePainter painter in painters) if(painter.semanticsBuilder != null) painter.semanticsBuilder!,
+  ];
+
+  @override
+  SemanticsBuilderCallback? get semanticsBuilder {
+    return _cachedBuilders.isEmpty
+      ? null
+      : (Size size) => <CustomPainterSemantics>[for (SemanticsBuilderCallback callback in _cachedBuilders) ...callback(size)];
+  }
+
+  @override
+  bool shouldRepaint(RenderEditablePainter oldDelegate) {
+    if (identical(oldDelegate, this))
+      return false;
+    if (oldDelegate is! _CompositeRenderEditablePainter || oldDelegate.painters.length != painters.length)
+      return true;
+
+    final Iterator<RenderEditablePainter> oldPainters = oldDelegate.painters.iterator;
+    final Iterator<RenderEditablePainter> newPainters = painters.iterator;
+    while (oldPainters.moveNext() && newPainters.moveNext())
+      if (newPainters.current.shouldRepaint(oldPainters.current))
+        return true;
+
+    return false;
+  }
+}
+
+class _TextHighlightPainter extends RenderEditablePainter {
+  _TextHighlightPainter({
+      TextRange? highlightedRange,
+      required Color highlightColor
+  }) : _highlightedRange = highlightedRange {
+    highlightPaint.color = highlightColor;
+  }
+
+  final Paint highlightPaint = Paint();
+
+  TextRange? get highlightedRange => _highlightedRange;
+  TextRange? _highlightedRange;
+  set highlightedRange(TextRange? newValue) {
+    if (newValue == _highlightedRange)
+      return;
+    _highlightedRange = newValue;
+    notifyListeners();
+  }
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final TextRange? range = highlightedRange;
+    if (range == null) {
+      return;
+    }
+
+    final RenderEditable? renderEditable = this.renderEditable;
+    assert(renderEditable != null);
+    if (renderEditable == null)
+      return;
+
+    final List<TextBox> boxes = renderEditable.getBoxesForSelection(
+      TextSelection(baseOffset: range.start, extentOffset: range.end),
+    );
+
+    for (final TextBox box in boxes)
+      canvas.drawRect(box.toRect(), highlightPaint);
+  }
+
+  @override
+  bool shouldRepaint(RenderEditablePainter oldDelegate) {
+    if (identical(oldDelegate, this))
+      return false;
+    return oldDelegate is! _TextHighlightPainter
+        || oldDelegate.highlightPaint.color != highlightPaint.color
+        || oldDelegate.highlightedRange != highlightedRange;
+  }
+}
+
+//class _EditableCustomPaint extends SingleChildRenderObjectWidget {
+//  const _EditableCustomPaint({
+//    Key? key,
+//    this.painter,
+//    this.foregroundPainter,
+//    Widget? child,
+//  }) : super(key: key, child: child);
+//
+//  final RenderEditablePainter? painter;
+//
+//  final RenderEditablePainter? foregroundPainter;
+//
+//  @override
+//  RenderCustomPaint createRenderObject(BuildContext context) {
+//    return _RenderEditableCustomPaint(
+//      painter: painter,
+//      foregroundPainter: foregroundPainter,
+//    );
+//  }
+//
+//  @override
+//  void updateRenderObject(BuildContext context, _RenderEditableCustomPaint renderObject) {
+//    renderObject
+//      ..painter = painter
+//      ..foregroundPainter = painter;
+//  }
+//
+//  @override
+//  void didUnmountRenderObject(_RenderEditableCustomPaint renderObject) {
+//    renderObject
+//      ..painter = null
+//      ..foregroundPainter = null;
+//  }
+//}
