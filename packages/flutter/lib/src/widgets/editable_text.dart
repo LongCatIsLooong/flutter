@@ -1521,10 +1521,6 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
       cursorRadius: widget.cursorRadius,
     );
     _cursorVisibilityNotifier.value = widget.showCursor && caretPainter == null;
-    final bool shouldPaintCaret = textEditingValue.selection.isCollapsed && textEditingValue.selection.isValid;
-    caretPainter?.textPosition = shouldPaintCaret
-      ? TextPosition(offset: textEditingValue.selection.start)
-      : null;
   }
 
   @override
@@ -2274,8 +2270,8 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
 
   void _onCursorColorTick() {
     final Color cursorColor = widget.cursorColor.withOpacity(_cursorBlinkOpacityController.value);
-    renderEditable.cursorColor = cursorColor;
-    _cursorVisibilityNotifier.value = widget.showCursor && _cursorBlinkOpacityController.value > 0 && caretPainter == null;
+    //renderEditable.cursorColor = cursorColor;
+    //_cursorVisibilityNotifier.value = widget.showCursor && _cursorBlinkOpacityController.value > 0 && caretPainter == null;
     caretPainter?.color = cursorColor;
   }
 
@@ -2365,14 +2361,6 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
     _startOrStopCursorTimerIfNeeded();
     _updateOrDisposeSelectionOverlayIfNeeded();
     _textChangedSinceLastCaretUpdate = true;
-
-    final BaseCaretPainter? caretPainter = this.caretPainter;
-    if (caretPainter != null) {
-      final bool shouldPaintCaret = textEditingValue.selection.isCollapsed && textEditingValue.selection.isValid;
-      caretPainter.textPosition = shouldPaintCaret
-        ? TextPosition(offset: textEditingValue.selection.start)
-        : null;
-    }
 
     // TODO(abarth): Teach RenderEditable about ValueNotifier<TextEditingValue>
     // to avoid this setState().
@@ -3042,10 +3030,7 @@ class _WhitespaceDirectionalityFormatter extends TextInputFormatter {
 }
 
 class _CompositeRenderEditablePainter extends RenderEditablePainter {
-  _CompositeRenderEditablePainter({ required this.painters }) {
-    for (final RenderEditablePainter painter in painters)
-      addListener(painter.notifyListeners);
-  }
+  _CompositeRenderEditablePainter({ required this.painters });
 
   @override
   RenderEditable? get renderEditable => _renderEditable;
@@ -3073,6 +3058,20 @@ class _CompositeRenderEditablePainter extends RenderEditablePainter {
   }
 
   final List<RenderEditablePainter> painters;
+
+  @override
+  void addListener(VoidCallback listener) {
+    // This painter is completely stateless.
+    //super.addListener(listener);
+    for (final RenderEditablePainter painter in painters)
+      painter.addListener(listener);
+  }
+
+  @override
+  void removeListener(VoidCallback listener) {
+    for (final RenderEditablePainter painter in painters)
+      painter.removeListener(listener);
+  }
 
   @override
   void paint(Canvas canvas, Size size) {

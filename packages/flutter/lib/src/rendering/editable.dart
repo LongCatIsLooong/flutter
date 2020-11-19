@@ -2272,6 +2272,9 @@ class _RenderEditableCustomPaint extends RenderCustomPaint {
   RenderEditable? get parent => super.parent as RenderEditable?;
 
   @override
+  bool get isRepaintBoundary => true;
+
+  @override
   RenderEditablePainter? get foregroundPainter => super.foregroundPainter as RenderEditablePainter?;
   @override
   set foregroundPainter(RenderEditablePainter? newValue) {

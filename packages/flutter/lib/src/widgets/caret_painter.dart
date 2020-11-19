@@ -70,14 +70,21 @@ abstract class BaseCaretPainter extends RenderEditablePainter {
     notifyListeners();
   }
 
-  TextPosition? get textPosition => _textPosition;
-  TextPosition? _textPosition;
-  set textPosition(TextPosition? newValue) {
-    if (_textPosition == newValue)
-      return;
-    _textPosition = newValue;
-    notifyListeners();
+  TextPosition? get textPosition {
+    assert(renderEditable != null);
+    final TextSelection? selection = renderEditable!.selection;
+    return selection != null && selection.isCollapsed && selection.isValid
+      ? TextPosition(offset: selection.start)
+      : null;
   }
+  //TextPosition? get textPosition => _textPosition;
+  //TextPosition? _textPosition;
+  //set textPosition(TextPosition? newValue) {
+  //  if (_textPosition == newValue)
+  //    return;
+  //  _textPosition = newValue;
+  //  notifyListeners();
+  //}
 
   @override
   Rect get caretPrototype {
@@ -193,7 +200,7 @@ class IOSCaretPainter extends BaseCaretPainter {
   }
 
   @override
-  Rect get caretPrototype => const EdgeInsets.only(right: 2).inflateRect(super.caretPrototype);
+  Rect get caretPrototype => const EdgeInsets.only(bottom: 2).inflateRect(super.caretPrototype);
 
   @override
   void paintCaret(Canvas canvas, Size size, Rect caretRect) {
@@ -220,7 +227,6 @@ class IOSCaretPainter extends BaseCaretPainter {
       cursorPaint.color = color!.withOpacity(0.75);
       super.paintCaret(canvas, size, effectiveFloatingCursorRect);
     } else {
-      //super.paintCaret(canvas, size, Offset.zero & Size(10, 10));
       super.paintCaret(canvas, size, adjustedCaret);
     }
   }
@@ -249,9 +255,6 @@ class CaretPainter extends BaseCaretPainter {
 
     super.paintCaret(canvas, size, adjustedCaret);
   }
-
-  @override
-  void updateFloatingCursor(RawFloatingCursorPoint point) {}
 
   @override
   bool shouldRepaint(RenderEditablePainter oldDelegate) {
