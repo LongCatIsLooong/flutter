@@ -794,8 +794,19 @@ enum SelectionChangedCause {
 /// A mixin for manipulating the selection, to be used by the implementer
 /// of the toolbar widget.
 mixin TextSelectionDelegate {
-  /// Gets the current text input.
+  /// Gets the current [TextEditingValue].
   TextEditingValue get textEditingValue;
+
+  /// Gets the [TextEditingValue] as it currently appears on screen.
+  ///
+  /// This value may become different from [textEditingValue] when
+  /// [textEditingValue] is updated but the new value has not yet been rendered
+  /// on screen (which happens during the [SchedulerPhase.persistentCallbacks]
+  /// phase.
+  ///
+  /// The value is null when [textEditingValue] has never been rendered, or the
+  /// text field is removed from the widget tree.
+  TextEditingValue? get textEditingValueOnScreen;
 
   /// Indicates that the user has requested the delegate to replace its current
   /// text editing state with [value].

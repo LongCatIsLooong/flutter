@@ -1503,7 +1503,7 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
   Timer? _cursorTimer;
   bool _targetCursorVisibility = false;
   final ValueNotifier<bool> _cursorVisibilityNotifier = ValueNotifier<bool>(true);
-  final GlobalKey _editableKey = GlobalKey();
+  final GlobalKey _textSpanBuilderKey = GlobalKey();
   final ClipboardStatusNotifier? _clipboardStatus = kIsWeb ? null : ClipboardStatusNotifier();
 
   TextInputConnection? _textInputConnection;
@@ -2483,28 +2483,63 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
     return result;
   }
 
+  _TextSpanBuilder? get _textSpanInformation {
+    // Currently this method can be called when the widget is unmounted.
+    final Widget? spanBuilder = _textSpanBuilderKey.currentWidget;
+    assert(spanBuilder is _TextSpanBuilder);
+    assert(
+      SchedulerBinding.instance!.schedulerPhase == SchedulerPhase.idle
+      || SchedulerBinding.instance!.schedulerPhase == SchedulerPhase.persistentCallbacks,
+      '${SchedulerBinding.instance!.schedulerPhase}, ${StackTrace.current}',
+    );
+    return spanBuilder is _TextSpanBuilder ? spanBuilder : null;
+  }
+
   /// The renderer for this widget's descendant.
   ///
   /// This property is typically used to notify the renderer of input gestures
   /// when [RenderEditable.ignorePointer] is true.
   @override
-  RenderEditable get renderEditable => _editableKey.currentContext!.findRenderObject()! as RenderEditable;
+  RenderEditable get renderEditable => _textSpanBuilderKey.currentContext!.findRenderObject()! as RenderEditable;
 
   @override
   TextEditingValue get textEditingValue => _value;
+
+  @override
+  TextEditingValue? get textEditingValueOnScreen => _textSpanInformation?.textEditingValue;
 
   double get _devicePixelRatio => MediaQuery.of(context).devicePixelRatio;
 
   @override
   void userUpdateTextEditingValue(TextEditingValue value, SelectionChangedCause? cause) {
+    final TextEditingValue? onScreenValue = textEditingValueOnScreen;
+    if (onScreenValue == null) {
+      assert(false, 'the widget has already been unmounted');
+      return;
+    }
+
+    // If the `TextEditingValue` in the current controller has already been
+    // updated by a differenet party in the same frame, abandon the change. That
+    // means if multiple text editing events that depend on the currently
+    // rendered TextEditingValue (TextSpan) happened in the same frame, only the
+    // first is honored.
+    //
+    // We choose to abandon the change because of . Also it makes
+    // However the equality check is likely an overkill.
+    if (onScreenValue.text != _value.text) {
+      //assert(false, '${StackTrace.current}');
+      return;
+    }
+
     // Compare the current TextEditingValue with the pre-format new
     // TextEditingValue value, in case the formatter would reject the change.
     final bool shouldShowCaret = widget.readOnly
-      ? _value.selection != value.selection
-      : _value != value;
+      ? onScreenValue.selection != value.selection
+      : onScreenValue != value;
     if (shouldShowCaret) {
       _scheduleShowCaretOnScreen();
     }
+
     _formatAndSetValue(value, cause, userInteraction: true);
   }
 
@@ -2645,53 +2680,55 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
               onCopy: _semanticsOnCopy(controls),
               onCut: _semanticsOnCut(controls),
               onPaste: _semanticsOnPaste(controls),
-              child: _Editable(
-                key: _editableKey,
-                startHandleLayerLink: _startHandleLayerLink,
-                endHandleLayerLink: _endHandleLayerLink,
+              child: _TextSpanBuilder(
+                key: _textSpanBuilderKey,
+                textEditingValue: _value,
                 textSpan: buildTextSpan(),
-                value: _value,
-                cursorColor: _cursorColor,
-                backgroundCursorColor: widget.backgroundCursorColor,
-                showCursor: EditableText.debugDeterministicCursor
-                    ? ValueNotifier<bool>(widget.showCursor)
-                    : _cursorVisibilityNotifier,
-                forceLine: widget.forceLine,
-                readOnly: widget.readOnly,
-                hasFocus: _hasFocus,
-                maxLines: widget.maxLines,
-                minLines: widget.minLines,
-                expands: widget.expands,
-                strutStyle: widget.strutStyle,
-                selectionColor: widget.selectionColor,
-                textScaleFactor: widget.textScaleFactor ?? MediaQuery.textScaleFactorOf(context),
-                textAlign: widget.textAlign,
-                textDirection: _textDirection,
-                locale: widget.locale,
-                textHeightBehavior: widget.textHeightBehavior ?? DefaultTextHeightBehavior.of(context),
-                textWidthBasis: widget.textWidthBasis,
-                obscuringCharacter: widget.obscuringCharacter,
-                obscureText: widget.obscureText,
-                autocorrect: widget.autocorrect,
-                smartDashesType: widget.smartDashesType,
-                smartQuotesType: widget.smartQuotesType,
-                enableSuggestions: widget.enableSuggestions,
-                offset: offset,
-                onCaretChanged: _handleCaretChanged,
-                rendererIgnoresPointer: widget.rendererIgnoresPointer,
-                cursorWidth: widget.cursorWidth,
-                cursorHeight: widget.cursorHeight,
-                cursorRadius: widget.cursorRadius,
-                cursorOffset: widget.cursorOffset ?? Offset.zero,
-                selectionHeightStyle: widget.selectionHeightStyle,
-                selectionWidthStyle: widget.selectionWidthStyle,
-                paintCursorAboveText: widget.paintCursorAboveText,
-                enableInteractiveSelection: widget.enableInteractiveSelection,
-                textSelectionDelegate: this,
-                devicePixelRatio: _devicePixelRatio,
-                promptRectRange: _currentPromptRectRange,
-                promptRectColor: widget.autocorrectionTextRectColor,
-                clipBehavior: widget.clipBehavior,
+                child: _Editable(
+                  startHandleLayerLink: _startHandleLayerLink,
+                  endHandleLayerLink: _endHandleLayerLink,
+                  cursorColor: _cursorColor,
+                  backgroundCursorColor: widget.backgroundCursorColor,
+                  showCursor: EditableText.debugDeterministicCursor
+                      ? ValueNotifier<bool>(widget.showCursor)
+                      : _cursorVisibilityNotifier,
+                  forceLine: widget.forceLine,
+                  readOnly: widget.readOnly,
+                  hasFocus: _hasFocus,
+                  maxLines: widget.maxLines,
+                  minLines: widget.minLines,
+                  expands: widget.expands,
+                  strutStyle: widget.strutStyle,
+                  selectionColor: widget.selectionColor,
+                  textScaleFactor: widget.textScaleFactor ?? MediaQuery.textScaleFactorOf(context),
+                  textAlign: widget.textAlign,
+                  textDirection: _textDirection,
+                  locale: widget.locale,
+                  textHeightBehavior: widget.textHeightBehavior ?? DefaultTextHeightBehavior.of(context),
+                  textWidthBasis: widget.textWidthBasis,
+                  obscuringCharacter: widget.obscuringCharacter,
+                  obscureText: widget.obscureText,
+                  autocorrect: widget.autocorrect,
+                  smartDashesType: widget.smartDashesType,
+                  smartQuotesType: widget.smartQuotesType,
+                  enableSuggestions: widget.enableSuggestions,
+                  offset: offset,
+                  onCaretChanged: _handleCaretChanged,
+                  rendererIgnoresPointer: widget.rendererIgnoresPointer,
+                  cursorWidth: widget.cursorWidth,
+                  cursorHeight: widget.cursorHeight,
+                  cursorRadius: widget.cursorRadius,
+                  cursorOffset: widget.cursorOffset ?? Offset.zero,
+                  selectionHeightStyle: widget.selectionHeightStyle,
+                  selectionWidthStyle: widget.selectionWidthStyle,
+                  paintCursorAboveText: widget.paintCursorAboveText,
+                  enableInteractiveSelection: widget.enableInteractiveSelection,
+                  textSelectionDelegate: this,
+                  devicePixelRatio: _devicePixelRatio,
+                  promptRectRange: _currentPromptRectRange,
+                  promptRectColor: widget.autocorrectionTextRectColor,
+                  clipBehavior: widget.clipBehavior,
+                ),
               ),
             ),
           );
@@ -2728,11 +2765,31 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
   }
 }
 
+class _TextSpanBuilder extends InheritedWidget {
+  const _TextSpanBuilder({
+    Key? key,
+    required this.textEditingValue,
+    required this.textSpan,
+    required Widget child,
+  }) : super(key: key, child: child);
+
+  final TextEditingValue textEditingValue;
+
+  //final TextSpan Function(TextEditingValue) buildTextSpan;
+  final TextSpan textSpan;
+
+  static _TextSpanBuilder of(BuildContext context) => context.dependOnInheritedWidgetOfExactType<_TextSpanBuilder>()!;
+
+  @override
+  bool updateShouldNotify(_TextSpanBuilder oldWidget) {
+    return textEditingValue != oldWidget.textEditingValue
+        || textSpan != oldWidget.textSpan;
+  }
+}
+
 class _Editable extends LeafRenderObjectWidget {
   const _Editable({
     Key? key,
-    required this.textSpan,
-    required this.value,
     required this.startHandleLayerLink,
     required this.endHandleLayerLink,
     this.cursorColor,
@@ -2778,8 +2835,6 @@ class _Editable extends LeafRenderObjectWidget {
        assert(rendererIgnoresPointer != null),
        super(key: key);
 
-  final TextSpan textSpan;
-  final TextEditingValue value;
   final Color? cursorColor;
   final LayerLink startHandleLayerLink;
   final LayerLink endHandleLayerLink;
@@ -2825,7 +2880,7 @@ class _Editable extends LeafRenderObjectWidget {
   @override
   RenderEditable createRenderObject(BuildContext context) {
     return RenderEditable(
-      text: textSpan,
+      text: _TextSpanBuilder.of(context).textSpan,
       cursorColor: cursorColor,
       startHandleLayerLink: startHandleLayerLink,
       endHandleLayerLink: endHandleLayerLink,
@@ -2843,7 +2898,7 @@ class _Editable extends LeafRenderObjectWidget {
       textAlign: textAlign,
       textDirection: textDirection,
       locale: locale ?? Localizations.maybeLocaleOf(context),
-      selection: value.selection,
+      selection: _TextSpanBuilder.of(context).textEditingValue.selection,
       offset: offset,
       onCaretChanged: onCaretChanged,
       ignorePointer: rendererIgnoresPointer,
@@ -2870,7 +2925,7 @@ class _Editable extends LeafRenderObjectWidget {
   @override
   void updateRenderObject(BuildContext context, RenderEditable renderObject) {
     renderObject
-      ..text = textSpan
+      ..text = _TextSpanBuilder.of(context).textSpan
       ..cursorColor = cursorColor
       ..startHandleLayerLink = startHandleLayerLink
       ..endHandleLayerLink = endHandleLayerLink
@@ -2887,7 +2942,7 @@ class _Editable extends LeafRenderObjectWidget {
       ..textAlign = textAlign
       ..textDirection = textDirection
       ..locale = locale ?? Localizations.maybeLocaleOf(context)
-      ..selection = value.selection
+      ..selection = _TextSpanBuilder.of(context).textEditingValue.selection
       ..offset = offset
       ..onCaretChanged = onCaretChanged
       ..ignorePointer = rendererIgnoresPointer

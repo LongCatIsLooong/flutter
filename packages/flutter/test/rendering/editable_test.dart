@@ -20,6 +20,11 @@ class FakeEditableTextState with TextSelectionDelegate {
   TextEditingValue textEditingValue = TextEditingValue.empty;
 
   @override
+  TextEditingValue? get textEditingValueOnScreen => textEditingValueOnScreenOverride ?? textEditingValue;
+
+  TextEditingValue? textEditingValueOnScreenOverride;
+
+  @override
   void hideToolbar([bool hideHandles = true]) { }
 
   @override
@@ -3487,6 +3492,7 @@ void main() {
       );
 
       delegate.textEditingValue = const TextEditingValue(text: 'BBB', selection: TextSelection.collapsed(offset: 0));
+      delegate.textEditingValueOnScreenOverride = TextEditingValue(text: 'A ' * 50, selection: editable.selection!);
     });
 
     void verifyDoesNotCrashWithInconsistentTextEditingValue(void Function(SelectionChangedCause) method) {

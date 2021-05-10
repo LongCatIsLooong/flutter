@@ -573,7 +573,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       // the _plainText when handling the pointer event.
       //
       // If this happens, we need to make sure the new selection is still valid.
-      final int textLength = _plainText.length;
+      final int textLength = textSelectionDelegate.textEditingValue.text.length;
       nextSelection = nextSelection.copyWith(
         baseOffset: math.min(nextSelection.baseOffset, textLength),
         extentOffset: math.min(nextSelection.extentOffset, textLength),
@@ -1107,7 +1107,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     if (_readOnly || selection == null || !selection.isValid) {
       return;
     }
-    final String text = _plainText;
+    final String text = _textEditingValue.text;
 
     if (!selection.isCollapsed) {
       return _deleteSelection(text, selection, cause);
@@ -1155,7 +1155,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     if (_readOnly || selection == null || !selection.isValid) {
       return;
     }
-    final String text = _plainText;
+    final String text = _textEditingValue.text;
 
     if (!selection.isCollapsed) {
       return _deleteSelection(text, selection, cause);
@@ -1202,7 +1202,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     if (_readOnly || selection == null || !selection.isValid) {
       return;
     }
-    final String text = _plainText;
+    final String text = _textEditingValue.text;
 
     if (!selection.isCollapsed) {
       return _deleteSelection(text, selection, cause);
@@ -1253,7 +1253,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     if (_readOnly || selection == null || !selection.isValid) {
       return;
     }
-    final String text = _plainText;
+    final String text = _textEditingValue.text;
 
     if (!selection.isCollapsed) {
       return _deleteSelection(text, selection, cause);
@@ -1297,7 +1297,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     if (_readOnly || selection == null || !selection.isValid) {
       return;
     }
-    final String text = _plainText;
+    final String text = _textEditingValue.text;
 
     if (!selection.isCollapsed) {
       return _deleteSelection(text, selection, cause);
@@ -1344,7 +1344,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     if (_readOnly || selection == null || !selection.isValid) {
       return;
     }
-    final String text = _plainText;
+    final String text = _textEditingValue.text;
 
     if (!selection.isCollapsed) {
       return _deleteSelection(text, selection, cause);
@@ -1544,20 +1544,23 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
   ///
   ///   * [extendSelectionLeft], which is same but in the opposite direction.
   void extendSelectionRight(SelectionChangedCause cause) {
-    assert(selection != null);
+    final TextSelection? selection = this.selection;
+    if (selection == null) {
+      return;
+    }
 
     if (!selectionEnabled) {
       return moveSelectionRight(cause);
     }
 
     final TextSelection nextSelection = _extendGivenSelectionRight(
-      selection!,
-      _plainText,
+      selection,
+      _textEditingValue.text,
     );
     if (nextSelection == selection) {
       return;
     }
-    final int distance = nextSelection.extentOffset - selection!.extentOffset;
+    final int distance = nextSelection.extentOffset - selection.extentOffset;
     _cursorResetLocation += distance;
     _setSelection(nextSelection, cause);
   }
@@ -2132,7 +2135,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       return;
     }
 
-    final String text = _plainText;
+    final String text = _textEditingValue.text;
     assert(_shortcutKeys.contains(key), 'shortcut key $key not recognized.');
     if (key == LogicalKeyboardKey.keyC) {
       if (!selection.isCollapsed) {
@@ -2214,6 +2217,11 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     _cachedPlainText ??= _textPainter.text!.toPlainText(includeSemanticsLabels: false);
     return _cachedPlainText!;
   }
+
+  // If the text field that this render object belongs to is unmounted, this
+  // render object should be already disposed or is being disposed so the force
+  // unwrapping should be safe.
+  TextEditingValue get _textEditingValue => textSelectionDelegate.textEditingValueOnScreen!;
 
   /// The text to display.
   TextSpan? get text => _textPainter.text as TextSpan?;

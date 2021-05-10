@@ -165,22 +165,7 @@ void main() {
   SystemChannels.platform.setMockMethodCallHandler(mockClipboard.handleMethodCall);
 
   // Returns the first RenderEditable.
-  RenderEditable findRenderEditable(WidgetTester tester) {
-    final RenderObject root = tester.renderObject(find.byType(EditableText));
-    expect(root, isNotNull);
-
-    RenderEditable? renderEditable;
-    void recursiveFinder(RenderObject child) {
-      if (child is RenderEditable) {
-        renderEditable = child;
-        return;
-      }
-      child.visitChildren(recursiveFinder);
-    }
-    root.visitChildren(recursiveFinder);
-    expect(renderEditable, isNotNull);
-    return renderEditable!;
-  }
+  RenderEditable findRenderEditable(WidgetTester tester) => tester.firstState<EditableTextState>(find.byType(EditableText)).renderEditable;
 
   List<TextSelectionPoint> globalize(Iterable<TextSelectionPoint> points, RenderBox box) {
     return points.map<TextSelectionPoint>((TextSelectionPoint point) {
@@ -2346,9 +2331,8 @@ void main() {
       ),
     );
 
-    final RenderEditable renderEditable = tester.renderObject<RenderEditable>(
-      find.byElementPredicate((Element element) => element.renderObject is RenderEditable),
-    );
+    final EditableTextState state = tester.state(find.byType(EditableText));
+    final RenderEditable renderEditable = state.renderEditable;
 
     List<TextSelectionPoint> lastCharEndpoint = renderEditable.getEndpointsForSelection(
       const TextSelection.collapsed(offset: 66), // Last character's position.
@@ -3146,10 +3130,11 @@ void main() {
       await tester.enterText(find.byType(CupertinoTextField), 'smoked meat');
       await tester.pump();
 
+      final EditableTextState editableTextState = tester.firstState(find.byType(EditableText));
+      final RenderEditable renderEditable = editableTextState.renderEditable;
+
       expect(
-        tester.renderObject<RenderEditable>(
-          find.byElementPredicate((Element element) => element.renderObject is RenderEditable),
-        ).text!.style!.color,
+        renderEditable.text!.style!.color,
         isSameColorAs(CupertinoColors.white),
       );
     },
@@ -3175,20 +3160,11 @@ void main() {
       );
 
       await tester.enterText(find.byType(CupertinoTextField), testValue);
-      // Tap the selection handle to bring up the "paste / select all" menu.
-      await tester.tapAt(textOffsetToPosition(tester, testValue.indexOf('e')));
+      // Long Tap to bring up the text selection menu.
+      await tester.longPressAt(textOffsetToPosition(tester, testValue.indexOf('e')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200)); // skip past the frame where the opacity is zero
-      RenderEditable renderEditable = findRenderEditable(tester);
-      List<TextSelectionPoint> endpoints = globalize(
-        renderEditable.getEndpointsForSelection(controller.selection),
-        renderEditable,
-      );
-      await tester.tapAt(endpoints[0].point + const Offset(1.0, 1.0));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200)); // skip past the frame where the opacity is zero
 
-      // Verify the selection toolbar position
+      // Verify the selection toolbar is placed above the text field.
       Offset toolbarTopLeft = tester.getTopLeft(find.text('Paste'));
       Offset textFieldTopLeft = tester.getTopLeft(find.byType(CupertinoTextField));
       expect(textFieldTopLeft.dy, lessThan(toolbarTopLeft.dy));
@@ -3205,20 +3181,11 @@ void main() {
       );
 
       await tester.enterText(find.byType(CupertinoTextField), testValue);
-      // Tap the selection handle to bring up the "paste / select all" menu.
-      await tester.tapAt(textOffsetToPosition(tester, testValue.indexOf('e')));
+      // Long Tap to bring up the text selection menu.
+      await tester.longPressAt(textOffsetToPosition(tester, testValue.indexOf('e')));
       await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200)); // skip past the frame where the opacity is zero
-      renderEditable = findRenderEditable(tester);
-      endpoints = globalize(
-        renderEditable.getEndpointsForSelection(controller.selection),
-        renderEditable,
-      );
-      await tester.tapAt(endpoints[0].point + const Offset(1.0, 1.0));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 200)); // skip past the frame where the opacity is zero
 
-      // Verify the selection toolbar position
+      // Verify the selection toolbar is placed above the text field.
       toolbarTopLeft = tester.getTopLeft(find.text('Paste'));
       textFieldTopLeft = tester.getTopLeft(find.byType(CupertinoTextField));
       expect(toolbarTopLeft.dy, lessThan(textFieldTopLeft.dy));

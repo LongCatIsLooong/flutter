@@ -479,7 +479,8 @@ void main() {
     await tester.tap(find.byKey(icon));
     await tester.pump();
     expect(controller.text, '');
-    expect(controller.selection, const TextSelection.collapsed(offset: 0, affinity: TextAffinity.upstream));
+    expect(controller.selection.isCollapsed, isTrue);
+    expect(controller.selection.baseOffset, 0);
   });
 
   testWidgets('Cursor radius is 2.0', (WidgetTester tester) async {
@@ -4570,6 +4571,9 @@ void main() {
 
       await tester.idle();
       await tester.tap(find.byType(TextField));
+      await tester.pump();
+      // Move the selection to the start.
+      controller.selection = const TextSelection.collapsed(offset: 0);
       await tester.pumpAndSettle();
       await tester.pumpAndSettle();
       await tester.sendKeyDownEvent(LogicalKeyboardKey.control);
@@ -4614,6 +4618,9 @@ void main() {
 
       await tester.idle();
       await tester.tap(find.byType(TextField));
+      await tester.pump();
+      // Move the selection to the start.
+      controller.selection = const TextSelection.collapsed(offset: 0);
       await tester.pumpAndSettle();
 
       for (int i = 0; i < 5; i += 1) {
@@ -4722,6 +4729,8 @@ void main() {
 
     await tester.idle();
     await tester.tap(find.byType(TextField));
+    await tester.pump();
+    controller.selection = const TextSelection.collapsed(offset: 0);
     await tester.pumpAndSettle();
 
     // Select the first 5 characters
@@ -4795,6 +4804,9 @@ void main() {
 
     await tester.idle();
     await tester.tap(find.byType(TextField));
+    await tester.pump();
+    // Move the selection to the start.
+    controller.selection = const TextSelection.collapsed(offset: 0);
     await tester.pumpAndSettle();
 
     // Select the first 5 characters
@@ -4866,6 +4878,7 @@ void main() {
 
     // This setter will set `selection` invalid.
     controller.text = '';
+    await tester.pump();
 
     // Paste clipboardContent to the text field.
     await tester.sendKeyDownEvent(LogicalKeyboardKey.controlRight);
@@ -4918,6 +4931,9 @@ void main() {
 
     await tester.idle();
     await tester.tap(find.byType(TextField));
+    await tester.pump();
+    // Move the selection to the start.
+    controller.selection = const TextSelection.collapsed(offset: 0);
     await tester.pumpAndSettle();
 
     // Select the first 5 characters
@@ -4992,6 +5008,9 @@ void main() {
 
     await tester.idle();
     await tester.tap(find.byType(TextField));
+    await tester.pump();
+    // Move the selection to the start.
+    controller.selection = const TextSelection.collapsed(offset: 0);
     await tester.pumpAndSettle();
 
     // Select the first 5 characters
@@ -5107,6 +5126,9 @@ void main() {
 
     await tester.idle();
     await tester.tap(find.byType(TextField));
+    await tester.pump();
+    // Move the selection to the start.
+    controller.selection = const TextSelection.collapsed(offset: 0);
     await tester.pumpAndSettle();
 
     // Delete
