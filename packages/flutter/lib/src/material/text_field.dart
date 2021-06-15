@@ -1148,6 +1148,29 @@ class _TextFieldState extends State<TextField> with RestorationMixin implements 
     return KeyEventResult.ignored;
   }
 
+  void _onTapUp(TapUpDetails details) {
+    final bool shouldShowHandle;
+    switch (details.kind) {
+      case PointerDeviceKind.touch:
+      case PointerDeviceKind.stylus:
+        shouldShowHandle = true;
+        break;
+      case PointerDeviceKind.invertedStylus:
+      case PointerDeviceKind.mouse:
+      case PointerDeviceKind.unknown:
+        shouldShowHandle = false;
+        break;
+    }
+
+    if (shouldShowHandle != _showSelectionHandles) {
+      setState(() {
+        _showSelectionHandles = shouldShowHandle;
+      });
+    }
+    _requestKeyboard();
+    widget.onTap?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     assert(debugCheckHasMaterial(context));
@@ -1238,64 +1261,68 @@ class _TextFieldState extends State<TextField> with RestorationMixin implements 
         break;
     }
 
-    Widget child = RepaintBoundary(
-      child: UnmanagedRestorationScope(
-        bucket: bucket,
-        child: EditableText(
-          key: editableTextKey,
-          readOnly: widget.readOnly || !_isEnabled,
-          toolbarOptions: widget.toolbarOptions,
-          showCursor: widget.showCursor,
-          showSelectionHandles: _showSelectionHandles,
-          controller: controller,
-          focusNode: focusNode,
-          keyboardType: widget.keyboardType,
-          textInputAction: widget.textInputAction,
-          textCapitalization: widget.textCapitalization,
-          style: style,
-          strutStyle: widget.strutStyle,
-          textAlign: widget.textAlign,
-          textDirection: widget.textDirection,
-          autofocus: widget.autofocus,
-          obscuringCharacter: widget.obscuringCharacter,
-          obscureText: widget.obscureText,
-          autocorrect: widget.autocorrect,
-          smartDashesType: widget.smartDashesType,
-          smartQuotesType: widget.smartQuotesType,
-          enableSuggestions: widget.enableSuggestions,
-          maxLines: widget.maxLines,
-          minLines: widget.minLines,
-          expands: widget.expands,
-          selectionColor: selectionColor,
-          selectionControls: widget.selectionEnabled ? textSelectionControls : null,
-          onChanged: widget.onChanged,
-          onSelectionChanged: _handleSelectionChanged,
-          onEditingComplete: widget.onEditingComplete,
-          onSubmitted: widget.onSubmitted,
-          onAppPrivateCommand: widget.onAppPrivateCommand,
-          onSelectionHandleTapped: _handleSelectionHandleTapped,
-          inputFormatters: formatters,
-          rendererIgnoresPointer: true,
-          mouseCursor: MouseCursor.defer, // TextField will handle the cursor
-          cursorWidth: widget.cursorWidth,
-          cursorHeight: widget.cursorHeight,
-          cursorRadius: cursorRadius,
-          cursorColor: cursorColor,
-          selectionHeightStyle: widget.selectionHeightStyle,
-          selectionWidthStyle: widget.selectionWidthStyle,
-          cursorOpacityAnimates: cursorOpacityAnimates,
-          cursorOffset: cursorOffset,
-          paintCursorAboveText: paintCursorAboveText,
-          backgroundCursorColor: CupertinoColors.inactiveGray,
-          scrollPadding: widget.scrollPadding,
-          keyboardAppearance: keyboardAppearance,
-          enableInteractiveSelection: widget.enableInteractiveSelection,
-          dragStartBehavior: widget.dragStartBehavior,
-          scrollController: widget.scrollController,
-          scrollPhysics: widget.scrollPhysics,
-          autofillHints: widget.autofillHints,
-          autocorrectionTextRectColor: autocorrectionTextRectColor,
-          restorationId: 'editable',
+
+    Widget child = _selectionGestureDetectorBuilder.buildGestureDetector(
+      behavior: HitTestBehavior.translucent,
+      child: RepaintBoundary(
+        child: UnmanagedRestorationScope(
+          bucket: bucket,
+          child: EditableText(
+            key: editableTextKey,
+            readOnly: widget.readOnly || !_isEnabled,
+            toolbarOptions: widget.toolbarOptions,
+            showCursor: widget.showCursor,
+            showSelectionHandles: _showSelectionHandles,
+            controller: controller,
+            focusNode: focusNode,
+            keyboardType: widget.keyboardType,
+            textInputAction: widget.textInputAction,
+            textCapitalization: widget.textCapitalization,
+            style: style,
+            strutStyle: widget.strutStyle,
+            textAlign: widget.textAlign,
+            textDirection: widget.textDirection,
+            autofocus: widget.autofocus,
+            obscuringCharacter: widget.obscuringCharacter,
+            obscureText: widget.obscureText,
+            autocorrect: widget.autocorrect,
+            smartDashesType: widget.smartDashesType,
+            smartQuotesType: widget.smartQuotesType,
+            enableSuggestions: widget.enableSuggestions,
+            maxLines: widget.maxLines,
+            minLines: widget.minLines,
+            expands: widget.expands,
+            selectionColor: selectionColor,
+            selectionControls: widget.selectionEnabled ? textSelectionControls : null,
+            onChanged: widget.onChanged,
+            onSelectionChanged: _handleSelectionChanged,
+            onEditingComplete: widget.onEditingComplete,
+            onSubmitted: widget.onSubmitted,
+            onAppPrivateCommand: widget.onAppPrivateCommand,
+            onSelectionHandleTapped: _handleSelectionHandleTapped,
+            inputFormatters: formatters,
+            rendererIgnoresPointer: true,
+            mouseCursor: MouseCursor.defer, // TextField will handle the cursor
+            cursorWidth: widget.cursorWidth,
+            cursorHeight: widget.cursorHeight,
+            cursorRadius: cursorRadius,
+            cursorColor: cursorColor,
+            selectionHeightStyle: widget.selectionHeightStyle,
+            selectionWidthStyle: widget.selectionWidthStyle,
+            cursorOpacityAnimates: cursorOpacityAnimates,
+            cursorOffset: cursorOffset,
+            paintCursorAboveText: paintCursorAboveText,
+            backgroundCursorColor: CupertinoColors.inactiveGray,
+            scrollPadding: widget.scrollPadding,
+            keyboardAppearance: keyboardAppearance,
+            enableInteractiveSelection: widget.enableInteractiveSelection,
+            dragStartBehavior: widget.dragStartBehavior,
+            scrollController: widget.scrollController,
+            scrollPhysics: widget.scrollPhysics,
+            autofillHints: widget.autofillHints,
+            autocorrectionTextRectColor: autocorrectionTextRectColor,
+            restorationId: 'editable',
+          ),
         ),
       ),
     );
@@ -1369,7 +1396,9 @@ class _TextFieldState extends State<TextField> with RestorationMixin implements 
               child: child,
             );
           },
-          child: _selectionGestureDetectorBuilder.buildGestureDetector(
+          child: GestureDetector(
+            excludeFromSemantics: true,
+            onTapUp: _onTapUp,
             behavior: HitTestBehavior.translucent,
             child: child,
           ),

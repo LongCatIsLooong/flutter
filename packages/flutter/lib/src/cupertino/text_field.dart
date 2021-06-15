@@ -103,17 +103,6 @@ class _CupertinoTextFieldSelectionGestureDetectorBuilder extends TextSelectionGe
   @override
   void onSingleTapUp(TapUpDetails details) {
     editableText.hideToolbar();
-    // Because TextSelectionGestureDetector listens to taps that happen on
-    // widgets in front of it, tapping the clear button will also trigger
-    // this handler. If the clear button widget recognizes the up event,
-    // then do not handle it.
-    if (_state._clearGlobalKey.currentContext != null) {
-      final RenderBox renderBox = _state._clearGlobalKey.currentContext!.findRenderObject()! as RenderBox;
-      final Offset localOffset = renderBox.globalToLocal(details.globalPosition);
-      if (renderBox.hitTest(BoxHitTestResult(), position: localOffset)) {
-        return;
-      }
-    }
     super.onSingleTapUp(details);
     _state._requestKeyboard();
     _state.widget.onTap?.call();
@@ -843,8 +832,6 @@ class CupertinoTextField extends StatefulWidget {
 }
 
 class _CupertinoTextFieldState extends State<CupertinoTextField> with RestorationMixin, AutomaticKeepAliveClientMixin<CupertinoTextField> implements TextSelectionGestureDetectorBuilderDelegate {
-  final GlobalKey _clearGlobalKey = GlobalKey();
-
   RestorableTextEditingController? _controller;
   TextEditingController get _effectiveController => widget.controller ?? _controller!.value;
 
@@ -1068,7 +1055,6 @@ class _CupertinoTextFieldState extends State<CupertinoTextField> with Restoratio
           // Otherwise, try to show a clear button if its visibility mode matches.
           else if (_showClearButton(text))
             GestureDetector(
-              key: _clearGlobalKey,
               onTap: widget.enabled ?? true ? () {
                 // Special handle onChanged for ClearButton
                 // Also call onChanged when the clear button is tapped.
@@ -1102,6 +1088,29 @@ class _CupertinoTextFieldState extends State<CupertinoTextField> with Restoratio
       return KeyEventResult.skipRemainingHandlers;
     }
     return KeyEventResult.ignored;
+  }
+
+  void _onTapUp(TapUpDetails details) {
+    final bool shouldShowHandle;
+    switch (details.kind) {
+      case PointerDeviceKind.touch:
+      case PointerDeviceKind.stylus:
+        shouldShowHandle = true;
+        break;
+      case PointerDeviceKind.invertedStylus:
+      case PointerDeviceKind.mouse:
+      case PointerDeviceKind.unknown:
+        shouldShowHandle = false;
+        break;
+    }
+
+    if (shouldShowHandle != _showSelectionHandles) {
+      setState(() {
+        _showSelectionHandles = shouldShowHandle;
+      });
+    }
+    _requestKeyboard();
+    widget.onTap?.call();
   }
 
   @override
@@ -1193,61 +1202,64 @@ class _CupertinoTextFieldState extends State<CupertinoTextField> with Restoratio
 
     Widget paddedEditable = Padding(
       padding: widget.padding,
-      child: RepaintBoundary(
-        child: UnmanagedRestorationScope(
-          bucket: bucket,
-          child: EditableText(
-            key: editableTextKey,
-            controller: controller,
-            readOnly: widget.readOnly,
-            toolbarOptions: widget.toolbarOptions,
-            showCursor: widget.showCursor,
-            showSelectionHandles: _showSelectionHandles,
-            focusNode: focusNode,
-            keyboardType: widget.keyboardType,
-            textInputAction: widget.textInputAction,
-            textCapitalization: widget.textCapitalization,
-            style: textStyle,
-            strutStyle: widget.strutStyle,
-            textAlign: widget.textAlign,
-            autofocus: widget.autofocus,
-            obscuringCharacter: widget.obscuringCharacter,
-            obscureText: widget.obscureText,
-            autocorrect: widget.autocorrect,
-            smartDashesType: widget.smartDashesType,
-            smartQuotesType: widget.smartQuotesType,
-            enableSuggestions: widget.enableSuggestions,
-            maxLines: widget.maxLines,
-            minLines: widget.minLines,
-            expands: widget.expands,
-            selectionColor: selectionColor,
-            selectionControls: widget.selectionEnabled
-              ? textSelectionControls : null,
-            onChanged: widget.onChanged,
-            onSelectionChanged: _handleSelectionChanged,
-            onEditingComplete: widget.onEditingComplete,
-            onSubmitted: widget.onSubmitted,
-            inputFormatters: formatters,
-            rendererIgnoresPointer: true,
-            cursorWidth: widget.cursorWidth,
-            cursorHeight: widget.cursorHeight,
-            cursorRadius: widget.cursorRadius,
-            cursorColor: cursorColor,
-            cursorOpacityAnimates: true,
-            cursorOffset: cursorOffset,
-            paintCursorAboveText: true,
-            autocorrectionTextRectColor: selectionColor,
-            backgroundCursorColor: CupertinoDynamicColor.resolve(CupertinoColors.inactiveGray, context),
-            selectionHeightStyle: widget.selectionHeightStyle,
-            selectionWidthStyle: widget.selectionWidthStyle,
-            scrollPadding: widget.scrollPadding,
-            keyboardAppearance: keyboardAppearance,
-            dragStartBehavior: widget.dragStartBehavior,
-            scrollController: widget.scrollController,
-            scrollPhysics: widget.scrollPhysics,
-            enableInteractiveSelection: widget.enableInteractiveSelection,
-            autofillHints: widget.autofillHints,
-            restorationId: 'editable',
+      child: _selectionGestureDetectorBuilder.buildGestureDetector(
+        behavior: HitTestBehavior.translucent,
+        child: RepaintBoundary(
+          child: UnmanagedRestorationScope(
+            bucket: bucket,
+            child: EditableText(
+              key: editableTextKey,
+              controller: controller,
+              readOnly: widget.readOnly,
+              toolbarOptions: widget.toolbarOptions,
+              showCursor: widget.showCursor,
+              showSelectionHandles: _showSelectionHandles,
+              focusNode: focusNode,
+              keyboardType: widget.keyboardType,
+              textInputAction: widget.textInputAction,
+              textCapitalization: widget.textCapitalization,
+              style: textStyle,
+              strutStyle: widget.strutStyle,
+              textAlign: widget.textAlign,
+              autofocus: widget.autofocus,
+              obscuringCharacter: widget.obscuringCharacter,
+              obscureText: widget.obscureText,
+              autocorrect: widget.autocorrect,
+              smartDashesType: widget.smartDashesType,
+              smartQuotesType: widget.smartQuotesType,
+              enableSuggestions: widget.enableSuggestions,
+              maxLines: widget.maxLines,
+              minLines: widget.minLines,
+              expands: widget.expands,
+              selectionColor: selectionColor,
+              selectionControls: widget.selectionEnabled
+                ? textSelectionControls : null,
+              onChanged: widget.onChanged,
+              onSelectionChanged: _handleSelectionChanged,
+              onEditingComplete: widget.onEditingComplete,
+              onSubmitted: widget.onSubmitted,
+              inputFormatters: formatters,
+              rendererIgnoresPointer: true,
+              cursorWidth: widget.cursorWidth,
+              cursorHeight: widget.cursorHeight,
+              cursorRadius: widget.cursorRadius,
+              cursorColor: cursorColor,
+              cursorOpacityAnimates: true,
+              cursorOffset: cursorOffset,
+              paintCursorAboveText: true,
+              autocorrectionTextRectColor: selectionColor,
+              backgroundCursorColor: CupertinoDynamicColor.resolve(CupertinoColors.inactiveGray, context),
+              selectionHeightStyle: widget.selectionHeightStyle,
+              selectionWidthStyle: widget.selectionWidthStyle,
+              scrollPadding: widget.scrollPadding,
+              keyboardAppearance: keyboardAppearance,
+              dragStartBehavior: widget.dragStartBehavior,
+              scrollController: widget.scrollController,
+              scrollPhysics: widget.scrollPhysics,
+              enableInteractiveSelection: widget.enableInteractiveSelection,
+              autofillHints: widget.autofillHints,
+              restorationId: 'editable',
+            ),
           ),
         ),
       ),
@@ -1276,8 +1288,10 @@ class _CupertinoTextFieldState extends State<CupertinoTextField> with Restoratio
         child: Container(
           decoration: effectiveDecoration,
           color: !enabled && effectiveDecoration == null ? disabledColor : null,
-          child: _selectionGestureDetectorBuilder.buildGestureDetector(
+          child: GestureDetector(
+            excludeFromSemantics: true,
             behavior: HitTestBehavior.translucent,
+            onTapUp: _onTapUp,
             child: Align(
               alignment: Alignment(-1.0, _textAlignVertical.y),
               widthFactor: 1.0,

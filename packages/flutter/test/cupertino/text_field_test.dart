@@ -194,13 +194,10 @@ void main() {
   Offset textOffsetToBottomLeftPosition(WidgetTester tester, int offset) {
     final RenderEditable renderEditable = findRenderEditable(tester);
     final List<TextSelectionPoint> endpoints = globalize(
-      renderEditable.getEndpointsForSelection(
-        TextSelection.collapsed(offset: offset),
-      ),
+      renderEditable.getEndpointsForSelection(TextSelection.collapsed(offset: offset)),
       renderEditable,
     );
-    expect(endpoints.length, 1);
-    return endpoints[0].point;
+    return endpoints.single.point;
   }
 
   Offset textOffsetToPosition(WidgetTester tester, int offset) => textOffsetToBottomLeftPosition(tester, offset) + const Offset(0, -2);
@@ -1441,7 +1438,7 @@ void main() {
     );
 
     await tester.longPressAt(
-      tester.getTopRight(find.text("j'aime la poutine")),
+      tester.getTopRight(find.text("j'aime la poutine")) + const Offset(-1, 1),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
@@ -1472,7 +1469,7 @@ void main() {
     );
 
     await tester.longPressAt(
-      tester.getTopRight(find.text("j'aime la poutine")),
+      tester.getTopRight(find.text("j'aime la poutine")) + const Offset(-1, 1),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
@@ -1547,9 +1544,7 @@ void main() {
     await tester.showKeyboard(find.byType(CupertinoTextField));
     expect(tester.testTextInput.hasAnyClients, false);
 
-    await tester.longPressAt(
-      tester.getTopRight(find.text('readonly')),
-    );
+    await tester.longPress(find.text('readonly'));
 
     await tester.pump();
 
@@ -1589,7 +1584,7 @@ void main() {
 
     // Tap an area inside the EditableText but with no text.
     await tester.longPressAt(
-      tester.getTopRight(find.text("j'aime la poutine")),
+      tester.getTopRight(find.text("j'aime la poutine")) + const Offset(-1, 1),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
@@ -1632,7 +1627,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.tapAt(textfieldStart + const Offset(50.0, 5.0));
       await tester.pump();
@@ -1664,7 +1659,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.tapAt(textfieldStart + const Offset(50.0, 5.0));
       await tester.pump(const Duration(milliseconds: 500));
@@ -1757,7 +1752,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.tapAt(textfieldStart + const Offset(50.0, 5.0));
       await tester.pump(const Duration(milliseconds: 500));
@@ -1799,7 +1794,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.tapAt(textfieldStart + const Offset(150.0, 5.0));
       await tester.pump(const Duration(milliseconds: 50));
@@ -1844,7 +1839,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.tapAt(textfieldStart + const Offset(150.0, 5.0));
       await tester.pump(const Duration(milliseconds: 50));
@@ -1916,9 +1911,9 @@ void main() {
 
     // Double tapping the first space selects the space.
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.tapAt(textOffsetToPosition(tester, 0));
+    await tester.tapAt(textOffsetToPosition(tester, 0) + const Offset(1, -1));
     await tester.pump(const Duration(milliseconds: 50));
-    await tester.tapAt(textOffsetToPosition(tester, 0));
+    await tester.tapAt(textOffsetToPosition(tester, 0) + const Offset(1, -1));
     await tester.pumpAndSettle();
     expect(controller.value.selection, isNotNull);
     expect(controller.value.selection.baseOffset, 0);
@@ -1984,9 +1979,9 @@ void main() {
 
     // Double tapping the first space selects it.
     await tester.pump(const Duration(milliseconds: 500));
-    await tester.tapAt(textOffsetToPosition(tester, 0));
+    await tester.tapAt(textOffsetToPosition(tester, 0) + const Offset(1, -1));
     await tester.pump(const Duration(milliseconds: 50));
-    await tester.tapAt(textOffsetToPosition(tester, 0));
+    await tester.tapAt(textOffsetToPosition(tester, 0) + const Offset(1, -1));
     await tester.pumpAndSettle();
     expect(controller.value.selection, isNotNull);
     expect(controller.value.selection.baseOffset, 0);
@@ -2048,11 +2043,11 @@ void main() {
 
     // Double tapping the first space selects it.
     await tester.pump(const Duration(milliseconds: 500));
-    await gesture.down(textOffsetToPosition(tester, 0));
+    await gesture.down(textOffsetToPosition(tester, 0) + const Offset(1, -1));
     await tester.pump();
     await gesture.up();
     await tester.pump(const Duration(milliseconds: 50));
-    await gesture.down(textOffsetToPosition(tester, 0));
+    await gesture.down(textOffsetToPosition(tester, 0) + const Offset(1, -1));
     await tester.pump();
     await gesture.up();
     await tester.pumpAndSettle();
@@ -2079,7 +2074,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.tapAt(textfieldStart + const Offset(150.0, 5.0));
       await tester.pump(const Duration(milliseconds: 50));
@@ -2126,7 +2121,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.tapAt(textfieldStart + const Offset(150.0, 5.0));
       await tester.pump(const Duration(milliseconds: 50));
@@ -2172,7 +2167,7 @@ void main() {
       ),
     );
 
-    final Offset textfieldStart = tester.getCenter(find.byType(CupertinoTextField));
+    final Offset textfieldStart = tester.getCenter(find.byType(EditableText));
 
     await tester.tapAt(textfieldStart + const Offset(150.0, 5.0));
     await tester.pump(const Duration(milliseconds: 50));
@@ -2186,7 +2181,7 @@ void main() {
     expect(find.text('Select All'), findsNothing);
 
     // Tap to cancel selection.
-    final Offset textfieldEnd = tester.getTopRight(find.byType(CupertinoTextField));
+    final Offset textfieldEnd = tester.getTopRight(find.byType(EditableText));
     await tester.tapAt(textfieldEnd + const Offset(-10.0, 5.0));
     await tester.pump(const Duration(milliseconds: 50));
     // Long tap at the end.
@@ -2216,7 +2211,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.longPressAt(textfieldStart + const Offset(50.0, 5.0));
       await tester.pumpAndSettle();
@@ -2224,7 +2219,7 @@ void main() {
       // Collapsed cursor for iOS long press.
       expect(
         controller.selection,
-        const TextSelection.collapsed(offset: 3, affinity: TextAffinity.upstream),
+        const TextSelection.collapsed(offset: 3),
       );
 
       // Collapsed toolbar shows 2 buttons.
@@ -2248,7 +2243,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.longPressAt(textfieldStart + const Offset(50.0, 5.0));
       await tester.pump(const Duration(milliseconds: 50));
@@ -2284,7 +2279,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       final TestGesture gesture =
           await tester.startGesture(textfieldStart + const Offset(50.0, 5.0));
@@ -2293,7 +2288,7 @@ void main() {
       // Long press on iOS shows collapsed selection cursor.
       expect(
         controller.selection,
-        const TextSelection.collapsed(offset: 3, affinity: TextAffinity.upstream),
+        const TextSelection.collapsed(offset: 3),
       );
       // Toolbar only shows up on long press up.
       expect(find.byType(CupertinoButton), findsNothing);
@@ -2304,7 +2299,7 @@ void main() {
       // The selection position is now moved with the drag.
       expect(
         controller.selection,
-        const TextSelection.collapsed(offset: 6, affinity: TextAffinity.upstream),
+        const TextSelection.collapsed(offset: 6),
       );
       expect(find.byType(CupertinoButton), findsNothing);
 
@@ -2314,7 +2309,7 @@ void main() {
       // The selection position is now moved with the drag.
       expect(
         controller.selection,
-        const TextSelection.collapsed(offset: 9, affinity: TextAffinity.upstream),
+        const TextSelection.collapsed(offset: 9),
       );
       expect(find.byType(CupertinoButton), findsNothing);
 
@@ -2324,7 +2319,7 @@ void main() {
       // The selection isn't affected by the gesture lift.
       expect(
         controller.selection,
-        const TextSelection.collapsed(offset: 9, affinity: TextAffinity.upstream),
+        const TextSelection.collapsed(offset: 9),
       );
       // The toolbar now shows up.
       expect(find.byType(CupertinoButton), isContextMenuProvidedByPlatform ? findsNothing : findsNWidgets(2));
@@ -2359,7 +2354,7 @@ void main() {
     // the right side of the screen.
     expect(lastCharEndpoint[0].point.dx, moreOrLessEquals(1094.73, epsilon: 0.25));
 
-    final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+    final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
     final TestGesture gesture =
         await tester.startGesture(textfieldStart + const Offset(300, 5));
@@ -2367,7 +2362,7 @@ void main() {
 
     expect(
       controller.selection,
-      const TextSelection.collapsed(offset: 18, affinity: TextAffinity.upstream),
+      const TextSelection.collapsed(offset: 18),
     );
     expect(find.byType(CupertinoButton), findsNothing);
 
@@ -2376,7 +2371,7 @@ void main() {
     await tester.pump();
     expect(
       controller.selection,
-      const TextSelection.collapsed(offset: 54, affinity: TextAffinity.upstream),
+      const TextSelection.collapsed(offset: 54),
     );
     // Keep moving out.
     await gesture.moveBy(const Offset(1, 0));
@@ -2436,7 +2431,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.tapAt(textfieldStart + const Offset(150.0, 5.0));
       await tester.pump(const Duration(milliseconds: 50));
@@ -2454,7 +2449,7 @@ void main() {
       // Plain collapsed selection at the exact tap position.
       expect(
         controller.selection,
-        const TextSelection.collapsed(offset: 6, affinity: TextAffinity.upstream),
+        const TextSelection.collapsed(offset: 6),
       );
 
       // Long press toolbar.
@@ -2478,7 +2473,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.longPressAt(textfieldStart + const Offset(50.0, 5.0));
       await tester.pump(const Duration(milliseconds: 50));
@@ -2519,7 +2514,7 @@ void main() {
         ),
       );
 
-      final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+      final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
       await tester.tapAt(textfieldStart + const Offset(50.0, 5.0));
       await tester.pump(const Duration(milliseconds: 50));
@@ -2582,7 +2577,7 @@ void main() {
       ),
     );
 
-    final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+    final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
     final int pointerValue = tester.nextPointer;
     final TestGesture gesture = await tester.createGesture();
@@ -2622,7 +2617,7 @@ void main() {
       ),
     );
 
-    final Offset textfieldStart = tester.getTopLeft(find.byType(CupertinoTextField));
+    final Offset textfieldStart = tester.getTopLeft(find.byType(EditableText));
 
     final int pointerValue = tester.nextPointer;
     final TestGesture gesture = await tester.createGesture();
@@ -3174,17 +3169,14 @@ void main() {
         ),
       );
 
+      EditableTextState state = tester.state<EditableTextState>(find.byType(EditableText));
       await tester.enterText(find.byType(CupertinoTextField), testValue);
-      // Tap the selection handle to bring up the "paste / select all" menu.
+      // Bring up the "paste / select all" menu.
       await tester.tapAt(textOffsetToPosition(tester, testValue.indexOf('e')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200)); // skip past the frame where the opacity is zero
-      RenderEditable renderEditable = findRenderEditable(tester);
-      List<TextSelectionPoint> endpoints = globalize(
-        renderEditable.getEndpointsForSelection(controller.selection),
-        renderEditable,
-      );
-      await tester.tapAt(endpoints[0].point + const Offset(1.0, 1.0));
+
+      assert(state.showToolbar());
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200)); // skip past the frame where the opacity is zero
 
@@ -3205,16 +3197,12 @@ void main() {
       );
 
       await tester.enterText(find.byType(CupertinoTextField), testValue);
-      // Tap the selection handle to bring up the "paste / select all" menu.
+      // Bring up the "paste / select all" menu.
       await tester.tapAt(textOffsetToPosition(tester, testValue.indexOf('e')));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200)); // skip past the frame where the opacity is zero
-      renderEditable = findRenderEditable(tester);
-      endpoints = globalize(
-        renderEditable.getEndpointsForSelection(controller.selection),
-        renderEditable,
-      );
-      await tester.tapAt(endpoints[0].point + const Offset(1.0, 1.0));
+      state = tester.state<EditableTextState>(find.byType(EditableText));
+      assert(state.showToolbar());
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 200)); // skip past the frame where the opacity is zero
 
@@ -4451,7 +4439,6 @@ void main() {
               child: Column(
                 children: <Widget>[
                   CupertinoTextField(
-                    key: const Key('field0'),
                     controller: controller,
                     style: const TextStyle(height: 4, color: ui.Color.fromARGB(100, 0, 0, 0)),
                     toolbarOptions: const ToolbarOptions(selectAll: true),
@@ -4467,12 +4454,9 @@ void main() {
       ),
     );
 
-    final Offset textfieldStart = tester.getTopLeft(find.byKey(const Key('field0')));
-
-    await tester.longPressAt(textfieldStart + const Offset(50.0, 2.0));
-    await tester.pump(const Duration(milliseconds: 150));
-    // Tap the Select All button.
-    await tester.tapAt(textfieldStart + const Offset(20.0, 100.0));
+    await tester.longPress(find.byType(EditableText));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('Select All'));
     await tester.pump(const Duration(milliseconds: 300));
 
     await expectLater(
@@ -4498,7 +4482,6 @@ void main() {
               child: Column(
                 children: <Widget>[
                   CupertinoTextField(
-                    key: const Key('field0'),
                     controller: controller,
                     style: const TextStyle(height: 4, color: ui.Color.fromARGB(100, 0, 0, 0)),
                     toolbarOptions: const ToolbarOptions(selectAll: true),
@@ -4514,12 +4497,9 @@ void main() {
       ),
     );
 
-    final Offset textfieldStart = tester.getTopLeft(find.byKey(const Key('field0')));
-
-    await tester.longPressAt(textfieldStart + const Offset(50.0, 2.0));
-    await tester.pump(const Duration(milliseconds: 150));
-    // Tap the Select All button.
-    await tester.tapAt(textfieldStart + const Offset(20.0, 100.0));
+    await tester.longPress(find.byType(EditableText));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.tap(find.text('Select All'));
     await tester.pump(const Duration(milliseconds: 300));
 
     await expectLater(
