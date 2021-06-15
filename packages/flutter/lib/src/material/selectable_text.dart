@@ -555,6 +555,28 @@ class _SelectableTextState extends State<SelectableText> with AutomaticKeepAlive
     return false;
   }
 
+  void _onTapUp(TapUpDetails details) {
+    final bool shouldShowHandle;
+    switch (details.kind) {
+      case PointerDeviceKind.touch:
+      case PointerDeviceKind.stylus:
+        shouldShowHandle = true;
+        break;
+      case PointerDeviceKind.invertedStylus:
+      case PointerDeviceKind.mouse:
+      case PointerDeviceKind.unknown:
+        shouldShowHandle = false;
+        break;
+    }
+
+    if (shouldShowHandle != _showSelectionHandles) {
+      setState(() {
+        _showSelectionHandles = shouldShowHandle;
+      });
+    }
+    widget.onTap?.call();
+  }
+
   @override
   bool get wantKeepAlive => true;
 
@@ -636,42 +658,45 @@ class _SelectableTextState extends State<SelectableText> with AutomaticKeepAlive
       effectiveTextStyle = defaultTextStyle.style.merge(widget.style);
     if (MediaQuery.boldTextOverride(context))
       effectiveTextStyle = effectiveTextStyle.merge(const TextStyle(fontWeight: FontWeight.bold));
-    final Widget child = RepaintBoundary(
-      child: EditableText(
-        key: editableTextKey,
-        style: effectiveTextStyle,
-        readOnly: true,
-        textWidthBasis: widget.textWidthBasis ?? defaultTextStyle.textWidthBasis,
-        textHeightBehavior: widget.textHeightBehavior ?? defaultTextStyle.textHeightBehavior,
-        showSelectionHandles: _showSelectionHandles,
-        showCursor: widget.showCursor,
-        controller: _controller,
-        focusNode: focusNode,
-        strutStyle: widget.strutStyle ?? const StrutStyle(),
-        textAlign: widget.textAlign ?? defaultTextStyle.textAlign ?? TextAlign.start,
-        textDirection: widget.textDirection,
-        textScaleFactor: widget.textScaleFactor,
-        autofocus: widget.autofocus,
-        forceLine: false,
-        toolbarOptions: widget.toolbarOptions,
-        minLines: widget.minLines,
-        maxLines: widget.maxLines ?? defaultTextStyle.maxLines,
-        selectionColor: selectionColor,
-        selectionControls: widget.selectionEnabled ? textSelectionControls : null,
-        onSelectionChanged: _handleSelectionChanged,
-        onSelectionHandleTapped: _handleSelectionHandleTapped,
-        rendererIgnoresPointer: true,
-        cursorWidth: widget.cursorWidth,
-        cursorHeight: widget.cursorHeight,
-        cursorRadius: cursorRadius,
-        cursorColor: cursorColor,
-        cursorOpacityAnimates: cursorOpacityAnimates,
-        cursorOffset: cursorOffset,
-        paintCursorAboveText: paintCursorAboveText,
-        backgroundCursorColor: CupertinoColors.inactiveGray,
-        enableInteractiveSelection: widget.enableInteractiveSelection,
-        dragStartBehavior: widget.dragStartBehavior,
-        scrollPhysics: widget.scrollPhysics,
+    final Widget child = _selectionGestureDetectorBuilder.buildGestureDetector(
+      behavior: HitTestBehavior.translucent,
+      child: RepaintBoundary(
+        child: EditableText(
+          key: editableTextKey,
+          style: effectiveTextStyle,
+          readOnly: true,
+          textWidthBasis: widget.textWidthBasis ?? defaultTextStyle.textWidthBasis,
+          textHeightBehavior: widget.textHeightBehavior ?? defaultTextStyle.textHeightBehavior,
+          showSelectionHandles: _showSelectionHandles,
+          showCursor: widget.showCursor,
+          controller: _controller,
+          focusNode: focusNode,
+          strutStyle: widget.strutStyle ?? const StrutStyle(),
+          textAlign: widget.textAlign ?? defaultTextStyle.textAlign ?? TextAlign.start,
+          textDirection: widget.textDirection,
+          textScaleFactor: widget.textScaleFactor,
+          autofocus: widget.autofocus,
+          forceLine: false,
+          toolbarOptions: widget.toolbarOptions,
+          minLines: widget.minLines,
+          maxLines: widget.maxLines ?? defaultTextStyle.maxLines,
+          selectionColor: selectionColor,
+          selectionControls: widget.selectionEnabled ? textSelectionControls : null,
+          onSelectionChanged: _handleSelectionChanged,
+          onSelectionHandleTapped: _handleSelectionHandleTapped,
+          rendererIgnoresPointer: true,
+          cursorWidth: widget.cursorWidth,
+          cursorHeight: widget.cursorHeight,
+          cursorRadius: cursorRadius,
+          cursorColor: cursorColor,
+          cursorOpacityAnimates: cursorOpacityAnimates,
+          cursorOffset: cursorOffset,
+          paintCursorAboveText: paintCursorAboveText,
+          backgroundCursorColor: CupertinoColors.inactiveGray,
+          enableInteractiveSelection: widget.enableInteractiveSelection,
+          dragStartBehavior: widget.dragStartBehavior,
+          scrollPhysics: widget.scrollPhysics,
+        ),
       ),
     );
 
@@ -679,7 +704,9 @@ class _SelectableTextState extends State<SelectableText> with AutomaticKeepAlive
       onLongPress: () {
         _effectiveFocusNode.requestFocus();
       },
-      child: _selectionGestureDetectorBuilder.buildGestureDetector(
+      child: GestureDetector(
+        excludeFromSemantics: true,
+        onTapUp: _onTapUp,
         behavior: HitTestBehavior.translucent,
         child: child,
       ),
