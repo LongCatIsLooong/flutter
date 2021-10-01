@@ -68,6 +68,14 @@ enum MaxLengthEnforcement {
 /// To create custom formatters, extend the [TextInputFormatter] class and
 /// implement the [formatEditUpdate] method.
 ///
+/// ## Limitations
+///
+/// While the [TextInputFormatter] class itself does not impose a limit on how
+/// the user input must not be formatted, some input methods may behave
+/// unexpectedly when the user input is modified in a certain way. Most notably,
+/// the default iOS Chinese keyboard may randomly modify the formatted text if
+/// the text in the composing region was modified by the framework.
+///
 /// ## Handling emojis and other complex characters
 /// {@macro flutter.widgets.EditableText.onChanged}
 ///
