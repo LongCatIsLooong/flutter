@@ -54,12 +54,29 @@ abstract class ConstrainedLayoutBuilder<ConstraintType extends Constraints> exte
   // updateRenderObject is redundant with the logic in the LayoutBuilderElement below.
 }
 
+class _LayoutBuilderScope extends BuildScope {
+  _LayoutBuilderScope(_LayoutBuilderElement<Constraints> root) : super(root);
+  @override
+  _LayoutBuilderElement<Constraints> get root => super.root as _LayoutBuilderElement<Constraints>;
+  @override
+  void scheduleBuildFor(Element element) {
+    if (element == root) {
+      parent?.scheduleBuildFor(element);
+    } else {
+      super.scheduleBuildFor(element);
+      root.renderObject.markNeedsBuild();
+    }
+  }
+}
+
 class _LayoutBuilderElement<ConstraintType extends Constraints> extends RenderObjectElement {
   _LayoutBuilderElement(ConstrainedLayoutBuilder<ConstraintType> widget) : super(widget);
 
   @override
   RenderConstrainedLayoutBuilder<ConstraintType, RenderObject> get renderObject => super.renderObject as RenderConstrainedLayoutBuilder<ConstraintType, RenderObject>;
 
+  @override
+  late final _LayoutBuilderScope buildScope =  _LayoutBuilderScope(this);
   Element? _child;
 
   @override
@@ -78,7 +95,7 @@ class _LayoutBuilderElement<ConstraintType extends Constraints> extends RenderOb
   @override
   void mount(Element? parent, Object? newSlot) {
     super.mount(parent, newSlot); // Creates the renderObject.
-    renderObject.updateCallback(_layout);
+    renderObject.updateCallback(_rebuildSubtree);
   }
 
   @override
@@ -87,7 +104,7 @@ class _LayoutBuilderElement<ConstraintType extends Constraints> extends RenderOb
     super.update(newWidget);
     assert(widget == newWidget);
 
-    renderObject.updateCallback(_layout);
+    renderObject.updateCallback(_rebuildSubtree);
     // Force the callback to be called, even if the layout constraints are the
     // same, because the logic in the callback might have changed.
     renderObject.markNeedsBuild();
@@ -111,7 +128,7 @@ class _LayoutBuilderElement<ConstraintType extends Constraints> extends RenderOb
     super.unmount();
   }
 
-  void _layout(ConstraintType constraints) {
+  void _rebuildSubtree(ConstraintType constraints) {
     @pragma('vm:notify-debugger-on-exception')
     void layoutCallback() {
       Widget built;
@@ -219,7 +236,7 @@ mixin RenderConstrainedLayoutBuilder<ConstraintType extends Constraints, ChildTy
   ///
   /// Typically this results in [ConstrainedLayoutBuilder.builder] being called
   /// during layout.
-  void rebuildIfNecessary() {
+  void rebuildIfNeeded() {
     assert(_callback != null);
     if (_needsBuild || constraints != _previousConstraints) {
       _previousConstraints = constraints;
@@ -313,7 +330,7 @@ class _RenderLayoutBuilder extends RenderBox with RenderObjectWithChildMixin<Ren
   @override
   void performLayout() {
     final BoxConstraints constraints = this.constraints;
-    rebuildIfNecessary();
+    rebuildIfNeeded();
     if (child != null) {
       child!.layout(constraints, parentUsesSize: true);
       size = constraints.constrain(child!.size);

@@ -1111,9 +1111,8 @@ class RenderObjectToWidgetAdapter<T extends RenderObject> extends RenderObjectWi
   RenderObjectToWidgetElement<T> attachToRenderTree(BuildOwner owner, [ RenderObjectToWidgetElement<T>? element ]) {
     if (element == null) {
       owner.lockState(() {
-        element = createElement();
+        element = createElement()..assignOwner(owner);
         assert(element != null);
-        element!.assignOwner(owner);
       });
       owner.buildScope(element!, () {
         element!.mount(null, null);

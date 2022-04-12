@@ -2362,6 +2362,159 @@ abstract class BuildContext {
   DiagnosticsNode describeOwnershipChain(String name);
 }
 
+class BuildScope {
+  BuildScope(this.root);
+  final Element root;
+
+  bool _dirtyElementsNeedsResorting = false;
+  final List<Element> _dirtyElements = <Element>[];
+
+  void scheduleBuildFor(Element element) {
+    if (element._scheduledInBuildScope == this) {
+      assert(() {
+        if (debugPrintScheduleBuildForStacks)
+          debugPrintStack(label: 'BuildOwner.scheduleBuildFor() called; _dirtyElementsNeedsResorting was $_dirtyElementsNeedsResorting (now true); dirty list is: $_dirtyElements');
+        if (!root.owner!._debugBuilding) {
+          throw FlutterError.fromParts(<DiagnosticsNode>[
+            ErrorSummary('BuildOwner.scheduleBuildFor() called inappropriately.'),
+            ErrorHint(
+              'The BuildOwner.scheduleBuildFor() method should only be called while the '
+              'buildScope() method is actively rebuilding the widget tree.',
+            ),
+          ]);
+        }
+        return true;
+      }());
+      _dirtyElementsNeedsResorting = true;
+      return;
+    }
+
+    _dirtyElements.add(element);
+    element._scheduledInBuildScope = this;
+  }
+
+  BuildScope? get parent => root._parent?.buildScope;
+
+  void rebuildDirtyElements() {
+    try {
+      _dirtyElements
+        ..remove((Element element) => element._scheduledInBuildScope != this)
+        ..sort(Element._sort);
+      _dirtyElementsNeedsResorting = false;
+      int dirtyCount = _dirtyElements.length;
+      int index = 0;
+      while (index < dirtyCount) {
+        final Element element = _dirtyElements[index];
+        assert(element != null);
+        if (!element._dirty) {
+          index += 1;
+          continue;
+        }
+        assert(() {
+          if (element._lifecycleState == _ElementLifecycle.active && !element._debugIsInScope(root)) {
+            throw FlutterError.fromParts(<DiagnosticsNode>[
+              ErrorSummary('Tried to build dirty widget in the wrong build scope.'),
+              ErrorDescription(
+                'A widget which was marked as dirty and is still active was scheduled to be built, '
+                'but the current build scope unexpectedly does not contain that widget.',
+              ),
+              ErrorHint(
+                'Sometimes this is detected when an element is removed from the widget tree, but the '
+                'element somehow did not get marked as inactive. In that case, it might be caused by '
+                'an ancestor element failing to implement visitChildren correctly, thus preventing '
+                'some or all of its descendants from being correctly deactivated.',
+              ),
+              DiagnosticsProperty<Element>(
+                'The root of the build scope was',
+                root,
+                style: DiagnosticsTreeStyle.errorProperty,
+              ),
+              DiagnosticsProperty<Element>(
+                'The offending element (which does not appear to be a descendant of the root of the build scope) was',
+                element,
+                style: DiagnosticsTreeStyle.errorProperty,
+              ),
+            ]);
+          }
+          return true;
+        }());
+        final bool isTimelineTracked = !kReleaseMode && _isProfileBuildsEnabledFor(element.widget);
+        if (isTimelineTracked) {
+          Map<String, String> debugTimelineArguments = timelineArgumentsIndicatingLandmarkEvent;
+          assert(() {
+            if (kDebugMode) {
+              debugTimelineArguments = element.widget.toDiagnosticsNode().toTimelineArguments();
+            }
+            return true;
+          }());
+          Timeline.startSync(
+            '${element.widget.runtimeType}',
+            arguments: debugTimelineArguments,
+          );
+        }
+        try {
+          element.rebuild();
+        } catch (e, stack) {
+          _debugReportException(
+            ErrorDescription('while rebuilding dirty elements'),
+            e,
+            stack,
+            informationCollector: () => <DiagnosticsNode>[
+              if (kDebugMode && index < _dirtyElements.length)
+                DiagnosticsDebugCreator(DebugCreator(element)),
+              if (index < _dirtyElements.length)
+                element.describeElement('The element being rebuilt at the time was index $index of $dirtyCount')
+              else
+                ErrorHint('The element being rebuilt at the time was index $index of $dirtyCount, but _dirtyElements only had ${_dirtyElements.length} entries. This suggests some confusion in the framework internals.'),
+            ],
+          );
+        }
+        if (isTimelineTracked)
+          Timeline.finishSync();
+        index += 1;
+        if (dirtyCount < _dirtyElements.length || _dirtyElementsNeedsResorting) {
+          _dirtyElements.sort(Element._sort);
+          _dirtyElementsNeedsResorting = false;
+          dirtyCount = _dirtyElements.length;
+
+          if (index > 0 && _dirtyElements[index - 1].dirty) {
+          //  // It is possible for previously dirty but inactive widgets to move right in the list.
+          //  // We therefore have to move the index left in the list to account for this.
+          //  // We don't know how many could have moved. However, we do know that the only possible
+          //  // change to the list is that nodes that were previously to the left of the index have
+          //  // now moved to be to the right of the right-most cleaned node, and we do know that
+          //  // all the clean nodes were to the left of the index. So we move the index left
+          //  // until just after the right-most clean node.
+              index -= 1;
+          }
+        }
+      }
+      assert(() {
+        if (_dirtyElements.any((Element element) => element._lifecycleState == _ElementLifecycle.active && element.dirty)) {
+          throw FlutterError.fromParts(<DiagnosticsNode>[
+            ErrorSummary('buildScope missed some dirty elements.'),
+            ErrorHint('This probably indicates that the dirty list should have been resorted but was not.'),
+            Element.describeElements('The list of dirty elements at the end of the buildScope call was', _dirtyElements),
+          ]);
+        }
+        return true;
+      }());
+    } finally {
+      for (final Element element in _dirtyElements) {
+        if (element._scheduledInBuildScope != this) {
+          continue;
+        }
+        element._scheduledInBuildScope = null;
+      }
+      _dirtyElements.clear();
+      _dirtyElementsNeedsResorting = false;
+      if (!kReleaseMode) {
+        Timeline.finishSync();
+      }
+    }
+  }
+}
+
 /// Manager class for the widgets framework.
 ///
 /// This class tracks which widgets need rebuilding, and handles other tasks
@@ -2415,11 +2568,6 @@ class BuildOwner {
   /// the widget tree.
   bool? _dirtyElementsNeedsResorting;
 
-  /// Whether [buildScope] is actively rebuilding the widget tree.
-  ///
-  /// [scheduleBuildFor] should only be called when this value is true.
-  bool get _debugIsInBuildScope => _dirtyElementsNeedsResorting != null;
-
   /// The object in charge of the focus tree.
   ///
   /// Rarely used directly. Instead, consider using [FocusScope.of] to obtain
@@ -2439,50 +2587,11 @@ class BuildOwner {
   void scheduleBuildFor(Element element) {
     assert(element != null);
     assert(element.owner == this);
-    assert(() {
-      if (debugPrintScheduleBuildForStacks)
-        debugPrintStack(label: 'scheduleBuildFor() called for $element${_dirtyElements.contains(element) ? " (ALREADY IN LIST)" : ""}');
-      if (!element.dirty) {
-        throw FlutterError.fromParts(<DiagnosticsNode>[
-          ErrorSummary('scheduleBuildFor() called for a widget that is not marked as dirty.'),
-          element.describeElement('The method was called for the following element'),
-          ErrorDescription(
-            'This element is not current marked as dirty. Make sure to set the dirty flag before '
-            'calling scheduleBuildFor().',
-          ),
-          ErrorHint(
-            'If you did not attempt to call scheduleBuildFor() yourself, then this probably '
-            'indicates a bug in the widgets framework. Please report it:\n'
-            '  https://github.com/flutter/flutter/issues/new?template=2_bug.md',
-          ),
-        ]);
-      }
-      return true;
-    }());
-    if (element._inDirtyList) {
-      assert(() {
-        if (debugPrintScheduleBuildForStacks)
-          debugPrintStack(label: 'BuildOwner.scheduleBuildFor() called; _dirtyElementsNeedsResorting was $_dirtyElementsNeedsResorting (now true); dirty list is: $_dirtyElements');
-        if (!_debugIsInBuildScope) {
-          throw FlutterError.fromParts(<DiagnosticsNode>[
-            ErrorSummary('BuildOwner.scheduleBuildFor() called inappropriately.'),
-            ErrorHint(
-              'The BuildOwner.scheduleBuildFor() method should only be called while the '
-              'buildScope() method is actively rebuilding the widget tree.',
-            ),
-          ]);
-        }
-        return true;
-      }());
-      _dirtyElementsNeedsResorting = true;
-      return;
-    }
+    element.buildScope!.scheduleBuildFor(element);
     if (!_scheduledFlushDirtyElements && onBuildScheduled != null) {
       _scheduledFlushDirtyElements = true;
       onBuildScheduled!();
     }
-    _dirtyElements.add(element);
-    element._inDirtyList = true;
     assert(() {
       if (debugPrintScheduleBuildForStacks)
         debugPrint('...dirty list is now: $_dirtyElements');
@@ -2494,6 +2603,8 @@ class BuildOwner {
   bool get _debugStateLocked => _debugStateLockLevel > 0;
 
   /// Whether this widget tree is in the build phase.
+  ///
+  /// [scheduleBuildFor] should only be called when this value is true.
   ///
   /// Only valid when asserts are enabled.
   bool get debugBuilding => _debugBuilding;
@@ -2526,6 +2637,7 @@ class BuildOwner {
   /// Establishes a scope for updating the widget tree, and calls the given
   /// `callback`, if any. Then, builds all the elements that were marked as
   /// dirty using [scheduleBuildFor], in depth order.
+
   ///
   /// This mechanism prevents build methods from transitively requiring other
   /// build methods to run, potentially causing infinite loops.
@@ -2550,7 +2662,7 @@ class BuildOwner {
   /// often.
   @pragma('vm:notify-debugger-on-exception')
   void buildScope(Element context, [ VoidCallback? callback ]) {
-    if (callback == null && _dirtyElements.isEmpty)
+    if (callback == null && context.buildScope!._dirtyElements.isEmpty)
       return;
     assert(context != null);
     assert(_debugStateLockLevel >= 0);
@@ -2605,114 +2717,13 @@ class BuildOwner {
           }());
         }
       }
-      _dirtyElements.sort(Element._sort);
-      _dirtyElementsNeedsResorting = false;
-      int dirtyCount = _dirtyElements.length;
-      int index = 0;
-      while (index < dirtyCount) {
-        final Element element = _dirtyElements[index];
-        assert(element != null);
-        assert(element._inDirtyList);
-        assert(() {
-          if (element._lifecycleState == _ElementLifecycle.active && !element._debugIsInScope(context)) {
-            throw FlutterError.fromParts(<DiagnosticsNode>[
-              ErrorSummary('Tried to build dirty widget in the wrong build scope.'),
-              ErrorDescription(
-                'A widget which was marked as dirty and is still active was scheduled to be built, '
-                'but the current build scope unexpectedly does not contain that widget.',
-              ),
-              ErrorHint(
-                'Sometimes this is detected when an element is removed from the widget tree, but the '
-                'element somehow did not get marked as inactive. In that case, it might be caused by '
-                'an ancestor element failing to implement visitChildren correctly, thus preventing '
-                'some or all of its descendants from being correctly deactivated.',
-              ),
-              DiagnosticsProperty<Element>(
-                'The root of the build scope was',
-                context,
-                style: DiagnosticsTreeStyle.errorProperty,
-              ),
-              DiagnosticsProperty<Element>(
-                'The offending element (which does not appear to be a descendant of the root of the build scope) was',
-                element,
-                style: DiagnosticsTreeStyle.errorProperty,
-              ),
-            ]);
-          }
-          return true;
-        }());
-        final bool isTimelineTracked = !kReleaseMode && _isProfileBuildsEnabledFor(element.widget);
-        if (isTimelineTracked) {
-          Map<String, String> debugTimelineArguments = timelineArgumentsIndicatingLandmarkEvent;
-          assert(() {
-            if (kDebugMode) {
-              debugTimelineArguments = element.widget.toDiagnosticsNode().toTimelineArguments();
-            }
-            return true;
-          }());
-          Timeline.startSync(
-            '${element.widget.runtimeType}',
-            arguments: debugTimelineArguments,
-          );
-        }
-        try {
-          element.rebuild();
-        } catch (e, stack) {
-          _debugReportException(
-            ErrorDescription('while rebuilding dirty elements'),
-            e,
-            stack,
-            informationCollector: () => <DiagnosticsNode>[
-              if (kDebugMode && index < _dirtyElements.length)
-                DiagnosticsDebugCreator(DebugCreator(element)),
-              if (index < _dirtyElements.length)
-                element.describeElement('The element being rebuilt at the time was index $index of $dirtyCount')
-              else
-                ErrorHint('The element being rebuilt at the time was index $index of $dirtyCount, but _dirtyElements only had ${_dirtyElements.length} entries. This suggests some confusion in the framework internals.'),
-            ],
-          );
-        }
-        if (isTimelineTracked)
-          Timeline.finishSync();
-        index += 1;
-        if (dirtyCount < _dirtyElements.length || _dirtyElementsNeedsResorting!) {
-          _dirtyElements.sort(Element._sort);
-          _dirtyElementsNeedsResorting = false;
-          dirtyCount = _dirtyElements.length;
-          while (index > 0 && _dirtyElements[index - 1].dirty) {
-            // It is possible for previously dirty but inactive widgets to move right in the list.
-            // We therefore have to move the index left in the list to account for this.
-            // We don't know how many could have moved. However, we do know that the only possible
-            // change to the list is that nodes that were previously to the left of the index have
-            // now moved to be to the right of the right-most cleaned node, and we do know that
-            // all the clean nodes were to the left of the index. So we move the index left
-            // until just after the right-most clean node.
-            index -= 1;
-          }
-        }
-      }
-      assert(() {
-        if (_dirtyElements.any((Element element) => element._lifecycleState == _ElementLifecycle.active && element.dirty)) {
-          throw FlutterError.fromParts(<DiagnosticsNode>[
-            ErrorSummary('buildScope missed some dirty elements.'),
-            ErrorHint('This probably indicates that the dirty list should have been resorted but was not.'),
-            Element.describeElements('The list of dirty elements at the end of the buildScope call was', _dirtyElements),
-          ]);
-        }
-        return true;
-      }());
+
+      // Rebuild dirty elements within the given BuildScope
+      // after callback.
+      context.buildScope!.rebuildDirtyElements();
     } finally {
-      for (final Element element in _dirtyElements) {
-        assert(element._inDirtyList);
-        element._inDirtyList = false;
-      }
-      _dirtyElements.clear();
-      _scheduledFlushDirtyElements = false;
-      _dirtyElementsNeedsResorting = null;
-      if (!kReleaseMode) {
-        Timeline.finishSync();
-      }
       assert(_debugBuilding);
+      _scheduledFlushDirtyElements = false;
       assert(() {
         _debugBuilding = false;
         _debugStateLockLevel -= 1;
@@ -2720,8 +2731,8 @@ class BuildOwner {
           debugPrint('buildScope finished');
         return true;
       }());
+      assert(_debugStateLockLevel >= 0);
     }
-    assert(_debugStateLockLevel >= 0);
   }
 
   Map<Element, Set<GlobalKey>>? _debugElementsThatWillNeedToBeRebuiltDueToGlobalKeyShenanigans;
@@ -3149,6 +3160,9 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
   Element? _parent;
   DebugReassembleConfig? _debugReassembleConfig;
   _NotificationNode? _notificationTree;
+
+  BuildScope? get buildScope => _buildScope;
+  BuildScope? _buildScope;
 
   /// Compare two widgets for equality.
   ///
@@ -3599,6 +3613,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
       // See RootRenderObjectElement.assignOwner().
       _owner = parent.owner;
     }
+    _buildScope = parent?.buildScope;
     assert(owner != null);
     final Key? key = widget.key;
     if (key is GlobalKey) {
@@ -3945,6 +3960,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
     _dependencies?.clear();
     _hadUnsatisfiedDependencies = false;
     _updateInheritance();
+    _buildScope = _parent?.buildScope;
     attachNotificationTree();
     if (_dirty)
       owner!.scheduleBuildFor(this);
@@ -4420,7 +4436,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
 
   // Whether this is in owner._dirtyElements. This is used to know whether we
   // should be adding the element back into the list when it's reactivated.
-  bool _inDirtyList = false;
+  BuildScope? _scheduledInBuildScope;
 
   // Whether we've already built or not. Set in [rebuild].
   bool _debugBuiltOnce = false;
@@ -6139,6 +6155,8 @@ abstract class RootRenderObjectElement extends RenderObjectElement {
   void assignOwner(BuildOwner owner) {
     _owner = owner;
   }
+
+  late final BuildScope buildScope = BuildScope(this);
 
   @override
   void mount(Element? parent, Object? newSlot) {

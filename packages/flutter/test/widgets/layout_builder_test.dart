@@ -696,6 +696,52 @@ void main() {
     await pumpTestWidget(const Size(10.0, 10.0));
     expect(childSize, const Size(10.0, 10.0));
   });
+
+  testWidgets('LayoutBuilder should not cause descendants to be rebuilt multiple times', (WidgetTester tester) async {
+    int buildCount = 0;
+    final Widget widget = Builder(builder: (BuildContext context) {
+      buildCount += 1;
+      return Text(
+        'directionality: ${Directionality.of(context)}, MediaQuery: ${MediaQuery.of(context)}, TextStyle: ${DefaultTextStyle.of(context)}'
+      );
+    });
+
+    await tester.pumpWidget(
+      DefaultTextStyle(
+        style: const TextStyle(),
+        child: SizedBox.square(
+          dimension: 100,
+          child: LayoutBuilder(builder: (BuildContext context, BoxConstraints constraints) {
+            return Directionality(
+              textDirection: TextDirection.ltr,
+              child: LayoutBuilder(builder: (BuildContext context, BoxConstraints constraints) {
+                return MediaQuery(data: const MediaQueryData(boldText: true), child: widget);
+              }),
+            );
+          }),
+        ),
+      ),
+    );
+
+    expect(buildCount, 1);
+    await tester.pumpWidget(
+      DefaultTextStyle(
+        style: const TextStyle(fontSize: 99),
+        child: SizedBox.square(
+          dimension: 200,
+          child: LayoutBuilder(builder: (BuildContext context, BoxConstraints constraints) {
+            return Directionality(
+              textDirection: TextDirection.rtl,
+              child: LayoutBuilder(builder: (BuildContext context, BoxConstraints constraints) {
+                return MediaQuery(data: const MediaQueryData(), child: widget);
+              }),
+            );
+          }),
+        ),
+      ),
+    );
+    expect(buildCount, 2);
+  });
 }
 
 class _LayoutSpy extends LeafRenderObjectWidget {
