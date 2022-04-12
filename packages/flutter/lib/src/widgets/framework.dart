@@ -2442,7 +2442,7 @@ class BuildScope {
         if (isTimelineTracked) {
           Map<String, String> debugTimelineArguments = timelineArgumentsIndicatingLandmarkEvent;
           assert(() {
-            if (kDebugMode) {
+            if (kDebugMode && debugEnhanceBuildTimelineArguments) {
               debugTimelineArguments = element.widget.toDiagnosticsNode().toTimelineArguments();
             }
             return true;
@@ -2677,7 +2677,7 @@ class BuildOwner {
     if (!kReleaseMode) {
       Map<String, String> debugTimelineArguments = timelineArgumentsIndicatingLandmarkEvent;
       assert(() {
-        if (debugProfileBuildsEnabled) {
+        if (debugEnhanceBuildTimelineArguments) {
           debugTimelineArguments = <String, String>{
             ...debugTimelineArguments,
             'dirty count': '${_dirtyElements.length}',
@@ -3531,7 +3531,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
         if (isTimelineTracked) {
           Map<String, String> debugTimelineArguments = timelineArgumentsIndicatingLandmarkEvent;
           assert(() {
-            if (kDebugMode) {
+            if (kDebugMode && debugEnhanceBuildTimelineArguments) {
               debugTimelineArguments = newWidget.toDiagnosticsNode().toTimelineArguments();
             }
             return true;
@@ -3797,7 +3797,7 @@ abstract class Element extends DiagnosticableTree implements BuildContext {
     if (isTimelineTracked) {
       Map<String, String> debugTimelineArguments = timelineArgumentsIndicatingLandmarkEvent;
       assert(() {
-        if (kDebugMode) {
+        if (kDebugMode && debugEnhanceBuildTimelineArguments) {
           debugTimelineArguments = newWidget.toDiagnosticsNode().toTimelineArguments();
         }
         return true;
