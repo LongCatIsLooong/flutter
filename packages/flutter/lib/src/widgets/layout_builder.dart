@@ -54,29 +54,12 @@ abstract class ConstrainedLayoutBuilder<ConstraintType extends Constraints> exte
   // updateRenderObject is redundant with the logic in the LayoutBuilderElement below.
 }
 
-class _LayoutBuilderScope extends BuildScope {
-  _LayoutBuilderScope(_LayoutBuilderElement<Constraints> root) : super(root);
-  @override
-  _LayoutBuilderElement<Constraints> get root => super.root as _LayoutBuilderElement<Constraints>;
-  @override
-  void scheduleBuildFor(Element element) {
-    if (element == root) {
-      parent?.scheduleBuildFor(element);
-    } else {
-      super.scheduleBuildFor(element);
-      root.renderObject.markNeedsBuild();
-    }
-  }
-}
-
-class _LayoutBuilderElement<ConstraintType extends Constraints> extends RenderObjectElement {
+class _LayoutBuilderElement<ConstraintType extends Constraints> extends RenderObjectElement with LayoutScope {
   _LayoutBuilderElement(ConstrainedLayoutBuilder<ConstraintType> widget) : super(widget);
 
   @override
   RenderConstrainedLayoutBuilder<ConstraintType, RenderObject> get renderObject => super.renderObject as RenderConstrainedLayoutBuilder<ConstraintType, RenderObject>;
 
-  @override
-  late final _LayoutBuilderScope buildScope =  _LayoutBuilderScope(this);
   Element? _child;
 
   @override
@@ -107,6 +90,11 @@ class _LayoutBuilderElement<ConstraintType extends Constraints> extends RenderOb
     renderObject.updateCallback(_rebuildSubtree);
     // Force the callback to be called, even if the layout constraints are the
     // same, because the logic in the callback might have changed.
+    renderObject.markNeedsBuild();
+  }
+
+  @override
+  void markNeedsFlushing() {
     renderObject.markNeedsBuild();
   }
 
@@ -208,6 +196,7 @@ mixin RenderConstrainedLayoutBuilder<ConstraintType extends Constraints, ChildTy
   }
 
   bool _needsBuild = true;
+  bool _needsRelayout = false;
 
   /// Marks this layout builder as needing to rebuild.
   ///
@@ -224,7 +213,11 @@ mixin RenderConstrainedLayoutBuilder<ConstraintType extends Constraints, ChildTy
     // phase, when parent constraints are available. Calling `markNeedsLayout`
     // will cause it to be called at the right time.
     _needsBuild = true;
-    markNeedsLayout();
+    markNeedsFlush();
+  }
+
+  void markNeedsFlush() {
+    super.markNeedsLayout();
   }
 
   // The constraints that were passed to this class last time it was laid out.
@@ -243,6 +236,11 @@ mixin RenderConstrainedLayoutBuilder<ConstraintType extends Constraints, ChildTy
       _needsBuild = false;
       invokeLayoutCallback(_callback!);
     }
+  }
+
+  @override
+  void markNeedsLayout() {
+    super.markNeedsLayout();
   }
 }
 

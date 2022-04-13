@@ -1792,7 +1792,7 @@ class _DecorateState extends State<Decorate> {
 
 class DirtyElementWithCustomBuildOwner extends Element {
   DirtyElementWithCustomBuildOwner(BuildOwner buildOwner, Widget widget)
-  : _owner = buildOwner, super(widget);
+    : _owner = buildOwner, super(widget);
 
   final BuildOwner _owner;
 

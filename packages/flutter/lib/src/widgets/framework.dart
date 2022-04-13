@@ -2366,6 +2366,10 @@ class BuildScope {
   BuildScope(this.root);
   final Element root;
 
+  /// Whether [_dirtyElements] need to be sorted again as a result of more
+  /// elements becoming dirty during the build.
+  ///
+  /// This is necessary to preserve the sort order defined by [Element._sort].
   bool _dirtyElementsNeedsResorting = false;
   final List<Element> _dirtyElements = <Element>[];
 
@@ -2393,7 +2397,6 @@ class BuildScope {
     element._scheduledInBuildScope = this;
   }
 
-  BuildScope? get parent => root._parent?.buildScope;
 
   void rebuildDirtyElements() {
     try {
@@ -2515,6 +2518,29 @@ class BuildScope {
   }
 }
 
+class _LayoutDependentScope extends BuildScope {
+  _LayoutDependentScope(LayoutScope root) : super(root);
+  @override
+  LayoutScope get root => super.root as LayoutScope;
+  @override
+  void scheduleBuildFor(Element element) {
+    if (element == root) {
+      root._parent?.buildScope?.scheduleBuildFor(element);
+    } else {
+      super.scheduleBuildFor(element);
+      root.markNeedsFlushing();
+    }
+  }
+}
+
+mixin LayoutScope on Element {
+  @override
+  late final _LayoutDependentScope buildScope =  _LayoutDependentScope(this);
+
+  @protected
+  void markNeedsFlushing();
+}
+
 /// Manager class for the widgets framework.
 ///
 /// This class tracks which widgets need rebuilding, and handles other tasks
@@ -2556,17 +2582,7 @@ class BuildOwner {
 
   final _InactiveElements _inactiveElements = _InactiveElements();
 
-  final List<Element> _dirtyElements = <Element>[];
   bool _scheduledFlushDirtyElements = false;
-
-  /// Whether [_dirtyElements] need to be sorted again as a result of more
-  /// elements becoming dirty during the build.
-  ///
-  /// This is necessary to preserve the sort order defined by [Element._sort].
-  ///
-  /// This field is set to null when [buildScope] is not actively rebuilding
-  /// the widget tree.
-  bool? _dirtyElementsNeedsResorting;
 
   /// The object in charge of the focus tree.
   ///
@@ -2594,7 +2610,7 @@ class BuildOwner {
     }
     assert(() {
       if (debugPrintScheduleBuildForStacks)
-        debugPrint('...dirty list is now: $_dirtyElements');
+        debugPrint('...dirty list is now: ${element.buildScope!._dirtyElements}');
       return true;
     }());
   }
@@ -2637,7 +2653,6 @@ class BuildOwner {
   /// Establishes a scope for updating the widget tree, and calls the given
   /// `callback`, if any. Then, builds all the elements that were marked as
   /// dirty using [scheduleBuildFor], in depth order.
-
   ///
   /// This mechanism prevents build methods from transitively requiring other
   /// build methods to run, potentially causing infinite loops.
@@ -2662,14 +2677,15 @@ class BuildOwner {
   /// often.
   @pragma('vm:notify-debugger-on-exception')
   void buildScope(Element context, [ VoidCallback? callback ]) {
-    if (callback == null && context.buildScope!._dirtyElements.isEmpty)
+    final BuildScope scope = context.buildScope!;
+    if (callback == null && scope._dirtyElements.isEmpty)
       return;
     assert(context != null);
     assert(_debugStateLockLevel >= 0);
     assert(!_debugBuilding);
     assert(() {
       if (debugPrintBuildScope)
-        debugPrint('buildScope called with context $context; dirty list is: $_dirtyElements');
+        debugPrint('buildScope called with context $context; dirty list is: $scope._dirtyElements');
       _debugStateLockLevel += 1;
       _debugBuilding = true;
       return true;
@@ -2680,8 +2696,8 @@ class BuildOwner {
         if (debugEnhanceBuildTimelineArguments) {
           debugTimelineArguments = <String, String>{
             ...debugTimelineArguments,
-            'dirty count': '${_dirtyElements.length}',
-            'dirty list': '$_dirtyElements',
+            'dirty count': '${scope._dirtyElements.length}',
+            'dirty list': '${scope._dirtyElements}',
             'lock level': '$_debugStateLockLevel',
             'scope context': '$context',
           };
@@ -2704,7 +2720,6 @@ class BuildOwner {
           _debugCurrentBuildTarget = context;
           return true;
         }());
-        _dirtyElementsNeedsResorting = false;
         try {
           callback();
         } finally {
@@ -2720,7 +2735,7 @@ class BuildOwner {
 
       // Rebuild dirty elements within the given BuildScope
       // after callback.
-      context.buildScope!.rebuildDirtyElements();
+      scope.rebuildDirtyElements();
     } finally {
       assert(_debugBuilding);
       _scheduledFlushDirtyElements = false;
@@ -2731,8 +2746,8 @@ class BuildOwner {
           debugPrint('buildScope finished');
         return true;
       }());
-      assert(_debugStateLockLevel >= 0);
     }
+    assert(_debugStateLockLevel >= 0);
   }
 
   Map<Element, Set<GlobalKey>>? _debugElementsThatWillNeedToBeRebuiltDueToGlobalKeyShenanigans;
@@ -6156,6 +6171,7 @@ abstract class RootRenderObjectElement extends RenderObjectElement {
     _owner = owner;
   }
 
+  @override
   late final BuildScope buildScope = BuildScope(this);
 
   @override
