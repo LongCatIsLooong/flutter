@@ -908,6 +908,19 @@ class PipelineOwner {
   }
 
   List<RenderObject> _nodesNeedingLayout = <RenderObject>[];
+  Set<RenderObject> _nodesNeedingFlush = <RenderObject>{};
+
+  void scheduleLayout(RenderObject renderObject) {
+    if (!renderObject._needsLayout) {
+      _nodesNeedingFlush.add(renderObject);
+      return;
+    }
+
+    // Only track relayout boundaries.
+    if (renderObject._relayoutBoundary == renderObject) {
+      _nodesNeedingLayout.add(renderObject);
+    }
+  }
 
   /// Whether this pipeline is currently in the layout phase.
   ///
@@ -917,6 +930,41 @@ class PipelineOwner {
   /// always returns false.
   bool get debugDoingLayout => _debugDoingLayout;
   bool _debugDoingLayout = false;
+
+  @pragma('vm:notify-debugger-on-exception')
+  void _layoutRelayoutBoundary(RenderObject renderObject) {
+    if (!renderObject._needsLayout || renderObject.owner != this) {
+      return;
+    }
+    assert(renderObject._relayoutBoundary == renderObject, '$renderObject');
+    RenderObject? debugPreviousActiveLayout;
+    assert(!renderObject._debugMutationsLocked);
+    assert(!renderObject._doingThisLayoutWithCallback);
+    assert(renderObject._debugCanParentUseSize != null);
+    assert(() {
+      renderObject._debugMutationsLocked = true;
+      renderObject._debugDoingThisLayout = true;
+      debugPreviousActiveLayout = RenderObject._debugActiveLayout;
+      RenderObject._debugActiveLayout = renderObject;
+      if (debugPrintLayouts)
+        debugPrint('Laying out (without resize) $renderObject');
+      return true;
+    }());
+    try {
+      renderObject.performLayout();
+      renderObject.markNeedsSemanticsUpdate();
+    } catch (e, stack) {
+      renderObject._debugReportException('performLayout', e, stack);
+    }
+    assert(() {
+      RenderObject._debugActiveLayout = debugPreviousActiveLayout;
+      renderObject._debugDoingThisLayout = false;
+      renderObject._debugMutationsLocked = false;
+      return true;
+    }());
+    renderObject._needsLayout = false;
+    renderObject.markNeedsPaint();
+  }
 
   /// Update the layout information for all dirty render objects.
   ///
@@ -949,10 +997,20 @@ class PipelineOwner {
     try {
       while (_nodesNeedingLayout.isNotEmpty) {
         final List<RenderObject> dirtyNodes = _nodesNeedingLayout;
+        final Set<RenderObject> nodesWithDirtyPipelines = _nodesNeedingFlush;
         _nodesNeedingLayout = <RenderObject>[];
-        for (final RenderObject node in dirtyNodes..sort((RenderObject a, RenderObject b) => a.depth - b.depth)) {
-          if (node._needsLayout && node.owner == this)
+        _nodesNeedingFlush = <RenderObject>{};
+        dirtyNodes.sort((RenderObject a, RenderObject b) => a.depth - b.depth);
+        for (final RenderObject node in dirtyNodes) {
+          // We'll see about this one…
+          if (node.owner != this) {
+            continue;
+          }
+          if (node._needsLayout) {
             node._layoutWithoutResize();
+          } else if (nodesWithDirtyPipelines.contains(node)) {
+            node.performLayout();
+          }
         }
       }
     } finally {
@@ -1703,29 +1761,27 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       assert(_debugSubtreeRelayoutRootAlreadyMarkedNeedsLayout());
       return;
     }
-    if (_relayoutBoundary == null) {
-      _needsLayout = true;
-      if (parent != null) {
-        // _relayoutBoundary is cleaned by an ancestor in RenderObject.layout.
-        // Conservatively mark everything dirty until it reaches the closest
-        // known relayout boundary.
-        markParentNeedsLayout();
-      }
-      return;
-    }
-    if (_relayoutBoundary != this) {
+    _needsLayout = true;
+    owner?.scheduleLayout(this);
+    owner?.requestVisualUpdate();
+
+    // markNeedsLayout can be called when the layout is being updated.
+    // _relayoutBoundary must be set to null when the old value is invalidated
+    // but the new one hasn't been calculated yet.
+    // Conservatively mark ancestor RenderObjects dirty until we reach the
+    // closest known relayout boundary.
+    final bool markParentDirty = _relayoutBoundary == null
+      ? parent != null
+      : _relayoutBoundary != this;
+
+    if (markParentDirty) {
       markParentNeedsLayout();
     } else {
-      _needsLayout = true;
-      if (owner != null) {
-        assert(() {
-          if (debugPrintMarkNeedsLayoutStacks)
-            debugPrintStack(label: 'markNeedsLayout() called for $this');
-          return true;
-        }());
-        owner!._nodesNeedingLayout.add(this);
-        owner!.requestVisualUpdate();
-      }
+      assert(() {
+        if (debugPrintMarkNeedsLayoutStacks)
+          debugPrintStack(label: 'markNeedsLayout() called for $this');
+        return true;
+      }());
     }
   }
 
@@ -1808,7 +1864,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       _debugCanParentUseSize = false;
       return true;
     }());
-    owner!._nodesNeedingLayout.add(this);
+    owner!.scheduleLayout(this);
   }
 
   @pragma('vm:notify-debugger-on-exception')
