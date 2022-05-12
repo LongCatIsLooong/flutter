@@ -530,6 +530,26 @@ class OverlayState extends State<Overlay> with TickerProviderStateMixin {
     });
   }
 
+  void _insertChildRenderObjectWithoutRelayout(RenderBox child) {
+    final RenderObject? renderObject = context.findRenderObject();
+    if (renderObject is! _RenderTheatre) {
+      assert(false);
+      return;
+    }
+
+    renderObject.add(child);
+  }
+
+  void _removeChildRenderObjectWithoutRelayout(RenderBox child) {
+    final RenderObject? renderObject = context.findRenderObject();
+    if (renderObject is! _RenderTheatre) {
+      assert(false);
+      return;
+    }
+
+    renderObject.remove(child);
+  }
+
   @override
   Widget build(BuildContext context) {
     // This list is filled backwards and then reversed below before
@@ -647,7 +667,16 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
     addAll(children);
   }
 
+  final Map<RenderBox, PipelineOwner> _pipelineOwners = <RenderBox, PipelineOwner>{};
+  bool _suppressMarkNeedsLayout = false;
   bool _hasVisualOverflow = false;
+
+  @override
+  void markNeedsLayout() {
+    if (!_suppressMarkNeedsLayout) {
+      super.markNeedsLayout();
+    }
+  }
 
   @override
   void setupParentData(RenderBox child) {
@@ -657,10 +686,39 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
 
   Alignment? _resolvedAlignment;
 
-  void _resolve() {
-    if (_resolvedAlignment != null)
+  @override
+  void attachChild(RenderBox child) {
+    if (!attached)
       return;
-    _resolvedAlignment = AlignmentDirectional.topStart.resolve(textDirection);
+    child.attach(_pipelineOwners.putIfAbsent(child, PipelineOwner.new));
+  }
+
+  @override
+  void detachChild(RenderBox child) {
+    super.detachChild(child);
+    if (!attached) {
+      _pipelineOwners.remove(child);
+    }
+  }
+
+  //void addChild(RenderBox child) {
+  //  _suppressMarkNeedsLayout = true;
+  //  try {
+  //  } finally {
+  //    _suppressMarkNeedsLayout = false;
+  //  }
+  //}
+
+  //void removeChild(RenderBox child) {
+  //  _suppressMarkNeedsLayout = true;
+  //  try {
+  //  } finally {
+  //    _suppressMarkNeedsLayout = false;
+  //  }
+  //}
+
+  void _resolve() {
+    _resolvedAlignment ??= AlignmentDirectional.topStart.resolve(textDirection);
   }
 
   void _markNeedResolution() {
@@ -786,6 +844,7 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
     RenderBox? child = _firstOnstageChild;
     while (child != null) {
       final StackParentData childParentData = child.parentData! as StackParentData;
+      final PipelineOwner childOwner = _pipelineOwners[child]!;
 
       if (!childParentData.isPositioned) {
         child.layout(nonPositionedConstraints, parentUsesSize: true);
@@ -794,6 +853,7 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
         _hasVisualOverflow = RenderStack.layoutPositionedChild(child, childParentData, size, _resolvedAlignment!) || _hasVisualOverflow;
       }
 
+      childOwner.flushLayout();
       assert(child.parentData == childParentData);
       child = childParentData.nextSibling;
     }
@@ -920,5 +980,91 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
           style: DiagnosticsTreeStyle.offstage,
         ),
     ];
+  }
+}
+
+class EvilWidget extends RenderObjectWidget {
+  const EvilWidget({
+    Key? super.key,
+    required this.remoteChild,
+    required this.child,
+    required OverlayState overlayState
+  }) : _overlayState = overlayState;
+
+  final Widget? remoteChild;
+  final Widget? child;
+
+  final OverlayState _overlayState;
+
+  @override
+  RenderObjectElement createElement() => _EvilWidgetElement(this);
+
+  @override
+  RenderObject createRenderObject(BuildContext context) => RenderProxyBox();
+}
+
+class _EvilWidgetElement extends RenderObjectElement {
+  _EvilWidgetElement(EvilWidget super.widget);
+
+  @override
+  EvilWidget get widget => super.widget as EvilWidget;
+
+  @override
+  RenderProxyBox get renderObject => super.renderObject as RenderProxyBox;
+
+  // Handling child Element
+  Element? _remoteChild;
+  Element? _child;
+
+  @override
+  void mount(Element? parent, Object? newSlot) {
+    super.mount(parent, newSlot);
+    _child = updateChild(_child, widget.child, null);
+    _remoteChild = updateChild(_remoteChild, widget.remoteChild, widget._overlayState);
+  }
+
+  @override
+  void update(EvilWidget newWidget) {
+    super.update(newWidget);
+    _child = updateChild(_child, widget.child, null);
+    _remoteChild = updateChild(_remoteChild, widget.remoteChild, widget._overlayState);
+  }
+
+  @override
+  void forgetChild(Element child) {
+    if (child == _child) {
+      _child = null;
+    } else if (child == _remoteChild) {
+      _remoteChild = null;
+    }
+    super.forgetChild(child);
+  }
+
+  @override
+  void visitChildren(ElementVisitor visitor) {
+    <Element?>[_child, _remoteChild].whereType<Element>().forEach(visitor);
+  }
+
+  @override
+  void insertRenderObjectChild(RenderBox child, OverlayState? slot) {
+    if (slot != null) {
+      slot._insertChildRenderObjectWithoutRelayout(child);
+    } else {
+      renderObject.child = child;
+    }
+  }
+
+  @override
+  void moveRenderObjectChild(covariant RenderObject child, covariant Object? oldSlot, covariant Object? newSlot) {
+    assert(false);
+  }
+
+  @override
+  void removeRenderObjectChild(RenderBox child, OverlayState? slot) {
+    if (slot != null) {
+      slot._removeChildRenderObjectWithoutRelayout(child);
+    } else {
+      renderObject.child = null;
+    }
   }
 }
