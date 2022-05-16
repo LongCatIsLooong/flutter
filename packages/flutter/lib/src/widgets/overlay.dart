@@ -667,7 +667,7 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
     addAll(children);
   }
 
-  final Map<RenderBox, PipelineOwner> _pipelineOwners = <RenderBox, PipelineOwner>{};
+  final Map<RenderBox, HostedPipelineOwner> _pipelineOwners = <RenderBox, HostedPipelineOwner>{};
   bool _suppressMarkNeedsLayout = false;
   //bool _pipelinesNeedFlushing;
   bool _hasVisualOverflow = false;
@@ -687,20 +687,24 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
 
   Alignment? _resolvedAlignment;
 
-  //@override
-  //void attachChild(RenderBox child) {
-  //  if (!attached)
-  //    return;
-  //  child.attach(_pipelineOwners.putIfAbsent(child, PipelineOwner.new));
-  //}
+  @override
+  void attachChild(RenderBox child) {
+    final PipelineOwner? owner = this.owner;
+    if (owner == null)
+      return;
 
-  //@override
-  //void detachChild(RenderBox child) {
-  //  super.detachChild(child);
-  //  if (attached) {
-  //    _pipelineOwners.remove(child);
-  //  }
-  //}
+    final HostedPipelineOwner childOwner = _pipelineOwners.putIfAbsent(child, () => HostedPipelineOwner(this, owner.rootPipelineOwner))
+        ..rootPipelineOwner = owner.rootPipelineOwner;
+    child.attach(childOwner);
+  }
+
+  @override
+  void detachChild(RenderBox child) {
+    super.detachChild(child);
+    if (attached) {
+      _pipelineOwners.remove(child);
+    }
+  }
 
   //void addChild(RenderBox child) {
   //  _suppressMarkNeedsLayout = true;
@@ -829,6 +833,14 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
   }
 
   @override
+  void maybeLayout() {
+    super.maybeLayout();
+    for (final HostedPipelineOwner childOwner in _pipelineOwners.values) {
+      childOwner.flushLayout();
+    }
+  }
+
+  @override
   void performLayout() {
     _hasVisualOverflow = false;
 
@@ -845,7 +857,7 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
     RenderBox? child = _firstOnstageChild;
     while (child != null) {
       final StackParentData childParentData = child.parentData! as StackParentData;
-      //final PipelineOwner childOwner = _pipelineOwners[child]!;
+      final PipelineOwner? childOwner = _pipelineOwners[child];
 
       if (!childParentData.isPositioned) {
         child.layout(nonPositionedConstraints, parentUsesSize: true);
@@ -854,7 +866,7 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
         _hasVisualOverflow = RenderStack.layoutPositionedChild(child, childParentData, size, _resolvedAlignment!) || _hasVisualOverflow;
       }
 
-      //childOwner.flushLayout();
+      childOwner!.flushLayout();
       assert(child.parentData == childParentData);
       child = childParentData.nextSibling;
     }
@@ -879,6 +891,22 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
       child = childParentData.previousSibling;
     }
     return false;
+  }
+
+  @override
+  void maybeUpdateCompositingBits() {
+    super.maybeUpdateCompositingBits();
+    for (final HostedPipelineOwner childOwner in _pipelineOwners.values) {
+      childOwner.flushCompositingBits();
+    }
+  }
+
+  @override
+  void maybePaint() {
+    for (final HostedPipelineOwner childOwner in _pipelineOwners.values) {
+      childOwner.flushPaint();
+    }
+    super.maybePaint();
   }
 
   @protected
@@ -914,6 +942,14 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
   void dispose() {
     _clipRectLayer.layer = null;
     super.dispose();
+  }
+
+  @override
+  void maybeUpdateSemantics() {
+    super.maybeUpdateSemantics();
+    for (final HostedPipelineOwner childOwner in _pipelineOwners.values) {
+      childOwner.flushSemantics();
+    }
   }
 
   @override

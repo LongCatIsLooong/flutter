@@ -854,6 +854,7 @@ abstract class PipelineOwner {
   void scheduleLayout(RenderObject renderObject);
 
   void layout(RenderObject renderObject, Constraints constraints, { bool parentUsesSize = false });
+
   void _enableMutationsToDirtySubtrees(VoidCallback callback) => callback();
 
   /// Whether this pipeline is currently in the layout phase.
@@ -953,16 +954,14 @@ abstract class PipelineOwner {
 
 mixin PipelineOwnerBase implements PipelineOwner {
   List<RenderObject> _nodesNeedingLayout = <RenderObject>[];
-  Set<RenderObject> _noneDirtyNodesNeedingFlush = <RenderObject>{};
 
   @override
   void scheduleLayout(RenderObject renderObject) {
-    if (!renderObject._needsLayout) {
-      _noneDirtyNodesNeedingFlush.add(renderObject);
-    }
-
-    // Only track relayout boundaries.
-    if (renderObject._relayoutBoundary == renderObject) {
+    // Use RenderObject implementation detail to reduce the number of dirty
+    // nodes to be tracked: only track relayout boundaries and nodes are not dirty.
+    final bool shouldAddToDirtyList = !renderObject._needsLayout
+                                   || renderObject._relayoutBoundary == renderObject;
+    if (shouldAddToDirtyList ) {
       _nodesNeedingLayout.add(renderObject);
     }
   }
@@ -1050,7 +1049,6 @@ mixin PipelineOwnerBase implements PipelineOwner {
       return true;
     }());
     renderObject._needsLayout = false;
-    _noneDirtyNodesNeedingFlush.remove(renderObject);
     renderObject.markNeedsPaint();
   }
 
@@ -1058,20 +1056,12 @@ mixin PipelineOwnerBase implements PipelineOwner {
   void flushLayout() {
     while (_nodesNeedingLayout.isNotEmpty) {
       final List<RenderObject> dirtyNodes = _nodesNeedingLayout;
-      final Set<RenderObject> nodesWithDirtyPipelines = _noneDirtyNodesNeedingFlush;
       _nodesNeedingLayout = <RenderObject>[];
-      _noneDirtyNodesNeedingFlush = <RenderObject>{};
       dirtyNodes.sort((RenderObject a, RenderObject b) => a.depth - b.depth);
       for (final RenderObject node in dirtyNodes) {
-        if (node.owner != this) {
-          continue;
+        if (node.owner == this) {
+          node.maybeLayout();
         }
-        if (node._needsLayout) {
-          node._layoutWithoutResize();
-        } else if (nodesWithDirtyPipelines.contains(node)) {
-          node.performLayout();
-        }
-        nodesWithDirtyPipelines.remove(node);
       }
     }
   }
@@ -1085,27 +1075,17 @@ mixin PipelineOwnerBase implements PipelineOwner {
   void flushCompositingBits() {
     _nodesNeedingCompositingBitsUpdate.sort((RenderObject a, RenderObject b) => a.depth - b.depth);
     for (final RenderObject node in _nodesNeedingCompositingBitsUpdate) {
-      if (node._needsCompositingBitsUpdate && node.owner?.rootPipelineOwner == rootPipelineOwner)
-        node._updateCompositingBits();
+      if (node.owner == this)
+        node.maybeUpdateCompositingBits();
     }
     _nodesNeedingCompositingBitsUpdate.clear();
   }
 
   List<RenderObject> _nodesNeedingPaint = <RenderObject>[];
-  Set<RenderObject> _nodesNeedingPaintFlush = <RenderObject>{};
   @override
-  void schedulePaint(RenderObject renderObject) {
-    if (!renderObject._needsPaint) {
-      _nodesNeedingPaintFlush.add(renderObject);
-    }
-    _nodesNeedingPaint.add(renderObject);
-  }
+  void schedulePaint(RenderObject renderObject) => _nodesNeedingPaint.add(renderObject);
   @override
-  void unschedulePaint(RenderObject renderObject) {
-    _nodesNeedingPaint.remove(renderObject);
-    _nodesNeedingPaintFlush.remove(renderObject);
-  }
-
+  void unschedulePaint(RenderObject renderObject) => _nodesNeedingPaint.remove(renderObject);
   @override
   void flushPaint() {
     final List<RenderObject> dirtyNodes = _nodesNeedingPaint;
@@ -1113,23 +1093,8 @@ mixin PipelineOwnerBase implements PipelineOwner {
 
     // Sort the dirty nodes in reverse order (deepest first).
     for (final RenderObject node in dirtyNodes..sort((RenderObject a, RenderObject b) => b.depth - a.depth)) {
-      assert(node._layerHandle.layer != null);
-      if (node.owner != this) {
-        continue;
-      }
-      if (node._needsPaint || node._needsCompositedLayerUpdate) {
-        if (node._layerHandle.layer!.attached) {
-          assert(node.isRepaintBoundary);
-          if (node._needsPaint) {
-            PaintingContext.repaintCompositedChild(node);
-          } else {
-            PaintingContext.updateLayerProperties(node);
-          }
-        } else {
-          node._skippedPaintingOnLayer();
-        }
-      } else if (_nodesNeedingPaintFlush.contains(node)) {
-
+      if (node.owner == this) {
+        node.maybePaint();
       }
     }
     assert(_nodesNeedingPaint.isEmpty);
@@ -1153,9 +1118,10 @@ mixin PipelineOwnerBase implements PipelineOwner {
     final List<RenderObject> nodesToProcess = _nodesNeedingSemantics.toList()
       ..sort((RenderObject a, RenderObject b) => a.depth - b.depth);
     _nodesNeedingSemantics.clear();
+    //print('$this => flushSemantics: $nodesToProcess');
     for (final RenderObject node in nodesToProcess) {
-      if (node._needsSemanticsUpdate && node.owner == this)
-        node._updateSemantics();
+      if (node.owner == this)
+        node.maybeUpdateSemantics();
     }
     rootPipelineOwner.semanticsOwner!.sendSemanticsUpdate();
   }
@@ -1196,6 +1162,26 @@ mixin _DebugPipelineOwner on PipelineOwner {
   @override
   bool get debugDoingLayout => _debugDoingLayout;
   bool _debugDoingLayout = false;
+
+  @override
+  void layout(RenderObject renderObject, Constraints constraints, { bool parentUsesSize = false }) {
+    final bool previousDebugDoingLayout = _debugDoingLayout;
+    assert(() {
+      // layout can be invoked by calling flushLayout on the parent
+      // PipelineOwners.
+      _debugDoingLayout = true;
+      return true;
+    }());
+    try {
+      super.layout(renderObject, constraints, parentUsesSize: parentUsesSize);
+    } finally {
+      assert(() {
+        _debugDoingLayout = previousDebugDoingLayout;
+        return true;
+      }());
+    }
+  }
+
   @override
   void flushLayout() {
     assert(() {
@@ -1250,35 +1236,36 @@ mixin _DebugPipelineOwner on PipelineOwner {
 }
 
 class HostedPipelineOwner with PipelineOwner, PipelineOwnerBase {
-  HostedPipelineOwner(this.hostRenderObject);
+  factory HostedPipelineOwner(RenderObject hostRenderObject, RootPipelineOwner rootPipelineOwner) {
+    HostedPipelineOwner? owner;
+    assert(() {
+      owner = _DebugHostedPipelineOwner._(hostRenderObject, rootPipelineOwner);
+      return true;
+    }());
+    return owner ?? HostedPipelineOwner._(hostRenderObject, rootPipelineOwner);
+  }
+
+  HostedPipelineOwner._(this.hostRenderObject, this.rootPipelineOwner);
 
   final RenderObject hostRenderObject;
 
-  PipelineOwner get hostOwner {
-    final PipelineOwner? parent = hostRenderObject.owner;
-    if (parent == null) {
-      throw StateError('message');
-    }
-    return parent;
-  }
-
   @override
-  RootPipelineOwner get rootPipelineOwner => hostOwner.rootPipelineOwner;
+  RootPipelineOwner rootPipelineOwner;
 
   @override
   void scheduleLayout(RenderObject renderObject) {
     super.scheduleLayout(renderObject);
-    if (_nodesNeedingLayout.isNotEmpty || _noneDirtyNodesNeedingFlush.isNotEmpty) {
+    if (_nodesNeedingLayout.isNotEmpty) {
       hostRenderObject.owner?.scheduleLayout(hostRenderObject);
     }
   }
 
   @override
-  void scheduleCompositingBitsUpdate(RenderObject renderObject) => rootPipelineOwner.scheduleCompositingBitsUpdate(renderObject);
-
-  @override
-  void flushCompositingBits() {
-    assert(false);
+  void scheduleCompositingBitsUpdate(RenderObject renderObject)  {
+    super.scheduleCompositingBitsUpdate(renderObject);
+    if (_nodesNeedingCompositingBitsUpdate.isNotEmpty) {
+      hostRenderObject.owner?.scheduleCompositingBitsUpdate(hostRenderObject);
+    }
   }
 
   @override
@@ -1291,11 +1278,17 @@ class HostedPipelineOwner with PipelineOwner, PipelineOwnerBase {
 
   @override
   void scheduleSemanticsUpdate(RenderObject renderObject) {
+    print('$this scheduleSemanticsUpdate: $renderObject');
+    print(StackTrace.current);
     super.scheduleSemanticsUpdate(renderObject);
     if (_nodesNeedingSemantics.isNotEmpty) {
       hostRenderObject.owner?.scheduleSemanticsUpdate(hostRenderObject);
     }
   }
+}
+
+class _DebugHostedPipelineOwner extends HostedPipelineOwner with _DebugPipelineOwner {
+  _DebugHostedPipelineOwner._(super.hostRenderObject, super.rootPipelineOwner) : super._();
 }
 
 /// The pipeline owner manages the rendering pipeline.
@@ -2128,7 +2121,10 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   }
 
   @pragma('vm:notify-debugger-on-exception')
-  void _layoutWithoutResize() {
+  void maybeLayout() {
+    if (!_needsLayout) {
+      return;
+    }
     assert(_relayoutBoundary == this);
     RenderObject? debugPreviousActiveLayout;
     assert(!_debugMutationsLocked);
@@ -2566,13 +2562,13 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     return _needsCompositing;
   }
 
-  void _updateCompositingBits() {
+  void maybeUpdateCompositingBits() {
     if (!_needsCompositingBitsUpdate)
       return;
     final bool oldNeedsCompositing = _needsCompositing;
     _needsCompositing = false;
     visitChildren((RenderObject child) {
-      child._updateCompositingBits();
+      child.maybeUpdateCompositingBits();
       if (child.needsCompositing)
         _needsCompositing = true;
     });
@@ -2795,6 +2791,26 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     _layerHandle.layer!.detach();
     _layerHandle.layer = rootLayer;
     markNeedsPaint();
+  }
+
+  void maybePaint() {
+    if (!_needsPaint && !_needsCompositedLayerUpdate) {
+      return;
+    }
+    final ContainerLayer? layer = _layerHandle.layer;
+    if (layer == null) {
+      return;
+    }
+    if (layer.attached) {
+      assert(isRepaintBoundary);
+      if (_needsPaint) {
+        PaintingContext.repaintCompositedChild(this);
+      } else {
+        PaintingContext.updateLayerProperties(this);
+      }
+    } else {
+      _skippedPaintingOnLayer();
+    }
   }
 
   void _paintWithContext(PaintingContext context, Offset offset) {
@@ -3163,11 +3179,12 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
   /// any way to update the semantics tree.
   void markNeedsSemanticsUpdate() {
     assert(!_debugDisposed);
-    assert(!attached || !(owner! as _DebugPipelineOwner)._debugDoingSemantics);
-    if (!attached || owner!.rootPipelineOwner._semanticsOwner == null) {
+    final PipelineOwner? owner = this.owner;
+    if (owner == null || owner.rootPipelineOwner._semanticsOwner == null) {
       _cachedSemanticsConfiguration = null;
       return;
     }
+    assert(!(owner as _DebugPipelineOwner)._debugDoingSemantics);
 
     // Dirty the semantics tree starting at `this` until we have reached a
     // RenderObject that is a semantics boundary. All semantics past this
@@ -3201,21 +3218,27 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       // this block will ensure that the semantics of `this` node actually gets
       // updated.
       // (See semantics_10_test.dart for an example why this is required).
-      owner!.unscheduleSemanticsUpdate(this);
+      owner.unscheduleSemanticsUpdate(this);
     }
     if (!node._needsSemanticsUpdate) {
       node._needsSemanticsUpdate = true;
-      if (owner != null) {
-        assert(node._semanticsConfiguration.isSemanticBoundary || node.parent is! RenderObject);
-        owner!.scheduleSemanticsUpdate(node);
-        owner!.requestVisualUpdate();
-      }
+      assert(node._semanticsConfiguration.isSemanticBoundary || node.parent is! RenderObject);
+      owner.scheduleSemanticsUpdate(node);
+      owner.requestVisualUpdate();
     }
   }
 
   /// Updates the semantic information of the render object.
-  void _updateSemantics() {
-    assert(_semanticsConfiguration.isSemanticBoundary || parent is! RenderObject);
+  void maybeUpdateSemantics() {
+    if (!_semanticsConfiguration.isSemanticBoundary && parent is RenderObject) {
+      // A RenderObject subclass scheduled a semantics update on itself.
+      // The subclass must override this method to perform the additoinal tasks
+      // to update its semantics information.
+      return;
+    }
+    if (!_needsSemanticsUpdate) {
+      return;
+    }
     if (_needsLayout) {
       // There's not enough information in this subtree to compute semantics.
       // The subtree is probably being kept alive by a viewport but not laid out.
