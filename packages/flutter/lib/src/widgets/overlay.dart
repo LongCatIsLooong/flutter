@@ -669,6 +669,7 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
 
   final Map<RenderBox, PipelineOwner> _pipelineOwners = <RenderBox, PipelineOwner>{};
   bool _suppressMarkNeedsLayout = false;
+  //bool _pipelinesNeedFlushing;
   bool _hasVisualOverflow = false;
 
   @override
@@ -686,20 +687,20 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
 
   Alignment? _resolvedAlignment;
 
-  @override
-  void attachChild(RenderBox child) {
-    if (!attached)
-      return;
-    child.attach(_pipelineOwners.putIfAbsent(child, PipelineOwner.new));
-  }
+  //@override
+  //void attachChild(RenderBox child) {
+  //  if (!attached)
+  //    return;
+  //  child.attach(_pipelineOwners.putIfAbsent(child, PipelineOwner.new));
+  //}
 
-  @override
-  void detachChild(RenderBox child) {
-    super.detachChild(child);
-    if (!attached) {
-      _pipelineOwners.remove(child);
-    }
-  }
+  //@override
+  //void detachChild(RenderBox child) {
+  //  super.detachChild(child);
+  //  if (attached) {
+  //    _pipelineOwners.remove(child);
+  //  }
+  //}
 
   //void addChild(RenderBox child) {
   //  _suppressMarkNeedsLayout = true;
@@ -844,7 +845,7 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
     RenderBox? child = _firstOnstageChild;
     while (child != null) {
       final StackParentData childParentData = child.parentData! as StackParentData;
-      final PipelineOwner childOwner = _pipelineOwners[child]!;
+      //final PipelineOwner childOwner = _pipelineOwners[child]!;
 
       if (!childParentData.isPositioned) {
         child.layout(nonPositionedConstraints, parentUsesSize: true);
@@ -853,7 +854,7 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
         _hasVisualOverflow = RenderStack.layoutPositionedChild(child, childParentData, size, _resolvedAlignment!) || _hasVisualOverflow;
       }
 
-      childOwner.flushLayout();
+      //childOwner.flushLayout();
       assert(child.parentData == childParentData);
       child = childParentData.nextSibling;
     }
@@ -982,6 +983,25 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
     ];
   }
 }
+
+//class _StackChildPipelineOwner extends PipelineOwner with PipelineOwnerBase {
+//  _StackChildPipelineOwner(this.renderThreater) : super.create();
+//
+//  final _RenderTheatre renderThreater;
+//  RootPipelineOwner get rootPipelineOwner {
+//    final PipelineOwner? parent = renderThreater.owner;
+//    if (parent == null) {
+//      throw StateError('message');
+//    }
+//    return parent.rootPipelineOwner;
+//  }
+//
+//  bool _markNeedsFlushing
+//  @override
+//  void scheduleLayout(RenderObject renderObject) {
+//    super.scheduleLayout(renderObject);
+//  }
+//}
 
 class EvilWidget extends RenderObjectWidget {
   const EvilWidget({

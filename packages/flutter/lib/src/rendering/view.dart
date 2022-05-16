@@ -161,8 +161,7 @@ class RenderView extends RenderObject with RenderObjectWithChildMixin<RenderBox>
     _size = configuration.size;
     assert(_size.isFinite);
 
-    if (child != null)
-      child!.layout(BoxConstraints.tight(_size));
+    child?.layout(BoxConstraints.tight(_size));
   }
 
   @override
