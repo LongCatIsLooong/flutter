@@ -871,8 +871,6 @@ abstract class PipelineOwner {
 
   void scheduleLayout(RenderObject renderObject);
 
-  void layout(RenderObject renderObject, Constraints constraints, { bool parentUsesSize = false });
-
   void _enableMutationsToDirtySubtrees(VoidCallback callback) => callback();
 
   /// Whether this pipeline is currently in the layout phase.
@@ -979,95 +977,9 @@ mixin PipelineOwnerBase implements PipelineOwner {
     // nodes to be tracked: only track relayout boundaries and nodes are not dirty.
     final bool shouldAddToDirtyList = !renderObject._needsLayout
                                    || renderObject._relayoutBoundary == renderObject;
-    if (shouldAddToDirtyList ) {
+    if (shouldAddToDirtyList) {
       _nodesNeedingLayout.add(renderObject);
     }
-  }
-
-  @override
-  void layout(RenderObject renderObject, Constraints constraints, { bool parentUsesSize = false }) {
-    final bool sizedByParent = renderObject.sizedByParent;
-    final bool isRelayoutBoundary = !parentUsesSize || sizedByParent || constraints.isTight || renderObject.parent is! RenderObject;
-    final RenderObject relayoutBoundary = isRelayoutBoundary ? renderObject : (renderObject.parent! as RenderObject)._relayoutBoundary!;
-
-    if (!renderObject._needsLayout && constraints == renderObject._constraints) {
-      assert(() {
-        // in case parentUsesSize changed since the last invocation, set size
-        // to itself, so it has the right internal debug values.
-        renderObject._debugDoingThisResize = sizedByParent;
-        renderObject._debugDoingThisLayout = !sizedByParent;
-        renderObject.debugResetSize();
-        return true;
-      }());
-
-      if (relayoutBoundary != renderObject._relayoutBoundary) {
-        renderObject._relayoutBoundary = relayoutBoundary;
-        renderObject.visitChildren(RenderObject._propagateRelayoutBoundaryToChild);
-      }
-
-      assert(() {
-        renderObject._debugDoingThisLayout = false;
-        renderObject._debugDoingThisResize = false;
-        return true;
-      }());
-      return;
-    }
-    if (renderObject._relayoutBoundary != null && relayoutBoundary != renderObject._relayoutBoundary) {
-      // The local relayout boundary has changed, must notify children in case
-      // they also need updating. Otherwise, they will be confused about what
-      // their actual relayout boundary is later.
-      renderObject.visitChildren(RenderObject._cleanChildRelayoutBoundary);
-    }
-    renderObject._constraints = constraints;
-    renderObject._relayoutBoundary = relayoutBoundary;
-    assert(!renderObject._debugMutationsLocked);
-    assert(!renderObject._doingThisLayoutWithCallback);
-    assert(() {
-      renderObject._debugMutationsLocked = true;
-      return true;
-    }());
-    if (sizedByParent) {
-      assert(() {
-        renderObject._debugDoingThisResize = true;
-        return true;
-      }());
-      try {
-        renderObject.performResize();
-        assert(() {
-          renderObject.debugAssertDoesMeetConstraints();
-          return true;
-        }());
-      } catch (e, stack) {
-        renderObject._debugReportException('performResize', e, stack);
-      }
-    }
-    assert(() {
-      renderObject._debugDoingThisResize = false;
-      return true;
-    }());
-
-    assert(() {
-      renderObject._debugDoingThisLayout = true;
-      return true;
-    }());
-    try {
-      renderObject.performLayout();
-      renderObject.markNeedsSemanticsUpdate();
-      assert(() {
-        renderObject.debugAssertDoesMeetConstraints();
-        return true;
-      }());
-    } catch (e, stack) {
-      renderObject._debugReportException('performLayout', e, stack);
-    }
-
-    assert(() {
-      renderObject._debugDoingThisLayout = false;
-      renderObject._debugMutationsLocked = false;
-      return true;
-    }());
-    renderObject._needsLayout = false;
-    renderObject.markNeedsPaint();
   }
 
   @override
@@ -1180,24 +1092,24 @@ mixin _DebugPipelineOwner on PipelineOwner {
   bool get debugDoingLayout => _debugDoingLayout;
   bool _debugDoingLayout = false;
 
-  @override
-  void layout(RenderObject renderObject, Constraints constraints, { bool parentUsesSize = false }) {
-    final bool previousDebugDoingLayout = _debugDoingLayout;
-    assert(() {
-      // layout can be invoked by calling flushLayout on the parent
-      // PipelineOwners.
-      _debugDoingLayout = true;
-      return true;
-    }());
-    try {
-      super.layout(renderObject, constraints, parentUsesSize: parentUsesSize);
-    } finally {
-      assert(() {
-        _debugDoingLayout = previousDebugDoingLayout;
-        return true;
-      }());
-    }
-  }
+  //@override
+  //void layout(RenderObject renderObject, Constraints constraints, { bool parentUsesSize = false }) {
+  //  final bool previousDebugDoingLayout = _debugDoingLayout;
+  //  assert(() {
+  //    // layout can be invoked by calling flushLayout on the parent
+  //    // PipelineOwners.
+  //    _debugDoingLayout = true;
+  //    return true;
+  //  }());
+  //  try {
+  //    super.layout(renderObject, constraints, parentUsesSize: parentUsesSize);
+  //  } finally {
+  //    assert(() {
+  //      _debugDoingLayout = previousDebugDoingLayout;
+  //      return true;
+  //    }());
+  //  }
+  //}
 
   @override
   void flushLayout() {
@@ -2241,33 +2153,192 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     ));
     assert(!_debugDoingThisResize);
     assert(!_debugDoingThisLayout);
+    final bool isRelayoutBoundary = !parentUsesSize || sizedByParent || constraints.isTight || parent is! RenderObject;
+    final RenderObject relayoutBoundary = isRelayoutBoundary ? this : (parent! as RenderObject)._relayoutBoundary!;
 
-    RenderObject? debugPreviousActiveLayout;
+    bool? previousDebugDoingLayout;
     assert(() {
+      _debugCanParentUseSize = parentUsesSize;
+      previousDebugDoingLayout = owner?.debugDoingLayout;
+      return true;
+    }());
+
+
+    if (!_needsLayout && constraints == _constraints) {
+      assert(() {
+        // in case parentUsesSize changed since the last invocation, set size
+        // to itself, so it has the right internal debug values.
+        _debugDoingThisResize = sizedByParent;
+        _debugDoingThisLayout = !sizedByParent;
+        final RenderObject? debugPreviousActiveLayout = _debugActiveLayout;
+        final PipelineOwner? owner = this.owner;
+        final _DebugPipelineOwner? debugOwner = (owner is _DebugPipelineOwner) ? owner : null;
+        debugOwner?._debugDoingLayout = true;
+        _debugActiveLayout = this;
+        debugResetSize();
+        debugOwner?._debugDoingLayout = previousDebugDoingLayout ?? false;
+        _debugActiveLayout = debugPreviousActiveLayout;
+        _debugDoingThisLayout = false;
+        _debugDoingThisResize = false;
+        return true;
+      }());
+
+      if (relayoutBoundary != _relayoutBoundary) {
+        _relayoutBoundary = relayoutBoundary;
+        visitChildren(_propagateRelayoutBoundaryToChild);
+      }
+
+      if (!kReleaseMode && debugProfileLayoutsEnabled)
+        Timeline.finishSync();
+      return;
+    }
+    _constraints = constraints;
+    if (_relayoutBoundary != null && relayoutBoundary != _relayoutBoundary) {
+      // The local relayout boundary has changed, must notify children in case
+      // they also need updating. Otherwise, they will be confused about what
+      // their actual relayout boundary is later.
+      visitChildren(_cleanChildRelayoutBoundary);
+    }
+    _relayoutBoundary = relayoutBoundary;
+    assert(!_debugMutationsLocked);
+    assert(!_doingThisLayoutWithCallback);
+    assert(() {
+      _debugMutationsLocked = true;
       if (debugPrintLayouts)
         debugPrint('Laying out (${sizedByParent ? "with separate resize" : "with resize allowed"}) $this');
-      _debugCanParentUseSize = parentUsesSize;
-      debugPreviousActiveLayout = RenderObject._debugActiveLayout;
-      RenderObject._debugActiveLayout = this;
       return true;
     }());
-
-    PipelineOwner? owner = this.owner;
+    if (sizedByParent) {
+      assert(() {
+        _debugDoingThisResize = true;
+        return true;
+      }());
+      try {
+        performResize();
+        assert(() {
+          debugAssertDoesMeetConstraints();
+          return true;
+        }());
+      } catch (e, stack) {
+        _debugReportException('performResize', e, stack);
+      }
+      assert(() {
+        _debugDoingThisResize = false;
+        return true;
+      }());
+    }
+    RenderObject? debugPreviousActiveLayout;
     assert(() {
-      owner ??= PipelineOwner();
+      final PipelineOwner? owner = this.owner;
+      final _DebugPipelineOwner? debugOwner = (owner is _DebugPipelineOwner) ? owner : null;
+      previousDebugDoingLayout = owner?.debugDoingLayout;
+      debugOwner?._debugDoingLayout = true;
+      _debugDoingThisLayout = true;
+      debugPreviousActiveLayout = _debugActiveLayout;
+      _debugActiveLayout = this;
       return true;
     }());
-
-    owner!.layout(this, constraints, parentUsesSize: parentUsesSize);
-
+    try {
+      performLayout();
+      markNeedsSemanticsUpdate();
+      assert(() {
+        debugAssertDoesMeetConstraints();
+        return true;
+      }());
+    } catch (e, stack) {
+      _debugReportException('performLayout', e, stack);
+    }
     assert(() {
-      RenderObject._debugActiveLayout = debugPreviousActiveLayout;
+      final PipelineOwner? owner = this.owner;
+      final _DebugPipelineOwner? debugOwner = (owner is _DebugPipelineOwner) ? owner : null;
+      debugOwner?._debugDoingLayout = previousDebugDoingLayout ?? false;
+      _debugActiveLayout = debugPreviousActiveLayout;
+      _debugDoingThisLayout = false;
+      _debugMutationsLocked = false;
       return true;
     }());
+    _needsLayout = false;
+    markNeedsPaint();
 
     if (!kReleaseMode && debugProfileLayoutsEnabled)
       Timeline.finishSync();
   }
+
+  //@pragma('vm:notify-debugger-on-exception')
+  //void layout(Constraints constraints, { bool parentUsesSize = false }) {
+  //  assert(!_debugDisposed);
+  //  if (!kReleaseMode && debugProfileLayoutsEnabled) {
+  //    Map<String, String>? debugTimelineArguments;
+  //    assert(() {
+  //      if (debugEnhanceLayoutTimelineArguments) {
+  //        debugTimelineArguments = toDiagnosticsNode().toTimelineArguments();
+  //      }
+  //      return true;
+  //    }());
+  //    Timeline.startSync(
+  //      '$runtimeType',
+  //      arguments: debugTimelineArguments,
+  //    );
+  //  }
+  //  assert(constraints != null);
+  //  assert(constraints.debugAssertIsValid(
+  //    isAppliedConstraint: true,
+  //    informationCollector: () {
+  //      final List<String> stack = StackTrace.current.toString().split('\n');
+  //      int? targetFrame;
+  //      final Pattern layoutFramePattern = RegExp(r'^#[0-9]+ +RenderObject.layout \(');
+  //      for (int i = 0; i < stack.length; i += 1) {
+  //        if (layoutFramePattern.matchAsPrefix(stack[i]) != null) {
+  //          targetFrame = i + 1;
+  //          break;
+  //        }
+  //      }
+  //      if (targetFrame != null && targetFrame < stack.length) {
+  //        final Pattern targetFramePattern = RegExp(r'^#[0-9]+ +(.+)$');
+  //        final Match? targetFrameMatch = targetFramePattern.matchAsPrefix(stack[targetFrame]);
+  //        final String? problemFunction = (targetFrameMatch != null && targetFrameMatch.groupCount > 0) ? targetFrameMatch.group(1) : stack[targetFrame].trim();
+  //        // TODO(jacobr): this case is similar to displaying a single stack frame.
+  //        return <DiagnosticsNode>[
+  //          ErrorDescription(
+  //            "These invalid constraints were provided to $runtimeType's layout() "
+  //            'function by the following function, which probably computed the '
+  //            'invalid constraints in question:\n'
+  //            '  $problemFunction',
+  //          ),
+  //        ];
+  //      }
+  //      return <DiagnosticsNode>[];
+  //    },
+  //  ));
+  //  assert(!_debugDoingThisResize);
+  //  assert(!_debugDoingThisLayout);
+
+  //  RenderObject? debugPreviousActiveLayout;
+  //  assert(() {
+  //    if (debugPrintLayouts)
+  //      debugPrint('Laying out (${sizedByParent ? "with separate resize" : "with resize allowed"}) $this');
+  //    _debugCanParentUseSize = parentUsesSize;
+  //    debugPreviousActiveLayout = RenderObject._debugActiveLayout;
+  //    RenderObject._debugActiveLayout = this;
+  //    return true;
+  //  }());
+
+  //  PipelineOwner? owner = this.owner;
+  //  assert(() {
+  //    owner ??= PipelineOwner();
+  //    return true;
+  //  }());
+
+  //  owner!.layout(this, constraints, parentUsesSize: parentUsesSize);
+
+  //  assert(() {
+  //    RenderObject._debugActiveLayout = debugPreviousActiveLayout;
+  //    return true;
+  //  }());
+
+  //  if (!kReleaseMode && debugProfileLayoutsEnabled)
+  //    Timeline.finishSync();
+  //}
 
   /// If a subclass has a "size" (the state controlled by `parentUsesSize`,
   /// whatever it is in the subclass, e.g. the actual `size` property of
