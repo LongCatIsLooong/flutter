@@ -228,6 +228,16 @@ class PaintingContext extends ClipContext {
       return true;
     }());
 
+    bool? previousDebugDoingPaint;
+    assert(() {
+      final PipelineOwner? owner = child.owner;
+      if (owner is _DebugPipelineOwner) {
+        previousDebugDoingPaint = owner._debugDoingPaint;
+        owner._debugDoingPaint = true;
+      }
+      return true;
+    }());
+
     if (child.isRepaintBoundary) {
       stopRecordingIfNeeded();
       _compositeChild(child, offset);
@@ -240,6 +250,14 @@ class PaintingContext extends ClipContext {
     } else {
       child._paintWithContext(this, offset);
     }
+
+    assert(() {
+      final PipelineOwner? owner = child.owner;
+      if (owner is _DebugPipelineOwner) {
+        owner._debugDoingPaint = previousDebugDoingPaint ?? true;
+      }
+      return true;
+    }());
   }
 
   void _compositeChild(RenderObject child, Offset offset) {
@@ -1118,7 +1136,6 @@ mixin PipelineOwnerBase implements PipelineOwner {
     final List<RenderObject> nodesToProcess = _nodesNeedingSemantics.toList()
       ..sort((RenderObject a, RenderObject b) => a.depth - b.depth);
     _nodesNeedingSemantics.clear();
-    //print('$this => flushSemantics: $nodesToProcess');
     for (final RenderObject node in nodesToProcess) {
       if (node.owner == this)
         node.maybeUpdateSemantics();
@@ -1278,8 +1295,6 @@ class HostedPipelineOwner with PipelineOwner, PipelineOwnerBase {
 
   @override
   void scheduleSemanticsUpdate(RenderObject renderObject) {
-    print('$this scheduleSemanticsUpdate: $renderObject');
-    print(StackTrace.current);
     super.scheduleSemanticsUpdate(renderObject);
     if (_nodesNeedingSemantics.isNotEmpty) {
       hostRenderObject.owner?.scheduleSemanticsUpdate(hostRenderObject);
@@ -2237,7 +2252,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       return true;
     }());
 
-    PipelineOwner? owner = this.owner ?? PipelineOwner();
+    PipelineOwner? owner = this.owner;
     assert(() {
       owner ??= PipelineOwner();
       return true;
@@ -2725,7 +2740,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
       // ourselves without involving any other nodes.
       assert(_layerHandle.layer != null);
       if (owner != null) {
-        owner!.rootPipelineOwner._nodesNeedingPaint.add(this);
+        owner!.schedulePaint(this);
         owner!.requestVisualUpdate();
       }
     } else {
@@ -2772,7 +2787,7 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     assert(_layerHandle.layer == null);
     _layerHandle.layer = rootLayer;
     assert(_needsPaint);
-    owner!.rootPipelineOwner._nodesNeedingPaint.add(this);
+    owner!.schedulePaint(this);
   }
 
   /// Replace the layer. This is only valid for the root of a render
@@ -3223,8 +3238,8 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     if (!node._needsSemanticsUpdate) {
       node._needsSemanticsUpdate = true;
       assert(node._semanticsConfiguration.isSemanticBoundary || node.parent is! RenderObject);
-      owner.scheduleSemanticsUpdate(node);
-      owner.requestVisualUpdate();
+      node.owner?.scheduleSemanticsUpdate(node);
+      node.owner?.requestVisualUpdate();
     }
   }
 

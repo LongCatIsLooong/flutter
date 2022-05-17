@@ -706,22 +706,6 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
     }
   }
 
-  //void addChild(RenderBox child) {
-  //  _suppressMarkNeedsLayout = true;
-  //  try {
-  //  } finally {
-  //    _suppressMarkNeedsLayout = false;
-  //  }
-  //}
-
-  //void removeChild(RenderBox child) {
-  //  _suppressMarkNeedsLayout = true;
-  //  try {
-  //  } finally {
-  //    _suppressMarkNeedsLayout = false;
-  //  }
-  //}
-
   void _resolve() {
     _resolvedAlignment ??= AlignmentDirectional.topStart.resolve(textDirection);
   }
@@ -1019,25 +1003,6 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
     ];
   }
 }
-
-//class _StackChildPipelineOwner extends PipelineOwner with PipelineOwnerBase {
-//  _StackChildPipelineOwner(this.renderThreater) : super.create();
-//
-//  final _RenderTheatre renderThreater;
-//  RootPipelineOwner get rootPipelineOwner {
-//    final PipelineOwner? parent = renderThreater.owner;
-//    if (parent == null) {
-//      throw StateError('message');
-//    }
-//    return parent.rootPipelineOwner;
-//  }
-//
-//  bool _markNeedsFlushing
-//  @override
-//  void scheduleLayout(RenderObject renderObject) {
-//    super.scheduleLayout(renderObject);
-//  }
-//}
 
 class EvilWidget extends RenderObjectWidget {
   const EvilWidget({
