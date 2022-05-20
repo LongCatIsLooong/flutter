@@ -826,7 +826,11 @@ void main() {
     // tap (down, up) gesture hides tooltip, since its not
     // a long press
     await tester.tap(tooltip);
+    // Start the fadeout animation.
+    await tester.pump();
     await tester.pump(const Duration(milliseconds: 10));
+    // Let the widget rebuild.
+    await tester.pump();
     expect(find.text(tooltipText), findsNothing);
 
     // long press once more
@@ -889,14 +893,7 @@ void main() {
       ),
     );
 
-    // The tooltip overlay still on the tree and it will removed in the next frame.
-
-    // Dispatch the mouse in and out events before the overlay detached.
-    await gesture.moveTo(tester.getCenter(find.text(tooltipText)));
-    await gesture.moveTo(Offset.zero);
-    await tester.pumpAndSettle();
-
-    // Go without crashes.
+    expect(find.text(tooltipText), findsNothing);
     await gesture.removePointer();
     gesture = null;
   });
@@ -1055,9 +1052,10 @@ void main() {
     expect(find.text('Outer'), findsNothing);
     expect(find.text('Inner'), findsOneWidget);
     await gesture.moveTo(tester.getCenter(outer));
+    // Start animation.
     await tester.pump();
-    // Wait for it to switch.
-    await tester.pump(waitDuration);
+    // Wait for the inner tooltip to fade out.
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Outer'), findsOneWidget);
     expect(find.text('Inner'), findsNothing);
 
@@ -1117,16 +1115,6 @@ void main() {
 
   testWidgets('Multiple Tooltips are dismissed by escape key', (WidgetTester tester) async {
     const Duration waitDuration = Duration.zero;
-    TestGesture? gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
-    addTearDown(() async {
-      if (gesture != null)
-        return gesture.removePointer();
-    });
-    await gesture.addPointer();
-    await gesture.moveTo(const Offset(1.0, 1.0));
-    await tester.pump();
-    await gesture.moveTo(Offset.zero);
-
     await tester.pumpWidget(
       MaterialApp(
         home: Center(
@@ -1151,34 +1139,25 @@ void main() {
       ),
     );
 
-    final Finder tooltip = find.text('tooltip1');
-    await gesture.moveTo(Offset.zero);
-    await tester.pump();
-    await gesture.moveTo(tester.getCenter(tooltip));
-    await tester.pump();
-    await tester.pump(waitDuration);
+    final Finder tooltip = find.widgetWithText(Tooltip, 'tooltip1');
+    tester.state<TooltipState>(tooltip).ensureTooltipVisible();
+    await tester.pumpAndSettle();
     expect(find.text('message1'), findsOneWidget);
 
-    final Finder secondTooltip = find.text('tooltip2');
-    await gesture.moveTo(Offset.zero);
-    await tester.pump();
-    await gesture.moveTo(tester.getCenter(secondTooltip));
-    await tester.pump();
-    await tester.pump(waitDuration);
+    final Finder secondTooltip = find.widgetWithText(Tooltip, 'tooltip2');
+    tester.state<TooltipState>(secondTooltip).ensureTooltipVisible();
+    await tester.pumpAndSettle();
     // Make sure both messages are on the screen.
     expect(find.text('message1'), findsOneWidget);
     expect(find.text('message2'), findsOneWidget);
 
     // Try to dismiss the tooltip with the shortcut key
     await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pumpAndSettle();
+    // Wait for the fade out animation to start and end.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
     expect(find.text('message1'), findsNothing);
     expect(find.text('message2'), findsNothing);
-
-    await gesture.moveTo(Offset.zero);
-    await tester.pumpAndSettle();
-    await gesture.removePointer();
-    gesture = null;
   });
 
   testWidgets('Tooltip does not attempt to show after unmount', (WidgetTester tester) async {
@@ -1281,7 +1260,7 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('Tooltip overlay does not update', (WidgetTester tester) async {
+  testWidgets('Tooltip overlay does update', (WidgetTester tester) async {
     Widget buildApp(String text) {
       return MaterialApp(
         home: Center(
@@ -1301,13 +1280,14 @@ void main() {
     await tester.longPress(find.byType(Tooltip));
     expect(find.text(tooltipText), findsOneWidget);
     await tester.pumpWidget(buildApp('NEW'));
-    expect(find.text(tooltipText), findsOneWidget);
+    expect(find.text(tooltipText), findsNothing);
+    expect(find.text('NEW'), findsOneWidget);
     await tester.tapAt(const Offset(5.0, 5.0));
     await tester.pump();
     await tester.pump(const Duration(seconds: 1));
-    expect(find.text(tooltipText), findsNothing);
+    expect(find.text('NEW'), findsNothing);
     await tester.longPress(find.byType(Tooltip));
-    expect(find.text(tooltipText), findsNothing);
+    expect(find.text('NEW'), findsOneWidget);
   });
 
   testWidgets('Tooltip text scales with textScaleFactor', (WidgetTester tester) async {

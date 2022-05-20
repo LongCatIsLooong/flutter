@@ -206,10 +206,10 @@ PaintPattern uniqueRipplePattern(Offset expectedCenter, double expectedRadius) {
 }
 
 // Finds any container of a tooltip.
-Finder findTooltipContainer(String tooltipText) {
+Finder findTooltip(String tooltipText) {
   return find.ancestor(
     of: find.text(tooltipText),
-    matching: find.byType(Container),
+    matching: find.byWidgetPredicate((Widget widget) => widget.runtimeType.toString() == '_TooltipOverlay'),
   );
 }
 
@@ -1168,7 +1168,7 @@ void main() {
     expect(box, uniqueRipplePattern(const Offset(163.0, 6.0), 20.9));
 
     // There should be no tooltip.
-    expect(findTooltipContainer('Delete'), findsNothing);
+    expect(findTooltip('Delete'), findsNothing);
 
     // Waits for 100 ms again.
     await tester.pump(const Duration(milliseconds: 100));
@@ -1178,13 +1178,13 @@ void main() {
     expect(box, uniqueRipplePattern(const Offset(163.0, 6.0), 41.8));
 
     // There should be no tooltip.
-    expect(findTooltipContainer('Delete'), findsNothing);
+    expect(findTooltip('Delete'), findsNothing);
 
     // Waits for a very long time.
     await tester.pumpAndSettle();
 
     // There should still be no tooltip.
-    expect(findTooltipContainer('Delete'), findsNothing);
+    expect(findTooltip('Delete'), findsNothing);
 
     await gesture.up();
   });
@@ -1251,7 +1251,7 @@ void main() {
     expect(box, uniqueRipplePattern(const Offset(3.0, 3.0), 1.44));
 
     // There should be no tooltip.
-    expect(findTooltipContainer('Delete'), findsNothing);
+    expect(findTooltip('Delete'), findsNothing);
 
     // Waits for 200 ms again.
     await tester.pump(const Duration(milliseconds: 100));
@@ -1263,14 +1263,14 @@ void main() {
     expect(box, uniqueRipplePattern(const Offset(5.0, 5.0), 4.32));
 
     // There should be no tooltip.
-    expect(findTooltipContainer('Delete'), findsNothing);
+    expect(findTooltip('Delete'), findsNothing);
 
     // Waits for a very long time.
     // This is pressing and holding the delete button.
     await tester.pumpAndSettle();
 
     // There should be a tooltip.
-    expect(findTooltipContainer('Delete'), findsOneWidget);
+    expect(findTooltip('Delete'), findsOneWidget);
 
     await gesture.up();
   });
@@ -1305,7 +1305,7 @@ void main() {
     expect(box, uniqueRipplePattern(const Offset(3.0, 3.0), 1.44));
 
     // There should be no tooltip.
-    expect(findTooltipContainer('Delete'), findsNothing);
+    expect(findTooltip('Delete'), findsNothing);
 
     // Waits for 200 ms again.
     await tester.pump(const Duration(milliseconds: 100));
@@ -1317,14 +1317,14 @@ void main() {
     expect(box, uniqueRipplePattern(const Offset(5.0, 5.0), 4.32));
 
     // There should be no tooltip.
-    expect(findTooltipContainer('Delete'), findsNothing);
+    expect(findTooltip('Delete'), findsNothing);
 
     // Waits for a very long time.
     // This is pressing and holding the delete button.
     await tester.pumpAndSettle();
 
     // There should be a tooltip.
-    expect(findTooltipContainer('Delete'), findsOneWidget);
+    expect(findTooltip('Delete'), findsOneWidget);
 
     await gesture.up();
   });
@@ -1354,7 +1354,7 @@ void main() {
 
     // The existence of a 'Delete' tooltip indicates the delete icon is tapped,
     // Instead of the label.
-    expect(findTooltipContainer('Delete'), findsOneWidget);
+    expect(findTooltip('Delete'), findsOneWidget);
 
     await gesture.up();
   });
@@ -1390,7 +1390,7 @@ void main() {
     expect(box, uniqueRipplePattern(const Offset(378.0, 22.0), 37.9));
 
     // There should be no tooltip.
-    expect(findTooltipContainer('Delete'), findsNothing);
+    expect(findTooltip('Delete'), findsNothing);
 
     // Waits for 100 ms again.
     await tester.pump(const Duration(milliseconds: 100));
@@ -1401,14 +1401,14 @@ void main() {
     expect(box, uniqueRipplePattern(const Offset(378.0, 22.0), 75.8));
 
     // There should be no tooltip.
-    expect(findTooltipContainer('Delete'), findsNothing);
+    expect(findTooltip('Delete'), findsNothing);
 
     // Waits for a very long time.
     await tester.pumpAndSettle();
 
     // There should still be no tooltip.
     // This indicates that the tap is not on a delete icon.
-    expect(findTooltipContainer('Delete'), findsNothing);
+    expect(findTooltip('Delete'), findsNothing);
 
     await gesture.up();
   });
@@ -3143,7 +3143,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // There should be no delete button tooltip
-    expect(findTooltipContainer('Delete'), findsNothing);
+    expect(findTooltip('Delete'), findsNothing);
 
     await tapGesture.up();
   });
@@ -3170,7 +3170,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // There should be no delete button tooltip
-    expect(findTooltipContainer(''), findsNothing);
+    expect(findTooltip(''), findsNothing);
   });
 
   testWidgets('Disabling delete button tooltip does not disable chip tooltip', (WidgetTester tester) async {
@@ -3196,9 +3196,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // There should be no delete button tooltip
-    expect(findTooltipContainer(''), findsNothing);
+    expect(findTooltip(''), findsNothing);
     // There should be a chip tooltip, however.
-    expect(findTooltipContainer('Chip Tooltip'), findsOneWidget);
+    expect(findTooltip('Chip Tooltip'), findsOneWidget);
   });
 
   testWidgets('Triggering delete button tooltip does not trigger Chip tooltip', (WidgetTester tester) async {
@@ -3223,9 +3223,9 @@ void main() {
     await tester.pumpAndSettle();
 
     // There should not be a chip tooltip
-    expect(findTooltipContainer('Chip Tooltip'), findsNothing);
+    expect(findTooltip('Chip Tooltip'), findsNothing);
     // There should be a delete button tooltip
-    expect(findTooltipContainer('Delete'), findsOneWidget);
+    expect(findTooltip('Delete'), findsOneWidget);
   });
 
   testWidgets('intrinsicHeight implementation meets constraints', (WidgetTester tester) async {

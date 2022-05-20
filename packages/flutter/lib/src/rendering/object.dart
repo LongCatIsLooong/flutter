@@ -1304,6 +1304,7 @@ class RootPipelineOwner with PipelineOwner, PipelineOwnerBase {
   @override
   RootPipelineOwner get rootPipelineOwner => this;
 
+  @override
   void flushLayout() {
     if (!kReleaseMode) {
       Map<String, String>? debugTimelineArguments;
@@ -1330,6 +1331,7 @@ class RootPipelineOwner with PipelineOwner, PipelineOwnerBase {
     }
   }
 
+  @override
   void flushCompositingBits() {
     if (!kReleaseMode) {
       Timeline.startSync('UPDATING COMPOSITING BITS');
@@ -1340,6 +1342,7 @@ class RootPipelineOwner with PipelineOwner, PipelineOwnerBase {
     }
   }
 
+  @override
   void flushPaint() {
     if (!kReleaseMode) {
       Map<String, String>? debugTimelineArguments;
@@ -1366,12 +1369,15 @@ class RootPipelineOwner with PipelineOwner, PipelineOwnerBase {
     }
   }
 
+  @override
   SemanticsOwner? get semanticsOwner => _semanticsOwner;
   SemanticsOwner? _semanticsOwner;
 
+  @override
   int get debugOutstandingSemanticsHandles => _outstandingSemanticsHandles;
   int _outstandingSemanticsHandles = 0;
 
+  @override
   SemanticsHandle ensureSemantics({ VoidCallback? listener }) {
     _outstandingSemanticsHandles += 1;
     if (_outstandingSemanticsHandles == 1) {
@@ -1392,6 +1398,7 @@ class RootPipelineOwner with PipelineOwner, PipelineOwnerBase {
     }
   }
 
+  @override
   void flushSemantics() {
     if (_semanticsOwner == null)
       return;
@@ -2263,82 +2270,6 @@ abstract class RenderObject extends AbstractNode with DiagnosticableTreeMixin im
     if (!kReleaseMode && debugProfileLayoutsEnabled)
       Timeline.finishSync();
   }
-
-  //@pragma('vm:notify-debugger-on-exception')
-  //void layout(Constraints constraints, { bool parentUsesSize = false }) {
-  //  assert(!_debugDisposed);
-  //  if (!kReleaseMode && debugProfileLayoutsEnabled) {
-  //    Map<String, String>? debugTimelineArguments;
-  //    assert(() {
-  //      if (debugEnhanceLayoutTimelineArguments) {
-  //        debugTimelineArguments = toDiagnosticsNode().toTimelineArguments();
-  //      }
-  //      return true;
-  //    }());
-  //    Timeline.startSync(
-  //      '$runtimeType',
-  //      arguments: debugTimelineArguments,
-  //    );
-  //  }
-  //  assert(constraints != null);
-  //  assert(constraints.debugAssertIsValid(
-  //    isAppliedConstraint: true,
-  //    informationCollector: () {
-  //      final List<String> stack = StackTrace.current.toString().split('\n');
-  //      int? targetFrame;
-  //      final Pattern layoutFramePattern = RegExp(r'^#[0-9]+ +RenderObject.layout \(');
-  //      for (int i = 0; i < stack.length; i += 1) {
-  //        if (layoutFramePattern.matchAsPrefix(stack[i]) != null) {
-  //          targetFrame = i + 1;
-  //          break;
-  //        }
-  //      }
-  //      if (targetFrame != null && targetFrame < stack.length) {
-  //        final Pattern targetFramePattern = RegExp(r'^#[0-9]+ +(.+)$');
-  //        final Match? targetFrameMatch = targetFramePattern.matchAsPrefix(stack[targetFrame]);
-  //        final String? problemFunction = (targetFrameMatch != null && targetFrameMatch.groupCount > 0) ? targetFrameMatch.group(1) : stack[targetFrame].trim();
-  //        // TODO(jacobr): this case is similar to displaying a single stack frame.
-  //        return <DiagnosticsNode>[
-  //          ErrorDescription(
-  //            "These invalid constraints were provided to $runtimeType's layout() "
-  //            'function by the following function, which probably computed the '
-  //            'invalid constraints in question:\n'
-  //            '  $problemFunction',
-  //          ),
-  //        ];
-  //      }
-  //      return <DiagnosticsNode>[];
-  //    },
-  //  ));
-  //  assert(!_debugDoingThisResize);
-  //  assert(!_debugDoingThisLayout);
-
-  //  RenderObject? debugPreviousActiveLayout;
-  //  assert(() {
-  //    if (debugPrintLayouts)
-  //      debugPrint('Laying out (${sizedByParent ? "with separate resize" : "with resize allowed"}) $this');
-  //    _debugCanParentUseSize = parentUsesSize;
-  //    debugPreviousActiveLayout = RenderObject._debugActiveLayout;
-  //    RenderObject._debugActiveLayout = this;
-  //    return true;
-  //  }());
-
-  //  PipelineOwner? owner = this.owner;
-  //  assert(() {
-  //    owner ??= PipelineOwner();
-  //    return true;
-  //  }());
-
-  //  owner!.layout(this, constraints, parentUsesSize: parentUsesSize);
-
-  //  assert(() {
-  //    RenderObject._debugActiveLayout = debugPreviousActiveLayout;
-  //    return true;
-  //  }());
-
-  //  if (!kReleaseMode && debugProfileLayoutsEnabled)
-  //    Timeline.finishSync();
-  //}
 
   /// If a subclass has a "size" (the state controlled by `parentUsesSize`,
   /// whatever it is in the subclass, e.g. the actual `size` property of

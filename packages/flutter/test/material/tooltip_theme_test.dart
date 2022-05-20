@@ -28,7 +28,7 @@ void _ensureTooltipVisible(GlobalKey key) {
   // It's ok to do this in tests, but you really don't want to do it in
   // production code.
   // ignore: avoid_dynamic_calls
-  (key.currentState as dynamic).ensureTooltipVisible();
+  (key.currentState! as TooltipState).ensureTooltipVisible();
 }
 
 void main() {

@@ -215,6 +215,26 @@ class OverlayEntry implements Listenable {
   String toString() => '${describeIdentity(this)}(opaque: $opaque; maintainState: $maintainState)';
 }
 
+class _OverlayInfoWidget extends InheritedWidget {
+  const _OverlayInfoWidget({
+    required this.state,
+    required super.child,
+  });
+
+  final _OverlayEntryWidgetState state;
+
+  @override
+  bool updateShouldNotify(_OverlayInfoWidget oldWidget) => oldWidget.state != state;
+}
+
+abstract class OverlayInfo {
+  _RenderTheatre get overlayRenderObject;
+
+  static OverlayInfo? of(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<_OverlayInfoWidget>()?.state;
+  }
+}
+
 class _OverlayEntryWidget extends StatefulWidget {
   const _OverlayEntryWidget({
     required Key key,
@@ -232,12 +252,15 @@ class _OverlayEntryWidget extends StatefulWidget {
   _OverlayEntryWidgetState createState() => _OverlayEntryWidgetState();
 }
 
-class _OverlayEntryWidgetState extends State<_OverlayEntryWidget> {
+class _OverlayEntryWidgetState extends State<_OverlayEntryWidget> implements OverlayInfo {
   @override
   void initState() {
     super.initState();
     widget.entry._overlayStateMounted.value = true;
   }
+
+  @override
+  _RenderTheatre get overlayRenderObject => context.findAncestorRenderObjectOfType<_RenderTheatre>()!;
 
   @override
   void dispose() {
@@ -250,7 +273,10 @@ class _OverlayEntryWidgetState extends State<_OverlayEntryWidget> {
   Widget build(BuildContext context) {
     return TickerMode(
       enabled: widget.tickerEnabled,
-      child: widget.entry.builder(context),
+      child: _OverlayInfoWidget(
+        state: this,
+        child: widget.entry.builder(context),
+      ),
     );
   }
 
@@ -530,25 +556,25 @@ class OverlayState extends State<Overlay> with TickerProviderStateMixin {
     });
   }
 
-  void _insertChildRenderObjectWithoutRelayout(RenderBox child) {
-    final RenderObject? renderObject = context.findRenderObject();
-    if (renderObject is! _RenderTheatre) {
-      assert(false);
-      return;
-    }
+  //void _insertChildRenderObjectWithoutRelayout(RenderBox child) {
+  //  final RenderObject? renderObject = context.findRenderObject();
+  //  if (renderObject is! _RenderTheatre) {
+  //    assert(false, 'context: $context, renderObject: $renderObject, ${(context as Element).toStringDeep()}');
+  //    return;
+  //  }
 
-    renderObject.add(child);
-  }
+  //  renderObject.add(child);
+  //}
 
-  void _removeChildRenderObjectWithoutRelayout(RenderBox child) {
-    final RenderObject? renderObject = context.findRenderObject();
-    if (renderObject is! _RenderTheatre) {
-      assert(false);
-      return;
-    }
+  //void _removeChildRenderObjectWithoutRelayout(RenderBox child) {
+  //  final RenderObject? renderObject = context.findRenderObject();
+  //  if (renderObject is! _RenderTheatre) {
+  //    assert(false);
+  //    return;
+  //  }
 
-    renderObject.remove(child);
-  }
+  //  renderObject.remove(child);
+  //}
 
   @override
   Widget build(BuildContext context) {
@@ -642,6 +668,12 @@ class _TheatreElement extends MultiChildRenderObjectElement {
 
   @override
   _RenderTheatre get renderObject => super.renderObject as _RenderTheatre;
+
+  //@override
+  //void mount(Element? parent, Object? newSlot) {
+  //  super.mount(parent, newSlot);
+  //  assert(renderObject != null);
+  //}
 
   @override
   void debugVisitOnstageChildren(ElementVisitor visitor) {
@@ -1006,16 +1038,16 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
 
 class EvilWidget extends RenderObjectWidget {
   const EvilWidget({
-    Key? super.key,
+    super.key,
     required this.remoteChild,
     required this.child,
-    required OverlayState overlayState
-  }) : _overlayState = overlayState;
+    required OverlayInfo overlayInfo
+  }) : _overlayInfo = overlayInfo;
 
   final Widget? remoteChild;
   final Widget? child;
 
-  final OverlayState _overlayState;
+  final OverlayInfo _overlayInfo;
 
   @override
   RenderObjectElement createElement() => _EvilWidgetElement(this);
@@ -1041,14 +1073,19 @@ class _EvilWidgetElement extends RenderObjectElement {
   void mount(Element? parent, Object? newSlot) {
     super.mount(parent, newSlot);
     _child = updateChild(_child, widget.child, null);
-    _remoteChild = updateChild(_remoteChild, widget.remoteChild, widget._overlayState);
+    _remoteChild = updateChild(_remoteChild, widget.remoteChild, widget._overlayInfo);
   }
 
   @override
   void update(EvilWidget newWidget) {
     super.update(newWidget);
     _child = updateChild(_child, widget.child, null);
-    _remoteChild = updateChild(_remoteChild, widget.remoteChild, widget._overlayState);
+    _remoteChild = updateChild(_remoteChild, widget.remoteChild, widget._overlayInfo);
+  }
+
+  @override
+  void deactivate() {
+    super.deactivate();
   }
 
   @override
@@ -1067,9 +1104,17 @@ class _EvilWidgetElement extends RenderObjectElement {
   }
 
   @override
-  void insertRenderObjectChild(RenderBox child, OverlayState? slot) {
+  void detachRenderObject() {
+    super.detachRenderObject();
+    final RenderBox? box = _remoteChild?.renderObject as RenderBox?;
+    if (box != null)
+      widget._overlayInfo.overlayRenderObject.remove(box);
+  }
+
+  @override
+  void insertRenderObjectChild(RenderBox child, OverlayInfo? slot) {
     if (slot != null) {
-      slot._insertChildRenderObjectWithoutRelayout(child);
+      slot.overlayRenderObject.add(child);
     } else {
       renderObject.child = child;
     }
@@ -1081,9 +1126,9 @@ class _EvilWidgetElement extends RenderObjectElement {
   }
 
   @override
-  void removeRenderObjectChild(RenderBox child, OverlayState? slot) {
+  void removeRenderObjectChild(RenderBox child, OverlayInfo? slot) {
     if (slot != null) {
-      slot._removeChildRenderObjectWithoutRelayout(child);
+      slot.overlayRenderObject.remove(child);
     } else {
       renderObject.child = null;
     }
