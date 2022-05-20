@@ -9,7 +9,7 @@ import 'package:flutter/cupertino.dart';
 void main() => runApp(const CupertinoTextFieldApp());
 
 class CupertinoTextFieldApp extends StatelessWidget {
-  const CupertinoTextFieldApp({Key? key}) : super(key: key);
+  const CupertinoTextFieldApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +21,7 @@ class CupertinoTextFieldApp extends StatelessWidget {
 }
 
 class CupertinoTextFieldExample extends StatefulWidget {
-  const CupertinoTextFieldExample({Key? key}) : super(key: key);
+  const CupertinoTextFieldExample({super.key});
 
   @override
   State<CupertinoTextFieldExample> createState() => _CupertinoTextFieldExampleState();
@@ -45,6 +45,9 @@ class _CupertinoTextFieldExampleState extends State<CupertinoTextFieldExample> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('CupertinoTextField Sample'),
+      ),
       child: Center(
         child: CupertinoTextField(
           controller: _textController,

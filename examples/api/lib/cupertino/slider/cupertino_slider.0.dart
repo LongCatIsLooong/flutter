@@ -9,7 +9,7 @@ import 'package:flutter/cupertino.dart';
 void main() => runApp(const CupertinoSliderApp());
 
 class CupertinoSliderApp extends StatelessWidget {
-  const CupertinoSliderApp({Key? key}) : super(key: key);
+  const CupertinoSliderApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +21,7 @@ class CupertinoSliderApp extends StatelessWidget {
 }
 
 class CupertinoSliderExample extends StatefulWidget {
-  const CupertinoSliderExample({Key? key}) : super(key: key);
+  const CupertinoSliderExample({super.key});
 
   @override
   State<CupertinoSliderExample> createState() => _CupertinoSliderExampleState();
@@ -34,6 +34,9 @@ class _CupertinoSliderExampleState extends State<CupertinoSliderExample> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('CupertinoSlider Sample'),
+      ),
       child: Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,

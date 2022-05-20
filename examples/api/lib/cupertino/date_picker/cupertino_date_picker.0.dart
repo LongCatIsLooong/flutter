@@ -9,7 +9,7 @@ import 'package:flutter/cupertino.dart';
 void main() => runApp(const DatePickerApp());
 
 class DatePickerApp extends StatelessWidget {
-  const DatePickerApp({Key? key}) : super(key: key);
+  const DatePickerApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +21,7 @@ class DatePickerApp extends StatelessWidget {
 }
 
 class DatePickerExample extends StatefulWidget {
-  const DatePickerExample({Key? key}) : super(key: key);
+  const DatePickerExample({super.key});
 
   @override
   State<DatePickerExample> createState() => _DatePickerExampleState();
@@ -57,6 +57,9 @@ class _DatePickerExampleState extends State<DatePickerExample> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('CupertinoDatePicker Sample'),
+      ),
       child: DefaultTextStyle(
         style: TextStyle(
           color: CupertinoColors.label.resolveFrom(context),

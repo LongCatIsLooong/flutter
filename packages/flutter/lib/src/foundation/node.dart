@@ -53,7 +53,7 @@ class AbstractNode {
   /// Only call this method from overrides of [redepthChildren].
   @protected
   void redepthChild(AbstractNode child) {
-    assert(child.attached == attached);
+    assert(child.owner == owner);
     if (child._depth <= _depth) {
       child._depth = _depth + 1;
       child.redepthChildren();
@@ -134,16 +134,9 @@ class AbstractNode {
       return true;
     }());
     child._parent = this;
-    attachChild(child);
-    assert(attached == child.attached);
+    if (attached)
+      child.attach(_owner!);
     redepthChild(child);
-  }
-
-  @protected
-  void attachChild(covariant AbstractNode child) {
-    final Object? owner = _owner;
-    if (owner != null)
-      child.attach(owner);
   }
 
   /// Disconnect the given node from this node.
@@ -156,13 +149,8 @@ class AbstractNode {
     assert(child._parent == this);
     assert(child.attached == attached);
     child._parent = null;
-    detachChild(child);
-    assert(!child.attached);
-  }
-
-  @protected
-  void detachChild(covariant AbstractNode child) {
     if (attached)
       child.detach();
+    assert(!child.attached);
   }
 }

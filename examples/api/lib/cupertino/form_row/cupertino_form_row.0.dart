@@ -9,7 +9,7 @@ import 'package:flutter/cupertino.dart';
 void main() => runApp(const CupertinoFormRowApp());
 
 class CupertinoFormRowApp extends StatelessWidget {
-  const CupertinoFormRowApp({Key? key}) : super(key: key);
+  const CupertinoFormRowApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +21,7 @@ class CupertinoFormRowApp extends StatelessWidget {
 }
 
 class CupertinoFormRowExample extends StatefulWidget {
-  const CupertinoFormRowExample({Key? key}) : super(key: key);
+  const CupertinoFormRowExample({super.key});
 
   @override
   State<CupertinoFormRowExample> createState() => _CupertinoFormRowExampleState();
@@ -33,74 +33,80 @@ class _CupertinoFormRowExampleState extends State<CupertinoFormRowExample> {
   @override
   Widget build(BuildContext context) {
     return CupertinoPageScaffold(
-      child: CupertinoFormSection(
-        header: const Text('Connectivity'),
-        children: <Widget>[
-          CupertinoFormRow(
-            prefix: const PrefixWidget(
-              icon: CupertinoIcons.airplane,
-              title: 'Airplane Mode',
-              color: CupertinoColors.systemOrange,
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('CupertinoFormSection Sample'),
+      ),
+      // Add safe area widget to place the CupertinoFormSection below the navigation bar.
+      child: SafeArea(
+        child: CupertinoFormSection(
+          header: const Text('Connectivity'),
+          children: <Widget>[
+            CupertinoFormRow(
+              prefix: const PrefixWidget(
+                icon: CupertinoIcons.airplane,
+                title: 'Airplane Mode',
+                color: CupertinoColors.systemOrange,
+              ),
+              child: CupertinoSwitch(
+                value: airplaneMode,
+                onChanged: (bool value) {
+                  setState(() {
+                    airplaneMode = value;
+                  });
+                },
+              ),
             ),
-            child: CupertinoSwitch(
-              value: airplaneMode,
-              onChanged: (bool value) {
-                setState(() {
-                  airplaneMode = value;
-                });
-              },
-            ),
-          ),
-          CupertinoFormRow(
-            prefix: const PrefixWidget(
-              icon: CupertinoIcons.wifi,
-              title: 'Wi-Fi',
-              color: CupertinoColors.systemBlue,
-            ),
-            error: const Text('Home network unavailable'),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: const <Widget>[
-                Text('Not connected'),
-                SizedBox(width: 5),
-                Icon(CupertinoIcons.forward)
-              ],
-            ),
-          ),
-          CupertinoFormRow(
-            prefix: const PrefixWidget(
-              icon: CupertinoIcons.bluetooth,
-              title: 'Bluetooth',
-              color: CupertinoColors.activeBlue,
-            ),
-            helper: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4.0),
+            CupertinoFormRow(
+              prefix: const PrefixWidget(
+                icon: CupertinoIcons.wifi,
+                title: 'Wi-Fi',
+                color: CupertinoColors.systemBlue,
+              ),
+              error: const Text('Home network unavailable'),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                mainAxisAlignment: MainAxisAlignment.end,
                 children: const <Widget>[
-                  Text('Headphone'),
-                  Text('Connected'),
+                  Text('Not connected'),
+                  SizedBox(width: 5),
+                  Icon(CupertinoIcons.forward)
                 ],
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: const <Widget>[
-                Text('On'),
-                SizedBox(width: 5),
-                Icon(CupertinoIcons.forward)
-              ],
+            CupertinoFormRow(
+              prefix: const PrefixWidget(
+                icon: CupertinoIcons.bluetooth,
+                title: 'Bluetooth',
+                color: CupertinoColors.activeBlue,
+              ),
+              helper: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: const <Widget>[
+                    Text('Headphone'),
+                    Text('Connected'),
+                  ],
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: const <Widget>[
+                  Text('On'),
+                  SizedBox(width: 5),
+                  Icon(CupertinoIcons.forward)
+                ],
+              ),
             ),
-          ),
-          const CupertinoFormRow(
-            prefix: PrefixWidget(
-              icon: CupertinoIcons.bluetooth,
-              title: 'Mobile Data',
-              color: CupertinoColors.systemGreen,
+            const CupertinoFormRow(
+              prefix: PrefixWidget(
+                icon: CupertinoIcons.bluetooth,
+                title: 'Mobile Data',
+                color: CupertinoColors.systemGreen,
+              ),
+              child: Icon(CupertinoIcons.forward),
             ),
-            child: Icon(CupertinoIcons.forward),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -108,11 +114,11 @@ class _CupertinoFormRowExampleState extends State<CupertinoFormRowExample> {
 
 class PrefixWidget extends StatelessWidget {
   const PrefixWidget({
-    Key? key,
+    super.key,
     required this.icon,
     required this.title,
     required this.color,
-  }) : super(key: key);
+  });
 
   final IconData icon;
   final String title;

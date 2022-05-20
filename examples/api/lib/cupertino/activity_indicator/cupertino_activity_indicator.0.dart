@@ -9,7 +9,7 @@ import 'package:flutter/cupertino.dart';
 void main() => runApp(const CupertinoIndicatorApp());
 
 class CupertinoIndicatorApp extends StatelessWidget {
-  const CupertinoIndicatorApp({Key? key}) : super(key: key);
+  const CupertinoIndicatorApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -21,12 +21,14 @@ class CupertinoIndicatorApp extends StatelessWidget {
 }
 
 class CupertinoIndicatorExample extends StatelessWidget {
-  const CupertinoIndicatorExample({Key? key}) : super(key: key);
+  const CupertinoIndicatorExample({super.key});
 
   @override
   Widget build(BuildContext context) {
-
     return CupertinoPageScaffold(
+      navigationBar: const CupertinoNavigationBar(
+        middle: Text('CupertinoActivityIndicator Sample'),
+      ),
       child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
