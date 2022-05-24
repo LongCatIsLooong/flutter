@@ -181,6 +181,54 @@ void main() {
     expect(layoutCount, 2);
   });
 
+  testWidgets('Adding/removing remoteChild works', (WidgetTester tester) async {
+    final GlobalKey overlayChildKey = GlobalKey(debugLabel: 'overlay child 1');
+    final RenderBox remoteChildBox = RenderConstrainedBox(additionalConstraints: const BoxConstraints());
+    late StateSetter setState;
+    bool buildRemoteChild = false;
+
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: Overlay(
+          initialEntries: <OverlayEntry>[
+            OverlayEntry(
+              builder: (BuildContext context) {
+                return Container(
+                  key: overlayChildKey,
+                  child: _ManyRelayoutBoundaries(
+                    levels: 50,
+                    child: StatefulBuilder(builder: (BuildContext context, StateSetter setter) {
+                      setState = setter;
+                      return EvilWidget(
+                        overlayInfo: OverlayInfo.of(context)!,
+                        remoteChild: buildRemoteChild ? WidgetToRenderBoxAdapter(renderBox: remoteChildBox) : null,
+                        child: const SizedBox(),
+                      );
+                    }),
+                  ),
+                );
+              }
+            ),
+          ],
+        ),
+      ),
+    );
+
+    expect(find.byType(WidgetToRenderBoxAdapter), findsNothing);
+    expect(remoteChildBox.attached, isFalse);
+
+    setState(() { buildRemoteChild = true; });
+    await tester.pump();
+    expect(find.byType(WidgetToRenderBoxAdapter), findsOneWidget);
+    expect(remoteChildBox.attached, isTrue);
+
+    setState(() { buildRemoteChild = false; });
+    await tester.pump();
+    expect(find.byType(WidgetToRenderBoxAdapter), findsNothing);
+    expect(remoteChildBox.attached, isFalse);
+  });
+
   group('GlobalKey Reparenting', () {
     testWidgets('child is laid out before remote child after reparenting 1', (WidgetTester tester) async {
       int layoutCount = 0;
@@ -605,33 +653,53 @@ void main() {
           child: Overlay(
             initialEntries: <OverlayEntry>[
               OverlayEntry(builder: (BuildContext context) {
-                return StatefulBuilder(builder: (BuildContext context, StateSetter stateSetter) {
-                  setState = stateSetter;
-                  return EvilWidget(
-                    key: swapped ? outerKey : innerKey,
-                    overlayInfo: OverlayInfo.of(context)!,
-                    remoteChild: Builder(builder: (BuildContext context) {
-                      return EvilWidget(
-                        key: swapped ? innerKey : outerKey,
-                        overlayInfo: OverlayInfo.of(context)!,
-                        remoteChild: EvilWidget(
+                return _ManyRelayoutBoundaries(
+                  levels: 20,
+                  child: StatefulBuilder(builder: (BuildContext context, StateSetter stateSetter) {
+                    setState = stateSetter;
+                    return EvilWidget(
+                      key: swapped ? innerKey : outerKey,
+                      overlayInfo: OverlayInfo.of(context)!,
+                      remoteChild: Builder(builder: (BuildContext context) {
+                        return EvilWidget(
+                          key: swapped ? outerKey : innerKey,
                           overlayInfo: OverlayInfo.of(context)!,
-                          child: null,
-                          remoteChild: child3,
-                        ),
-                        child: child2,
-                      );
-                    }),
-                    child: child1,
-                  );
-                });
+                          remoteChild: EvilWidget(
+                            overlayInfo: OverlayInfo.of(context)!,
+                            child: null,
+                            remoteChild: LayoutBuilder(builder: (BuildContext context, BoxConstraints constraints) {
+                              expect(
+                                innerKey.currentContext!.findRenderObject(),
+                                _hasFinishedLayout,
+                              );
+                              expect(
+                                innerKey.currentContext!.findRenderObject(),
+                                _hasFinishedLayout,
+                              );
+                              return child3;
+                            }),
+                          ),
+                          child: _ManyRelayoutBoundaries(levels: 10, child: child2),
+                        );
+                      }),
+                      child: child1,
+                    );
+                  }),
+                );
               }),
+              OverlayEntry(builder: (BuildContext context) => const Placeholder()),
             ],
           ),
         ),
       );
 
+      // Swap the first and the second.
       setState(() { swapped = true; });
+      // Force the LayoutBuilder to rebuild so we can verify the preceding
+      // nodes are laid out at that point.
+      final RenderConstrainedLayoutBuilder<BoxConstraints, RenderBox> renderLayoutBuilder = remoteChildBox.parent! as RenderConstrainedLayoutBuilder<BoxConstraints, RenderBox>;
+      renderLayoutBuilder.markNeedsBuild();
+
       await tester.pump();
     });
   });

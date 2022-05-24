@@ -1110,6 +1110,25 @@ class _EvilWidgetElement extends RenderObjectElement {
   }
 
   @override
+  void activate() {
+    super.activate();
+    final RenderBox? box = _remoteChild?.renderObject as RenderBox?;
+    if (box != null) {
+      assert(!box.attached);
+      widget._overlayInfo.overlayRenderObject.add(box);
+    }
+  }
+
+  @override
+  void deactivate() {
+    final RenderBox? box = _remoteChild?.renderObject as RenderBox?;
+    if (box != null && box.attached) {
+      widget._overlayInfo.overlayRenderObject.remove(box);
+    }
+    super.deactivate();
+  }
+
+  @override
   void visitChildren(ElementVisitor visitor) {
     <Element?>[_child, _remoteChild].whereType<Element>().forEach(visitor);
   }
@@ -1118,7 +1137,7 @@ class _EvilWidgetElement extends RenderObjectElement {
   void detachRenderObject() {
     super.detachRenderObject();
     final RenderBox? box = _remoteChild?.renderObject as RenderBox?;
-    if (box != null)
+    if (box != null && box.attached)
       widget._overlayInfo.overlayRenderObject.remove(box);
   }
 
