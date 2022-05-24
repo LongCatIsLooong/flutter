@@ -275,7 +275,7 @@ class _OverlayEntryWidgetState extends State<_OverlayEntryWidget> implements Ove
       enabled: widget.tickerEnabled,
       child: _OverlayInfoWidget(
         state: this,
-        child: widget.entry.builder(context),
+        child: Builder(builder: widget.entry.builder),
       ),
     );
   }
@@ -1048,9 +1048,9 @@ class _RenderTheatre extends RenderBox with ContainerRenderObjectMixin<RenderBox
 class EvilWidget extends RenderObjectWidget {
   const EvilWidget({
     super.key,
+    required OverlayInfo overlayInfo,
     required this.remoteChild,
     required this.child,
-    required OverlayInfo overlayInfo
   }) : _overlayInfo = overlayInfo;
 
   final Widget? remoteChild;
@@ -1088,13 +1088,15 @@ class _EvilWidgetElement extends RenderObjectElement {
   @override
   void update(EvilWidget newWidget) {
     super.update(newWidget);
-    _child = updateChild(_child, widget.child, null);
-    _remoteChild = updateChild(_remoteChild, widget.remoteChild, widget._overlayInfo);
-  }
 
-  @override
-  void deactivate() {
-    super.deactivate();
+    final Key? oldChildKey = _child?.widget.key;
+    final Key? oldRemoteChildKey = _remoteChild?.widget.key;
+    final bool shouldSwap = (oldChildKey is GlobalKey && oldChildKey == widget.remoteChild?.key)
+                         || (oldRemoteChildKey is GlobalKey && oldRemoteChildKey == widget.child?.key);
+
+    final Element? newChild = updateChild(shouldSwap ? _remoteChild : _child, widget.child, null);
+    _remoteChild = updateChild(shouldSwap ? _child : _remoteChild, widget.remoteChild, widget._overlayInfo);
+    _child = newChild;
   }
 
   @override
@@ -1122,6 +1124,7 @@ class _EvilWidgetElement extends RenderObjectElement {
 
   @override
   void insertRenderObjectChild(RenderBox child, OverlayInfo? slot) {
+    assert(child.parent == null);
     if (slot != null) {
       slot.overlayRenderObject.add(child);
     } else {
@@ -1130,16 +1133,28 @@ class _EvilWidgetElement extends RenderObjectElement {
   }
 
   @override
-  void moveRenderObjectChild(covariant RenderObject child, covariant Object? oldSlot, covariant Object? newSlot) {
-    assert(false);
+  void moveRenderObjectChild(RenderBox child, OverlayInfo? oldSlot, OverlayInfo? newSlot) {
+    assert(oldSlot != null || newSlot != null, '$this: $child changing slot: $oldSlot => $newSlot');
+    if (child.attached)
+      oldSlot?.overlayRenderObject.remove(child);
+    insertRenderObjectChild(child, newSlot);
   }
 
   @override
   void removeRenderObjectChild(RenderBox child, OverlayInfo? slot) {
-    if (slot != null) {
-      slot.overlayRenderObject.remove(child);
-    } else {
+    if (slot == null) {
       renderObject.child = null;
+      return;
     }
+    if (child.attached) {
+      slot.overlayRenderObject.remove(child);
+    }
+  }
+
+  @override
+  void debugFillProperties(DiagnosticPropertiesBuilder properties) {
+    super.debugFillProperties(properties);
+    properties.add(DiagnosticsProperty<Element>('child', _child, defaultValue: null));
+    properties.add(DiagnosticsProperty<Element>('remoteChild', _remoteChild, defaultValue: null));
   }
 }

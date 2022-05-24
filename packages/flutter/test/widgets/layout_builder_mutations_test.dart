@@ -70,8 +70,8 @@ void main() {
   });
 
   testWidgets('Moving a global key from another SliverLayoutBuilder at layout time', (WidgetTester tester) async {
-    final GlobalKey victimKey1 = GlobalKey();
-    final GlobalKey victimKey2 = GlobalKey();
+    final GlobalKey victimKey1 = GlobalKey(debugLabel: 'victimeKey1');
+    final GlobalKey victimKey2 = GlobalKey(debugLabel: 'victimeKey2');
 
     await tester.pumpWidget(
       Directionality(
