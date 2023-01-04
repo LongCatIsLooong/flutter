@@ -311,6 +311,7 @@ class TextPainter {
   // Whether _paragraph contains outdated paint information and needs to be
   // rebuilt before painting.
   bool _rebuildParagraphForPaint = true;
+  final (int, int) x = (1, 3);
 
   bool get _debugAssertTextLayoutIsValid {
     assert(!debugDisposed);
