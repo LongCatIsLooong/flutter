@@ -83,24 +83,6 @@ class AppBarTheme with Diagnosticable {
   )
   final Brightness? brightness;
 
-  /// This property is deprecated, please use [backgroundColor] instead.
-  ///
-  /// Obsolete property that overrides the default value of
-  /// [AppBar.backgroundColor] in all descendant [AppBar] widgets.
-  ///
-  /// See also:
-  ///
-  ///  * [backgroundColor], which serves this same purpose
-  ///    as this property, but has a name that's consistent with
-  ///    [AppBar.backgroundColor].
-  ///  * [AppBar.backwardsCompatibility], which forces [AppBar] to depend
-  ///    on this obsolete property.
-  @Deprecated(
-    'This property is no longer used, please use backgroundColor instead. '
-    'This feature was deprecated after v2.4.0-0.0.pre.',
-  )
-  Color? get color => backgroundColor;
-
   /// Overrides the default value of [AppBar.backgroundColor] in all
   /// descendant [AppBar] widgets.
   ///
