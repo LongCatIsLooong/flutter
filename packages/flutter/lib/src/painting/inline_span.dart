@@ -218,7 +218,15 @@ abstract class InlineSpan extends DiagnosticableTree {
   /// in the same order as defined in the [InlineSpan] tree.
   ///
   /// [Paragraph] objects can be drawn on [Canvas] objects.
-  void build(ui.ParagraphBuilder builder, { double textScaleFactor = 1.0, List<PlaceholderDimensions>? dimensions });
+  void build(ui.ParagraphBuilder builder, {
+    @Deprecated(
+      'Use textScale instead. '
+      'This feature was deprecated after [TBD].',
+    )
+    double textScaleFactor = 1.0,
+    TextScaler textScale = TextScaler.noScaling,
+    List<PlaceholderDimensions>? dimensions,
+  });
 
   /// Walks this [InlineSpan] and any descendants in pre-order and calls `visitor`
   /// for each span that has content.

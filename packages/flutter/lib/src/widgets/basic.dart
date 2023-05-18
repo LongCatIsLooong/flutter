@@ -5722,7 +5722,12 @@ class RichText extends MultiChildRenderObjectWidget {
     this.textDirection,
     this.softWrap = true,
     this.overflow = TextOverflow.clip,
+    @Deprecated(
+      'Use textScale instead. '
+      'This feature was deprecated after [TBD].',
+    )
     this.textScaleFactor = 1.0,
+    this.textScale = TextScaler.noScaling,
     this.maxLines,
     this.locale,
     this.strutStyle,
@@ -5749,6 +5754,30 @@ class RichText extends MultiChildRenderObjectWidget {
       return true;
     });
     return result;
+  }
+
+  static List<Widget> extractWidgetSpans(InlineSpan span) {
+    final List<(PlaceholderSpan, double)> placeholderSpans = <(PlaceholderSpan, double)>[];
+    final List<double> fontSizeStack = <double>[14.0];
+    bool visitSubtree(InlineSpan span) {
+      final double? fontSize = switch (span.style?.fontSize) {
+        final double size when size != fontSizeStack.last => size,
+        _ => null,
+      };
+      if (fontSize != null) {
+        fontSizeStack.add(fontSize);
+      }
+      if (span is PlaceholderSpan) {
+        placeholderSpans.add((span, fontSizeStack.last));
+      }
+      span.visitDirectChildren(visitSubtree);
+      if (fontSize != null) {
+        fontSizeStack.removeLast();
+        assert(fontSizeStack.isNotEmpty);
+      }
+      return true;
+    }
+    visitSubtree(span);
   }
 
   /// The text to display in this widget.
@@ -5785,7 +5814,13 @@ class RichText extends MultiChildRenderObjectWidget {
   ///
   /// For example, if the text scale factor is 1.5, text will be 50% larger than
   /// the specified font size.
+  @Deprecated(
+    'Use textScale instead. '
+    'This feature was deprecated after [TBD].',
+  )
   final double textScaleFactor;
+
+  final TextScaler textScale;
 
   /// An optional maximum number of lines for the text to span, wrapping if necessary.
   /// If the text exceeds the given number of lines, it will be truncated according

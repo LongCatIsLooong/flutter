@@ -23,6 +23,7 @@ import 'inline_span.dart';
 import 'placeholder_span.dart';
 import 'strut_style.dart';
 import 'text_span.dart';
+import 'text_style.dart' show TextScaler;
 
 export 'package:flutter/services.dart' show TextRange, TextSelection;
 
@@ -337,7 +338,12 @@ class TextPainter {
     InlineSpan? text,
     TextAlign textAlign = TextAlign.start,
     TextDirection? textDirection,
+    @Deprecated(
+      'Use textScale instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double textScaleFactor = 1.0,
+    TextScaler textScale = TextScaler.noScaling,
     int? maxLines,
     String? ellipsis,
     Locale? locale,
@@ -350,6 +356,7 @@ class TextPainter {
        _textAlign = textAlign,
        _textDirection = textDirection,
        _textScaleFactor = textScaleFactor,
+       _textScale = textScale == TextScaler.noScaling ? TextScaler.linear(textScaleFactor) : textScale,
        _maxLines = maxLines,
        _ellipsis = ellipsis,
        _locale = locale,
@@ -369,7 +376,12 @@ class TextPainter {
     required InlineSpan text,
     required TextDirection textDirection,
     TextAlign textAlign = TextAlign.start,
+    @Deprecated(
+      'Use textScale instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double textScaleFactor = 1.0,
+    TextScaler textScale = TextScaler.noScaling,
     int? maxLines,
     String? ellipsis,
     Locale? locale,
@@ -411,7 +423,12 @@ class TextPainter {
     required InlineSpan text,
     required TextDirection textDirection,
     TextAlign textAlign = TextAlign.start,
+    @Deprecated(
+      'Use textScale instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double textScaleFactor = 1.0,
+    TextScaler textScale = TextScaler.noScaling,
     int? maxLines,
     String? ellipsis,
     Locale? locale,
@@ -579,6 +596,7 @@ class TextPainter {
   /// the specified font size.
   ///
   /// After this is set, you must call [layout] before the next call to [paint].
+  @Deprecated('')
   double get textScaleFactor => _textScaleFactor;
   double _textScaleFactor;
   set textScaleFactor(double value) {
@@ -586,6 +604,16 @@ class TextPainter {
       return;
     }
     _textScaleFactor = value;
+    _textScale = TextScaler.linear(value);
+  }
+
+  TextScaler get textScale => _textScale;
+  TextScaler _textScale;
+  set textScale(TextScaler value) {
+    if (value != _textScale) {
+      return;
+    }
+    _textScale = value;
     markNeedsLayout();
     _layoutTemplate?.dispose();
     _layoutTemplate = null;
@@ -747,7 +775,7 @@ class TextPainter {
     return _text!.style?.getParagraphStyle(
       textAlign: textAlign,
       textDirection: textDirection ?? defaultTextDirection,
-      textScaleFactor: textScaleFactor,
+      textScale: textScale,
       maxLines: _maxLines,
       textHeightBehavior: _textHeightBehavior,
       ellipsis: _ellipsis,
@@ -758,8 +786,8 @@ class TextPainter {
       textDirection: textDirection ?? defaultTextDirection,
       // Use the default font size to multiply by as RichText does not
       // perform inheriting [TextStyle]s and would otherwise
-      // fail to apply textScaleFactor.
-      fontSize: _kDefaultFontSize * textScaleFactor,
+      // fail to apply textScale.
+      fontSize: textScale.scale(_kDefaultFontSize),
       maxLines: maxLines,
       textHeightBehavior: _textHeightBehavior,
       ellipsis: ellipsis,
@@ -772,7 +800,7 @@ class TextPainter {
     final ui.ParagraphBuilder builder = ui.ParagraphBuilder(
       _createParagraphStyle(TextDirection.rtl),
     ); // direction doesn't matter, text is just a space
-    final ui.TextStyle? textStyle = text?.style?.getTextStyle(textScaleFactor: textScaleFactor);
+    final ui.TextStyle? textStyle = text?.style?.getTextStyle(textScale: textScale);
     if (textStyle != null) {
       builder.pushStyle(textStyle);
     }
@@ -889,7 +917,7 @@ class TextPainter {
       throw StateError('TextPainter.text must be set to a non-null value before using the TextPainter.');
     }
     final ui.ParagraphBuilder builder = ui.ParagraphBuilder(_createParagraphStyle());
-    text.build(builder, textScaleFactor: textScaleFactor, dimensions: _placeholderDimensions);
+    text.build(builder, textScale: textScale, dimensions: _placeholderDimensions);
     _inlinePlaceholderScales = builder.placeholderScales;
     assert(() {
       _debugMarkNeedsLayoutCallStack = null;

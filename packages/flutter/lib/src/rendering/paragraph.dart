@@ -106,7 +106,6 @@ class RenderParagraph extends RenderBox
          textHeightBehavior: textHeightBehavior,
        ) {
     addAll(children);
-    _extractPlaceholderSpans(text);
     this.registrar = registrar;
   }
 
@@ -138,7 +137,6 @@ class RenderParagraph extends RenderBox
         _textPainter.text = value;
         _cachedAttributedLabels = null;
         _cachedCombinedSemanticsInfos = null;
-        _extractPlaceholderSpans(value);
         markNeedsPaint();
         markNeedsSemanticsUpdate();
       case RenderComparison.layout:
@@ -146,7 +144,6 @@ class RenderParagraph extends RenderBox
         _overflowShader = null;
         _cachedAttributedLabels = null;
         _cachedCombinedSemanticsInfos = null;
-        _extractPlaceholderSpans(value);
         markNeedsLayout();
         _removeSelectionRegistrarSubscription();
         _disposeSelectableFragments();
@@ -254,17 +251,6 @@ class RenderParagraph extends RenderBox
     _lastSelectableFragments = null;
     _textPainter.dispose();
     super.dispose();
-  }
-
-  late List<PlaceholderSpan> _placeholderSpans;
-  void _extractPlaceholderSpans(InlineSpan span) {
-    _placeholderSpans = <PlaceholderSpan>[];
-    span.visitChildren((InlineSpan span) {
-      if (span is PlaceholderSpan) {
-        _placeholderSpans.add(span);
-      }
-      return true;
-    });
   }
 
   /// How the text should be aligned horizontally.
@@ -486,28 +472,33 @@ class RenderParagraph extends RenderBox
     return _textPainter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
   }
 
+  static bool _canComputeIntrinsicsForSpan(InlineSpan span) {
+    if (span is! PlaceholderSpan) {
+      return true;
+    }
+    switch (span.alignment) {
+      case ui.PlaceholderAlignment.baseline:
+      case ui.PlaceholderAlignment.aboveBaseline:
+      case ui.PlaceholderAlignment.belowBaseline:
+        return false;
+      case ui.PlaceholderAlignment.top:
+      case ui.PlaceholderAlignment.middle:
+      case ui.PlaceholderAlignment.bottom:
+        return true;
+    }
+  }
+
   // Intrinsics cannot be calculated without a full layout for
   // alignments that require the baseline (baseline, aboveBaseline,
   // belowBaseline).
   bool _canComputeIntrinsics() {
-    for (final PlaceholderSpan span in _placeholderSpans) {
-      switch (span.alignment) {
-        case ui.PlaceholderAlignment.baseline:
-        case ui.PlaceholderAlignment.aboveBaseline:
-        case ui.PlaceholderAlignment.belowBaseline:
-          assert(
-            RenderObject.debugCheckingIntrinsics,
-            'Intrinsics are not available for PlaceholderAlignment.baseline, '
-            'PlaceholderAlignment.aboveBaseline, or PlaceholderAlignment.belowBaseline.',
-          );
-          return false;
-        case ui.PlaceholderAlignment.top:
-        case ui.PlaceholderAlignment.middle:
-        case ui.PlaceholderAlignment.bottom:
-          continue;
-      }
-    }
-    return true;
+    final bool noBadSpans = text.visitChildren(_canComputeIntrinsicsForSpan);
+    assert(
+      noBadSpans || RenderObject.debugCheckingIntrinsics,
+      'Intrinsics are not available for PlaceholderAlignment.baseline, '
+      'PlaceholderAlignment.aboveBaseline, or PlaceholderAlignment.belowBaseline.',
+    );
+    return !noBadSpans;
   }
 
   void _computeChildrenWidthWithMaxIntrinsics(double height) {
@@ -515,12 +506,13 @@ class RenderParagraph extends RenderBox
     final List<PlaceholderDimensions> placeholderDimensions = List<PlaceholderDimensions>.filled(childCount, PlaceholderDimensions.empty);
     int childIndex = 0;
     while (child != null) {
+      final PlaceholderSpan span = _placeholderSpans[childIndex].$1;
       // Height and baseline is irrelevant as all text will be laid
       // out in a single line. Therefore, using 0.0 as a dummy for the height.
       placeholderDimensions[childIndex] = PlaceholderDimensions(
         size: Size(child.getMaxIntrinsicWidth(double.infinity), 0.0),
-        alignment: _placeholderSpans[childIndex].alignment,
-        baseline: _placeholderSpans[childIndex].baseline,
+        alignment: span.alignment,
+        baseline: span.baseline,
       );
       child = childAfter(child);
       childIndex += 1;
@@ -533,12 +525,13 @@ class RenderParagraph extends RenderBox
     final List<PlaceholderDimensions> placeholderDimensions = List<PlaceholderDimensions>.filled(childCount, PlaceholderDimensions.empty);
     int childIndex = 0;
     while (child != null) {
+      final PlaceholderSpan span = _placeholderSpans[childIndex].$1;
       // Height and baseline is irrelevant; only looking for the widest word or
       // placeholder. Therefore, using 0.0 as a dummy for height.
       placeholderDimensions[childIndex] = PlaceholderDimensions(
         size: Size(child.getMinIntrinsicWidth(double.infinity), 0.0),
-        alignment: _placeholderSpans[childIndex].alignment,
-        baseline: _placeholderSpans[childIndex].baseline,
+        alignment: span.alignment,
+        baseline: span.baseline,
       );
       child = childAfter(child);
       childIndex += 1;
@@ -554,11 +547,12 @@ class RenderParagraph extends RenderBox
     // span will be scaled up when it paints.
     width = width / textScaleFactor;
     while (child != null) {
+      final PlaceholderSpan span = _placeholderSpans[childIndex].$1;
       final Size size = child.getDryLayout(BoxConstraints(maxWidth: width));
       placeholderDimensions[childIndex] = PlaceholderDimensions(
         size: size,
-        alignment: _placeholderSpans[childIndex].alignment,
-        baseline: _placeholderSpans[childIndex].baseline,
+        alignment: span.alignment,
+        baseline: span.baseline,
       );
       child = childAfter(child);
       childIndex += 1;
@@ -659,7 +653,7 @@ class RenderParagraph extends RenderBox
   // specified.
   List<PlaceholderDimensions> _layoutChildren(BoxConstraints constraints, {bool dry = false}) {
     if (childCount == 0) {
-      return <PlaceholderDimensions>[];
+      return const <PlaceholderDimensions>[];
     }
     RenderBox? child = firstChild;
     final List<PlaceholderDimensions> placeholderDimensions = List<PlaceholderDimensions>.filled(childCount, PlaceholderDimensions.empty);
@@ -674,16 +668,17 @@ class RenderParagraph extends RenderBox
     while (child != null) {
       double? baselineOffset;
       final Size childSize;
+      final PlaceholderSpan span = _placeholderSpans[childIndex].$1;
       if (!dry) {
         child.layout(
           boxConstraints,
           parentUsesSize: true,
         );
         childSize = child.size;
-        switch (_placeholderSpans[childIndex].alignment) {
+        switch (span.alignment) {
           case ui.PlaceholderAlignment.baseline:
             baselineOffset = child.getDistanceToBaseline(
-              _placeholderSpans[childIndex].baseline!,
+              span.baseline!,
             );
           case ui.PlaceholderAlignment.aboveBaseline:
           case ui.PlaceholderAlignment.belowBaseline:
@@ -693,13 +688,13 @@ class RenderParagraph extends RenderBox
             baselineOffset = null;
         }
       } else {
-        assert(_placeholderSpans[childIndex].alignment != ui.PlaceholderAlignment.baseline);
+        assert(span.alignment != ui.PlaceholderAlignment.baseline);
         childSize = child.getDryLayout(boxConstraints);
       }
       placeholderDimensions[childIndex] = PlaceholderDimensions(
         size: childSize,
-        alignment: _placeholderSpans[childIndex].alignment,
-        baseline: _placeholderSpans[childIndex].baseline,
+        alignment: span.alignment,
+        baseline: span.baseline,
         baselineOffset: baselineOffset,
       );
       child = childAfter(child);
@@ -729,19 +724,16 @@ class RenderParagraph extends RenderBox
     // Dry layout cannot be calculated without a full layout for
     // alignments that require the baseline (baseline, aboveBaseline,
     // belowBaseline).
-    for (final PlaceholderSpan span in _placeholderSpans) {
-      switch (span.alignment) {
-        case ui.PlaceholderAlignment.baseline:
-        case ui.PlaceholderAlignment.aboveBaseline:
-        case ui.PlaceholderAlignment.belowBaseline:
-          return false;
-        case ui.PlaceholderAlignment.top:
-        case ui.PlaceholderAlignment.middle:
-        case ui.PlaceholderAlignment.bottom:
-          continue;
-      }
-    }
-    return true;
+    return !_placeholderSpans.any(((PlaceholderSpan, double) pair) {
+      return switch (pair.$1.alignment) {
+        ui.PlaceholderAlignment.baseline => true,
+        ui.PlaceholderAlignment.aboveBaseline => true,
+        ui.PlaceholderAlignment.belowBaseline => true,
+        ui.PlaceholderAlignment.top => false,
+        ui.PlaceholderAlignment.middle => false,
+        ui.PlaceholderAlignment.bottom => false,
+      };
+    });
   }
 
   @override

@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:math' show max, min;
 import 'dart:ui' as ui show
   FontFeature,
   FontVariation,
@@ -1266,7 +1267,16 @@ class TextStyle with Diagnosticable {
   }
 
   /// The style information for text runs, encoded for use by `dart:ui`.
-  ui.TextStyle getTextStyle({ double textScaleFactor = 1.0 }) {
+  ui.TextStyle getTextStyle({
+    @Deprecated('')
+    double textScaleFactor = 1.0,
+    TextScaler textScale = TextScaler.noScaling,
+  }) {
+    final double? fontSize = switch (this.fontSize) {
+      null => null,
+      final double size when textScale == TextScaler.noScaling => size * textScaleFactor,
+      final double size => textScale.scale(size),
+    };
     return ui.TextStyle(
       color: color,
       decoration: decoration,
@@ -1279,16 +1289,17 @@ class TextStyle with Diagnosticable {
       leadingDistribution: leadingDistribution,
       fontFamily: fontFamily,
       fontFamilyFallback: fontFamilyFallback,
-      fontSize: fontSize == null ? null : fontSize! * textScaleFactor,
+      fontSize: fontSize,
       letterSpacing: letterSpacing,
       wordSpacing: wordSpacing,
       height: height,
       locale: locale,
       foreground: foreground,
-      background: background ?? (backgroundColor != null
-        ? (Paint()..color = backgroundColor!)
-        : null
-      ),
+      background: switch ((background, backgroundColor)) {
+        (final Paint paint, _) => paint,
+        (_, final Color color) => Paint()..color = color,
+        _ => null,
+      },
       shadows: shadows,
       fontFeatures: fontFeatures,
       fontVariations: fontVariations,
@@ -1306,7 +1317,9 @@ class TextStyle with Diagnosticable {
   ui.ParagraphStyle getParagraphStyle({
     TextAlign? textAlign,
     TextDirection? textDirection,
+    @Deprecated('')
     double textScaleFactor = 1.0,
+    TextScaler textScale = TextScaler.noScaling,
     String? ellipsis,
     int? maxLines,
     ui.TextHeightBehavior? textHeightBehavior,
@@ -1319,9 +1332,14 @@ class TextStyle with Diagnosticable {
     StrutStyle? strutStyle,
   }) {
     assert(maxLines == null || maxLines > 0);
-    final ui.TextLeadingDistribution? leadingDistribution = this.leadingDistribution;
-    final ui.TextHeightBehavior? effectiveTextHeightBehavior = textHeightBehavior
-      ?? (leadingDistribution == null ? null : ui.TextHeightBehavior(leadingDistribution: leadingDistribution));
+
+    final ui.TextHeightBehavior? effectiveTextHeightBehavior = textHeightBehavior ?? switch (leadingDistribution) {
+      final ui.TextLeadingDistribution leadingDistribution? => ui.TextHeightBehavior(leadingDistribution: leadingDistribution),
+      null => null,
+    };
+    final TextScaler effectiveTextScale = textScale == TextScaler.noScaling
+      ? TextScaler.linear(textScaleFactor)
+      : textScale;
     return ui.ParagraphStyle(
       textAlign: textAlign,
       textDirection: textDirection,
@@ -1330,13 +1348,16 @@ class TextStyle with Diagnosticable {
       fontWeight: fontWeight ?? this.fontWeight,
       fontStyle: fontStyle ?? this.fontStyle,
       fontFamily: fontFamily ?? this.fontFamily,
-      fontSize: (fontSize ?? this.fontSize ?? _kDefaultFontSize) * textScaleFactor,
+      fontSize: effectiveTextScale.scale(fontSize ?? this.fontSize ?? _kDefaultFontSize),
       height: height ?? this.height,
       textHeightBehavior: effectiveTextHeightBehavior,
       strutStyle: strutStyle == null ? null : ui.StrutStyle(
         fontFamily: strutStyle.fontFamily,
         fontFamilyFallback: strutStyle.fontFamilyFallback,
-        fontSize: strutStyle.fontSize == null ? null : strutStyle.fontSize! * textScaleFactor,
+        fontSize: switch (strutStyle.fontSize) {
+          null => null,
+          final double unscaled => effectiveTextScale.scale(unscaled),
+        },
         height: strutStyle.height,
         leading: strutStyle.leading,
         fontWeight: strutStyle.fontWeight,

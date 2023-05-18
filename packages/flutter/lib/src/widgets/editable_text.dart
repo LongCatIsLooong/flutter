@@ -5058,11 +5058,18 @@ class _ScribblePlaceholder extends WidgetSpan {
   final Size size;
 
   @override
-  void build(ui.ParagraphBuilder builder, { double textScaleFactor = 1.0, List<PlaceholderDimensions>? dimensions }) {
+  void build(ui.ParagraphBuilder builder, {
+    double textScaleFactor = 1.0,
+    TextScaler textScale = TextScaler.noScaling,
+    List<PlaceholderDimensions>? dimensions,
+  }) {
     assert(debugAssertIsValid());
     final bool hasStyle = style != null;
     if (hasStyle) {
-      builder.pushStyle(style!.getTextStyle(textScaleFactor: textScaleFactor));
+      final TextScaler effectiveTextScale = textScale == TextScaler.noScaling
+        ? TextScaler.linear(textScaleFactor)
+        : textScale;
+      builder.pushStyle(style!.getTextStyle(textScale: effectiveTextScale));
     }
     builder.addPlaceholder(
       size.width,

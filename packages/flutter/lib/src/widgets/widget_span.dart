@@ -97,12 +97,19 @@ class WidgetSpan extends PlaceholderSpan {
   ///
   /// The `textScaleFactor` will be applied to the laid-out size of the widget.
   @override
-  void build(ui.ParagraphBuilder builder, { double textScaleFactor = 1.0, List<PlaceholderDimensions>? dimensions }) {
+  void build(ui.ParagraphBuilder builder, {
+    double textScaleFactor = 1.0,
+    TextScaler textScale = TextScaler.noScaling,
+    List<PlaceholderDimensions>? dimensions,
+  }) {
     assert(debugAssertIsValid());
     assert(dimensions != null);
     final bool hasStyle = style != null;
     if (hasStyle) {
-      builder.pushStyle(style!.getTextStyle(textScaleFactor: textScaleFactor));
+      final TextScaler effectiveTextScale = textScale == TextScaler.noScaling
+        ? TextScaler.linear(textScaleFactor)
+        : textScale;
+      builder.pushStyle(style!.getTextStyle(textScale: effectiveTextScale));
     }
     assert(builder.placeholderCount < dimensions!.length);
     final PlaceholderDimensions currentDimensions = dimensions![builder.placeholderCount];

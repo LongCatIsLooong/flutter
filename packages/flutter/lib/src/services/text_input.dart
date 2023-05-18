@@ -2009,6 +2009,7 @@ class TextInput {
         control.setEditingState(value);
       }
     }
+    print('updateEditingState: $value');
     _instance._currentConnection!._client.updateEditingValue(value);
   }
 
@@ -2244,6 +2245,7 @@ class _PlatformTextInputControl with TextInputControl {
 
   @override
   void setEditingState(TextEditingValue value) {
+    print('setEditingState: $value');
     _channel.invokeMethod<void>(
       'TextInput.setEditingState',
       value.toJSON(),
