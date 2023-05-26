@@ -166,6 +166,14 @@ abstract mixin class WidgetsBindingObserver {
   ///    boilerplate.
   void didChangeMetrics() { }
 
+  /// Renamed to [didChangeTextScaler]. Will be removed in a future version of
+  /// Flutter.
+  @Deprecated(
+    'Use didChangeTextScaler instead. '
+    'This feature was deprecated after 3.11.0-5.0.pre.',
+  )
+  void didChangeTextScaleFactor() { }
+
   /// Called when the platform's text scale factor changes.
   ///
   /// This typically happens as the result of the user changing system
@@ -217,7 +225,7 @@ abstract mixin class WidgetsBindingObserver {
   ///
   ///  * [MediaQuery.of], which provides a similar service with less
   ///    boilerplate.
-  void didChangeTextScaleFactor() { }
+  void didChangeTextScaler() => didChangeTextScaleFactor();
 
   /// Called when the platform brightness changes.
   ///
@@ -591,7 +599,7 @@ mixin WidgetsBinding on BindingBase, ServicesBinding, SchedulerBinding, GestureB
   void handleTextScaleFactorChanged() {
     super.handleTextScaleFactorChanged();
     for (final WidgetsBindingObserver observer in _observers) {
-      observer.didChangeTextScaleFactor();
+      observer.didChangeTextScaler();
     }
   }
 

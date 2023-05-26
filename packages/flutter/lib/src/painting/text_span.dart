@@ -11,7 +11,6 @@ import 'package:flutter/services.dart';
 import 'basic_types.dart';
 import 'inline_span.dart';
 import 'text_painter.dart';
-import 'text_style.dart' show TextScaler;
 
 // Examples can assume:
 // late TextSpan myTextSpan;
@@ -269,16 +268,16 @@ class TextSpan extends InlineSpan implements HitTestTarget, MouseTrackerAnnotati
   void build(
     ui.ParagraphBuilder builder, {
     double textScaleFactor = 1.0,
-    TextScaler textScale = TextScaler.noScaling,
+    TextScaler textScaler = TextScaler.noScaling,
     List<PlaceholderDimensions>? dimensions,
   }) {
     assert(debugAssertIsValid());
     final bool hasStyle = style != null;
     if (hasStyle) {
-      final TextScaler effectiveTextScale = textScale == TextScaler.noScaling
+      final TextScaler effectiveTextScaler = textScaler == TextScaler.noScaling
         ? TextScaler.linear(textScaleFactor)
-        : textScale;
-      builder.pushStyle(style!.getTextStyle(textScale: effectiveTextScale));
+        : textScaler;
+      builder.pushStyle(style!.getTextStyle(textScaler: effectiveTextScaler));
     }
     if (text != null) {
       try {

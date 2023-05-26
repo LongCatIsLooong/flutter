@@ -220,11 +220,11 @@ abstract class InlineSpan extends DiagnosticableTree {
   /// [Paragraph] objects can be drawn on [Canvas] objects.
   void build(ui.ParagraphBuilder builder, {
     @Deprecated(
-      'Use textScale instead. '
+      'Use textScaler instead. '
       'This feature was deprecated after [TBD].',
     )
     double textScaleFactor = 1.0,
-    TextScaler textScale = TextScaler.noScaling,
+    TextScaler textScaler = TextScaler.noScaling,
     List<PlaceholderDimensions>? dimensions,
   });
 

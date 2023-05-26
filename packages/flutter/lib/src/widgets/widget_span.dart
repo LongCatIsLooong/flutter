@@ -93,18 +93,27 @@ class WidgetSpan extends PlaceholderSpan {
   /// The extracted widgets will be annotated with necessary semantics
   /// information. This function is used by [EditableText] and [RichText] so
   /// calling it directly is rarely necessary.
-  static List<Widget> extractFromInlineSpan(InlineSpan span, double textScaleFactor) {
+  static List<Widget> extractFromInlineSpan(InlineSpan span, TextScaler textScaler) {
     final List<Widget> widgets = <Widget>[];
+    final List<double> fontSizeStack = <double>[14.0];
     int index = 0;
     // This assumes an InlineSpan tree's logical order is equivalent to preorder.
-    span.visitChildren((InlineSpan span) {
+    bool visitSubtree(InlineSpan span) {
+      final double? fontSize = switch (span.style?.fontSize) {
+        final double size when size != fontSizeStack.last => size,
+        _ => null,
+      };
+      if (fontSize != null) {
+        fontSizeStack.add(fontSize);
+      }
       if (span is WidgetSpan) {
+        final double fontSize = fontSizeStack.last;
         widgets.add(
           _WidgetSpanParentData(
             span: span,
             child: Semantics(
               tagForChildren: PlaceholderSpanIndexSemanticsTag(index++),
-              child: _AutoScaleInlineWidget(span: span, textScaleFactor: textScaleFactor, child: span.child),
+              child: _AutoScaleInlineWidget(span: span, textScaleFactor: textScaler.scale(fontSize) / fontSize, child: span.child),
             ),
           ),
         );
@@ -113,8 +122,14 @@ class WidgetSpan extends PlaceholderSpan {
         span is WidgetSpan || span is! PlaceholderSpan,
         '$span is a PlaceholderSpan but not a WidgetSpan subclass. This is currently not supported.',
       );
+      span.visitDirectChildren(visitSubtree);
+      if (fontSize != null) {
+        fontSizeStack.removeLast();
+        assert(fontSizeStack.isNotEmpty);
+      }
       return true;
-    });
+    }
+    visitSubtree(span);
     return widgets;
   }
 
@@ -132,17 +147,17 @@ class WidgetSpan extends PlaceholderSpan {
   @override
   void build(ui.ParagraphBuilder builder, {
     double textScaleFactor = 1.0,
-    TextScaler textScale = TextScaler.noScaling,
+    TextScaler textScaler = TextScaler.noScaling,
     List<PlaceholderDimensions>? dimensions,
   }) {
     assert(debugAssertIsValid());
     assert(dimensions != null);
     final bool hasStyle = style != null;
     if (hasStyle) {
-      final TextScaler effectiveTextScale = textScale == TextScaler.noScaling
+      final TextScaler effectiveTextScale = textScaler == TextScaler.noScaling
         ? TextScaler.linear(textScaleFactor)
-        : textScale;
-      builder.pushStyle(style!.getTextStyle(textScale: effectiveTextScale));
+        : textScaler;
+      builder.pushStyle(style!.getTextStyle(textScaler: effectiveTextScale));
     }
     assert(builder.placeholderCount < dimensions!.length);
     final PlaceholderDimensions currentDimensions = dimensions![builder.placeholderCount];

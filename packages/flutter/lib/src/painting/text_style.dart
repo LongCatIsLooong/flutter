@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:math' show max, min;
 import 'dart:ui' as ui show
   FontFeature,
   FontVariation,
@@ -1273,14 +1272,17 @@ class TextStyle with Diagnosticable {
 
   /// The style information for text runs, encoded for use by `dart:ui`.
   ui.TextStyle getTextStyle({
-    @Deprecated('')
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double textScaleFactor = 1.0,
-    TextScaler textScale = TextScaler.noScaling,
+    TextScaler textScaler = TextScaler.noScaling,
   }) {
     final double? fontSize = switch (this.fontSize) {
       null => null,
-      final double size when textScale == TextScaler.noScaling => size * textScaleFactor,
-      final double size => textScale.scale(size),
+      final double size when textScaler == TextScaler.noScaling => size * textScaleFactor,
+      final double size => textScaler.scale(size),
     };
     return ui.TextStyle(
       color: color,
@@ -1322,9 +1324,12 @@ class TextStyle with Diagnosticable {
   ui.ParagraphStyle getParagraphStyle({
     TextAlign? textAlign,
     TextDirection? textDirection,
-    @Deprecated('')
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double textScaleFactor = 1.0,
-    TextScaler textScale = TextScaler.noScaling,
+    TextScaler textScaler = TextScaler.noScaling,
     String? ellipsis,
     int? maxLines,
     ui.TextHeightBehavior? textHeightBehavior,
@@ -1342,9 +1347,9 @@ class TextStyle with Diagnosticable {
       final ui.TextLeadingDistribution leadingDistribution? => ui.TextHeightBehavior(leadingDistribution: leadingDistribution),
       null => null,
     };
-    final TextScaler effectiveTextScale = textScale == TextScaler.noScaling
+    final TextScaler effectiveTextScale = textScaler == TextScaler.noScaling
       ? TextScaler.linear(textScaleFactor)
-      : textScale;
+      : textScaler;
     return ui.ParagraphStyle(
       textAlign: textAlign,
       textDirection: textDirection,
