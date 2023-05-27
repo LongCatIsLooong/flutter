@@ -229,12 +229,9 @@ bool _isTransitionable(BuildContext context) {
 /// behavior for multiple navigation bars per route.
 ///
 /// When used in a [CupertinoPageScaffold], [CupertinoPageScaffold.navigationBar]
-/// has its text scale factor set to 1.0 and does not respond to text scale factor
-/// changes from the operating system, to match the native iOS behavior. To override
-/// this behavior, wrap each of the `navigationBar`'s components inside a [MediaQuery]
-/// with the desired [MediaQueryData.textScaleFactor] value. The text scale factor
-/// value from the operating system can be retrieved in many ways, such as querying
-/// [MediaQuery.textScaleFactorOf] against [CupertinoApp]'s [BuildContext].
+/// disables text scaling to match the native iOS behavior. To override
+/// this behavior, wrap each of the `navigationBar`'s components inside a
+/// [MediaQuery] with the desired [TextScaler].
 ///
 /// {@tool dartpad}
 /// This example shows a [CupertinoNavigationBar] placed in a [CupertinoPageScaffold].
@@ -555,13 +552,10 @@ class _CupertinoNavigationBarState extends State<CupertinoNavigationBar> {
 /// Use [transitionBetweenRoutes] or [heroTag] to customize the transition
 /// behavior for multiple navigation bars per route.
 ///
-/// [CupertinoSliverNavigationBar] has its text scale factor set to 1.0 by default
-/// and does not respond to text scale factor changes from the operating system,
-/// to match the native iOS behavior. To override this behavior, wrap each of the
+/// [CupertinoSliverNavigationBar] by default disables text scaling to match the
+/// native iOS behavior. To override this behavior, wrap each of the
 /// [CupertinoSliverNavigationBar]'s components inside a [MediaQuery] with the
-/// desired [MediaQueryData.textScaleFactor] value. The text scale factor value
-/// from the operating system can be retrieved in many ways, such as querying
-/// [MediaQuery.textScaleFactorOf] against [CupertinoApp]'s [BuildContext].
+/// desired [TextScaler].
 ///
 /// The [stretch] parameter determines whether the nav bar should stretch to
 /// fill the over-scroll area. The nav bar can still expand and contract as the

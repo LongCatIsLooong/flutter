@@ -290,7 +290,8 @@ class MediaQueryData {
   )
   final double textScaleFactor;
 
-  final TextScaler textScaler;
+  TextScaler get textScaler => _textScaler == TextScaler.noScaling
+  TextScaler _textScaler;
 
   /// The current brightness mode of the host platform.
   ///
@@ -1173,7 +1174,7 @@ class MediaQuery extends InheritedModel<_MediaQueryAspect> {
   /// the [MediaQueryData.textScaleFactor] property of the ancestor [MediaQuery] changes.
   ///
   /// Deprecated. Will be removed in a future version of Flutter. Use
-  /// [scaledFontSizeOf] instead.
+  /// [textScalerOf] instead.
   @Deprecated(
     'Use textScalerOf instead. '
     'This feature was deprecated after [TBD].',
@@ -1187,7 +1188,7 @@ class MediaQuery extends InheritedModel<_MediaQueryAspect> {
   /// the [MediaQueryData.textScaleFactor] property of the ancestor [MediaQuery] changes.
   ///
   /// Deprecated. Will be removed in a future version of Flutter. Use
-  /// [scaledFontSizeOf] instead.
+  /// [maybeTextScalerOf] instead.
   @Deprecated(
     'Use maybeTextScalerOf instead. '
     'This feature was deprecated after [TBD].',
