@@ -266,7 +266,7 @@ class VerticalCaretMovementRun implements Iterator<TextPosition> {
 /// Keyboard handling, IME handling, scrolling, toggling the [showCursor] value
 /// to actually blink the cursor, and other features not mentioned above are the
 /// responsibility of higher layers and not handled by this object.
-class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin, ContainerRenderObjectMixin<RenderBox, TextParentData>, RenderInlineWidgetContainerDefaults implements TextLayoutMetrics {
+class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin, ContainerRenderObjectMixin<RenderBox, TextParentData>, RenderInlineChildrenContainerDefaults implements TextLayoutMetrics {
   /// Creates a render object that implements the visual aspects of a text field.
   ///
   /// The [textAlign] argument must not be null. It defaults to [TextAlign.start].
@@ -1928,7 +1928,6 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin, 
   @override
   @protected
   bool hitTestChildren(BoxHitTestResult result, { required Offset position }) {
-    // Hit test text spans.
     final InlineSpan? textSpan = _textPainter.text;
     if (textSpan != null) {
       final Offset effectivePosition = position - _paintOffset;
@@ -1939,7 +1938,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin, 
         return true;
       }
     }
-    return hitTestInlineWidgets(result, position);
+    return hitTestInlineChildren(result, position);
   }
 
   late TapGestureRecognizer _tap;
@@ -2293,7 +2292,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin, 
       ));
       return Size.zero;
     }
-    _textPainter.setPlaceholderDimensions(layoutInlineWidgets(constraints.maxWidth, ChildLayoutHelper.dryLayoutChild));
+    _textPainter.setPlaceholderDimensions(layoutInlineChildren(constraints.maxWidth, ChildLayoutHelper.dryLayoutChild));
     _layoutText(minWidth: constraints.minWidth, maxWidth: constraints.maxWidth);
     final double width = forceLine ? constraints.maxWidth : constraints
         .constrainWidth(_textPainter.size.width + _caretMargin);
@@ -2303,7 +2302,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin, 
   @override
   void performLayout() {
     final BoxConstraints constraints = this.constraints;
-    _placeholderDimensions = layoutInlineWidgets(constraints.maxWidth, ChildLayoutHelper.layoutChild);
+    _placeholderDimensions = layoutInlineChildren(constraints.maxWidth, ChildLayoutHelper.layoutChild);
     _textPainter.setPlaceholderDimensions(_placeholderDimensions);
     _computeTextMetricsIfNeeded();
     positionInlineChildren(_textPainter.inlinePlaceholderBoxes!);
@@ -2481,7 +2480,7 @@ class RenderEditable extends RenderBox with RelayoutWhenSystemFontsChangeMixin, 
     }
 
     _textPainter.paint(context.canvas, effectiveOffset);
-    paintInlineWidgets(context, offset);
+    paintInlineChildren(context, offset);
 
     if (foregroundChild != null) {
       context.paintChild(foregroundChild, offset);
