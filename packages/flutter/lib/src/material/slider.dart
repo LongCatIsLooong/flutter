@@ -884,13 +884,13 @@ class _SliderState extends State<Slider> with TickerProviderStateMixin {
         shortcutMap = _traditionalNavShortcutMap;
     }
 
-    final double textScaleFactor = theme.useMaterial3
+    final TextScaler textScaler = theme.useMaterial3
       // TODO(tahatesser): This is an eye-balled value.
       // This needs to be updated when accessibility
       // guidelines are available on the material specs page
       // https://m3.material.io/components/sliders/accessibility.
-      ? math.min(MediaQuery.textScaleFactorOf(context), 1.3)
-      : MediaQuery.textScaleFactorOf(context);
+      ? MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.3)
+      : MediaQuery.textScalerOf(context);
 
     return Semantics(
       container: true,
@@ -914,7 +914,7 @@ class _SliderState extends State<Slider> with TickerProviderStateMixin {
             divisions: widget.divisions,
             label: widget.label,
             sliderTheme: sliderTheme,
-            textScaleFactor: textScaleFactor,
+            textScaler: textScaler,
             screenSize: screenSize(),
             onChanged: (widget.onChanged != null) && (widget.max > widget.min) ? _handleChanged : null,
             onChangeStart: _handleDragStart,
@@ -978,7 +978,7 @@ class _SliderRenderObjectWidget extends LeafRenderObjectWidget {
     required this.divisions,
     required this.label,
     required this.sliderTheme,
-    required this.textScaleFactor,
+    required this.textScaler,
     required this.screenSize,
     required this.onChanged,
     required this.onChangeStart,
@@ -995,7 +995,7 @@ class _SliderRenderObjectWidget extends LeafRenderObjectWidget {
   final int? divisions;
   final String? label;
   final SliderThemeData sliderTheme;
-  final double textScaleFactor;
+  final TextScaler textScaler;
   final Size screenSize;
   final ValueChanged<double>? onChanged;
   final ValueChanged<double>? onChangeStart;
@@ -1014,7 +1014,7 @@ class _SliderRenderObjectWidget extends LeafRenderObjectWidget {
       divisions: divisions,
       label: label,
       sliderTheme: sliderTheme,
-      textScaleFactor: textScaleFactor,
+      textScaler: textScaler,
       screenSize: screenSize,
       onChanged: onChanged,
       onChangeStart: onChangeStart,
@@ -1040,7 +1040,7 @@ class _SliderRenderObjectWidget extends LeafRenderObjectWidget {
       ..secondaryTrackValue = secondaryTrackValue
       ..label = label
       ..sliderTheme = sliderTheme
-      ..textScaleFactor = textScaleFactor
+      ..textScaler = textScaler
       ..screenSize = screenSize
       ..onChanged = onChanged
       ..onChangeStart = onChangeStart
@@ -1064,7 +1064,7 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     required int? divisions,
     required String? label,
     required SliderThemeData sliderTheme,
-    required double textScaleFactor,
+    required TextScaler textScaler,
     required Size screenSize,
     required TargetPlatform platform,
     required ValueChanged<double>? onChanged,
@@ -1086,7 +1086,7 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         _secondaryTrackValue = secondaryTrackValue,
         _divisions = divisions,
         _sliderTheme = sliderTheme,
-        _textScaleFactor = textScaleFactor,
+        _textScaler = textScaler,
         _screenSize = screenSize,
         _onChanged = onChanged,
         _state = state,
@@ -1260,13 +1260,13 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
     _updateLabelPainter();
   }
 
-  double get textScaleFactor => _textScaleFactor;
-  double _textScaleFactor;
-  set textScaleFactor(double value) {
-    if (value == _textScaleFactor) {
+  TextScaler get textScaler => _textScaler;
+  TextScaler _textScaler;
+  set textScaler(TextScaler value) {
+    if (value == _textScaler) {
       return;
     }
-    _textScaleFactor = value;
+    _textScaler = value;
     _updateLabelPainter();
   }
 
@@ -1419,7 +1419,7 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
           text: label,
         )
         ..textDirection = textDirection
-        ..textScaleFactor = textScaleFactor
+        ..textScaler = textScaler
         ..layout();
     } else {
       _labelPainter.text = null;
@@ -1692,7 +1692,7 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
         sliderTheme: _sliderTheme,
         textDirection: _textDirection,
         value: _value,
-        textScaleFactor: _textScaleFactor,
+        textScaler: _textScaler,
         sizeWithOverflow: screenSize.isEmpty ? size : screenSize,
       );
     }
@@ -1742,7 +1742,7 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
               sliderTheme: _sliderTheme,
               textDirection: _textDirection,
               value: _value,
-              textScaleFactor: textScaleFactor,
+              textScaler: textScaler,
               sizeWithOverflow: screenSize.isEmpty ? size : screenSize,
             );
           }
@@ -1761,7 +1761,7 @@ class _RenderSlider extends RenderBox with RelayoutWhenSystemFontsChangeMixin {
       sliderTheme: _sliderTheme,
       textDirection: _textDirection,
       value: _value,
-      textScaleFactor: textScaleFactor,
+      textScaleFactor: textScaler,
       sizeWithOverflow: screenSize.isEmpty ? size : screenSize,
     );
   }

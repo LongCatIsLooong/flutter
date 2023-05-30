@@ -918,7 +918,12 @@ abstract class SliderComponentShape {
     required SliderThemeData sliderTheme,
     required TextDirection textDirection,
     required double value,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
   });
 
@@ -1243,7 +1248,12 @@ abstract class RangeSliderValueIndicatorShape {
     bool isEnabled,
     bool isDiscrete, {
     required TextPainter labelPainter,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     required double textScaleFactor,
+    required TextScaler textScaler,
   });
 
   /// Determines the best offset to keep this shape on the screen.
@@ -1255,7 +1265,12 @@ abstract class RangeSliderValueIndicatorShape {
     Offset? center,
     TextPainter? labelPainter,
     Animation<double>? activationAnimation,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double? textScaleFactor,
+    TextScaler textScaler = TextScaler.noScaling,
     Size? sizeWithOverflow,
   }) {
     return 0;
@@ -1306,7 +1321,12 @@ abstract class RangeSliderValueIndicatorShape {
     bool isDiscrete,
     bool isOnTop,
     required TextPainter labelPainter,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double textScaleFactor,
+    required TextScaler textScaler,
     Size sizeWithOverflow,
     required RenderBox parentBox,
     required SliderThemeData sliderTheme,
@@ -2276,7 +2296,12 @@ class _EmptySliderComponentShape extends SliderComponentShape {
     required SliderThemeData sliderTheme,
     required TextDirection textDirection,
     required double value,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
   }) {
     // no-op.
@@ -2350,7 +2375,12 @@ class RoundSliderThumbShape extends SliderComponentShape {
     required SliderThemeData sliderTheme,
     required TextDirection textDirection,
     required double value,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
   }) {
     assert(sliderTheme.disabledThumbColor != null);
@@ -2557,7 +2587,12 @@ class RoundSliderOverlayShape extends SliderComponentShape {
     required SliderThemeData sliderTheme,
     required TextDirection textDirection,
     required double value,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
   }) {
 
@@ -2596,11 +2631,16 @@ class RectangularSliderValueIndicatorShape extends SliderComponentShape {
     bool isEnabled,
     bool isDiscrete, {
     TextPainter? labelPainter,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double? textScaleFactor,
+    TextScaler textScaler = TextScaler.noScaling,
   }) {
     assert(labelPainter != null);
     assert(textScaleFactor != null && textScaleFactor >= 0);
-    return _pathPainter.getPreferredSize(labelPainter!, textScaleFactor!);
+    return _pathPainter.getPreferredSize(labelPainter!, textScaler);
   }
 
   @override
@@ -2615,7 +2655,12 @@ class RectangularSliderValueIndicatorShape extends SliderComponentShape {
     required SliderThemeData sliderTheme,
     required TextDirection textDirection,
     required double value,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
   }) {
     final Canvas canvas = context.canvas;
@@ -2626,7 +2671,7 @@ class RectangularSliderValueIndicatorShape extends SliderComponentShape {
       center: center,
       scale: scale,
       labelPainter: labelPainter,
-      textScaleFactor: textScaleFactor,
+      textScaler: textScaler,
       sizeWithOverflow: sizeWithOverflow,
       backgroundPaintColor: sliderTheme.valueIndicatorColor!,
     );
@@ -2655,10 +2700,15 @@ class RectangularRangeSliderValueIndicatorShape
     bool isEnabled,
     bool isDiscrete, {
     required TextPainter labelPainter,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     required double textScaleFactor,
+    required TextScaler textScaler,
   }) {
     assert(textScaleFactor >= 0);
-    return _pathPainter.getPreferredSize(labelPainter, textScaleFactor);
+    return _pathPainter.getPreferredSize(labelPainter, textScaler);
   }
 
   @override
@@ -2668,13 +2718,14 @@ class RectangularRangeSliderValueIndicatorShape
     TextPainter? labelPainter,
     Animation<double>? activationAnimation,
     double? textScaleFactor,
+    TextScaler textScaler = TextScaler.noScaling,
     Size? sizeWithOverflow,
   }) {
     return _pathPainter.getHorizontalShift(
       parentBox: parentBox!,
       center: center!,
       labelPainter: labelPainter!,
-      textScaleFactor: textScaleFactor!,
+      textScaler: textScaler,
       sizeWithOverflow: sizeWithOverflow!,
       scale: activationAnimation!.value,
     );
@@ -2689,7 +2740,12 @@ class RectangularRangeSliderValueIndicatorShape
     bool? isDiscrete,
     bool? isOnTop,
     TextPainter? labelPainter,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double? textScaleFactor,
+    required TextScaler textScaler,
     Size? sizeWithOverflow,
     RenderBox? parentBox,
     SliderThemeData? sliderTheme,
@@ -2705,7 +2761,7 @@ class RectangularRangeSliderValueIndicatorShape
       center: center,
       scale: scale,
       labelPainter: labelPainter!,
-      textScaleFactor: textScaleFactor!,
+      textScaler: textScaler,
       sizeWithOverflow: sizeWithOverflow!,
       backgroundPaintColor: sliderTheme!.valueIndicatorColor!,
       strokePaintColor: isOnTop! ? sliderTheme.overlappingShapeStrokeColor : null,
@@ -2726,10 +2782,10 @@ class _RectangularSliderValueIndicatorPathPainter {
 
   Size getPreferredSize(
     TextPainter labelPainter,
-    double textScaleFactor,
+    TextScaler textScaler,
   ) {
     return Size(
-      _upperRectangleWidth(labelPainter, 1, textScaleFactor),
+      _upperRectangleWidth(labelPainter, 1, textScaler),
       labelPainter.height + _labelPadding,
     );
   }
@@ -2738,14 +2794,14 @@ class _RectangularSliderValueIndicatorPathPainter {
     required RenderBox parentBox,
     required Offset center,
     required TextPainter labelPainter,
-    required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
     required double scale,
   }) {
     assert(!sizeWithOverflow.isEmpty);
 
     const double edgePadding = 8.0;
-    final double rectangleWidth = _upperRectangleWidth(labelPainter, scale, textScaleFactor);
+    final double rectangleWidth = _upperRectangleWidth(labelPainter, scale, textScaler);
     /// Value indicator draws on the Overlay and by using the global Offset
     /// we are making sure we use the bounds of the Overlay instead of the Slider.
     final Offset globalCenter = parentBox.localToGlobal(center);
@@ -2766,7 +2822,7 @@ class _RectangularSliderValueIndicatorPathPainter {
     }
   }
 
-  double _upperRectangleWidth(TextPainter labelPainter, double scale, double textScaleFactor) {
+  double _upperRectangleWidth(TextPainter labelPainter, double scale, TextScaler textScaler) {
     final double unscaledWidth = math.max(_minLabelWidth * textScaleFactor, labelPainter.width) + _labelPadding * 2;
     return unscaledWidth * scale;
   }
@@ -2777,7 +2833,7 @@ class _RectangularSliderValueIndicatorPathPainter {
     required Offset center,
     required double scale,
     required TextPainter labelPainter,
-    required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
     required Color backgroundPaintColor,
     Color? strokePaintColor,
@@ -2788,12 +2844,12 @@ class _RectangularSliderValueIndicatorPathPainter {
     }
     assert(!sizeWithOverflow.isEmpty);
 
-    final double rectangleWidth = _upperRectangleWidth(labelPainter, scale, textScaleFactor);
+    final double rectangleWidth = _upperRectangleWidth(labelPainter, scale, textScaler);
     final double horizontalShift = getHorizontalShift(
       parentBox: parentBox,
       center: center,
       labelPainter: labelPainter,
-      textScaleFactor: textScaleFactor,
+      textScaler: textScaler,
       sizeWithOverflow: sizeWithOverflow,
       scale: scale,
     );
@@ -2861,11 +2917,16 @@ class PaddleSliderValueIndicatorShape extends SliderComponentShape {
     bool isEnabled,
     bool isDiscrete, {
     TextPainter? labelPainter,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double? textScaleFactor,
+    TextScaler textScaler = TextScaler.noScaling,
   }) {
     assert(labelPainter != null);
     assert(textScaleFactor != null && textScaleFactor >= 0);
-    return _pathPainter.getPreferredSize(labelPainter!, textScaleFactor!);
+    return _pathPainter.getPreferredSize(labelPainter!, textScaler);
   }
 
   @override
@@ -2880,7 +2941,12 @@ class PaddleSliderValueIndicatorShape extends SliderComponentShape {
     required SliderThemeData sliderTheme,
     required TextDirection textDirection,
     required double value,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
   }) {
     assert(!sizeWithOverflow.isEmpty);
@@ -2894,7 +2960,7 @@ class PaddleSliderValueIndicatorShape extends SliderComponentShape {
       Paint()..color = enableColor.evaluate(enableAnimation)!,
       activationAnimation.value,
       labelPainter,
-      textScaleFactor,
+      textScaler,
       sizeWithOverflow,
       null,
     );
@@ -2923,10 +2989,15 @@ class PaddleRangeSliderValueIndicatorShape extends RangeSliderValueIndicatorShap
     bool isEnabled,
     bool isDiscrete, {
     required TextPainter labelPainter,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     required double textScaleFactor,
+    required TextScaler textScaler,
   }) {
     assert(textScaleFactor >= 0);
-    return _pathPainter.getPreferredSize(labelPainter, textScaleFactor);
+    return _pathPainter.getPreferredSize(labelPainter, textScaler);
   }
 
   @override
@@ -2935,14 +3006,19 @@ class PaddleRangeSliderValueIndicatorShape extends RangeSliderValueIndicatorShap
     Offset? center,
     TextPainter? labelPainter,
     Animation<double>? activationAnimation,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double? textScaleFactor,
+    TextScaler textScaler = TextScaler.noScaling,
     Size? sizeWithOverflow,
   }) {
     return _pathPainter.getHorizontalShift(
       center: center!,
       labelPainter: labelPainter!,
       scale: activationAnimation!.value,
-      textScaleFactor: textScaleFactor!,
+      textScaler: textScaler,
       sizeWithOverflow: sizeWithOverflow!,
     );
   }
@@ -2961,7 +3037,12 @@ class PaddleRangeSliderValueIndicatorShape extends RangeSliderValueIndicatorShap
     TextDirection? textDirection,
     Thumb? thumb,
     double? value,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double? textScaleFactor,
+    TextScaler textScaler = TextScaler.noScaling,
     Size? sizeWithOverflow,
   }) {
     assert(!sizeWithOverflow!.isEmpty);
@@ -2976,7 +3057,7 @@ class PaddleRangeSliderValueIndicatorShape extends RangeSliderValueIndicatorShap
       Paint()..color = enableColor.evaluate(enableAnimation)!,
       activationAnimation.value,
       labelPainter,
-      textScaleFactor!,
+      textScaler,
       sizeWithOverflow!,
       isOnTop ? sliderTheme.overlappingShapeStrokeColor : null,
     );
@@ -3025,9 +3106,8 @@ class _PaddleSliderValueIndicatorPathPainter {
 
   Size getPreferredSize(
     TextPainter labelPainter,
-    double textScaleFactor,
+    TextScaler textScaler,
   ) {
-    assert(textScaleFactor >= 0);
     final double width = math.max(_minLabelWidth * textScaleFactor, labelPainter.width) + _labelPadding * 2 * textScaleFactor;
     return Size(width, _preferredHeight * textScaleFactor);
   }
@@ -3044,7 +3124,7 @@ class _PaddleSliderValueIndicatorPathPainter {
     required Offset center,
     required TextPainter labelPainter,
     required double scale,
-    required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
   }) {
     assert(!sizeWithOverflow.isEmpty);
@@ -3105,7 +3185,7 @@ class _PaddleSliderValueIndicatorPathPainter {
     Paint paint,
     double scale,
     TextPainter labelPainter,
-    double textScaleFactor,
+    TextScaler textScaler,
     Size sizeWithOverflow,
     Color? strokePaintColor,
   ) {
@@ -3412,7 +3492,12 @@ class DropSliderValueIndicatorShape extends SliderComponentShape {
     required SliderThemeData sliderTheme,
     required TextDirection textDirection,
     required double value,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
   }) {
     final Canvas canvas = context.canvas;

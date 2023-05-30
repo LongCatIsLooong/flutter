@@ -307,7 +307,7 @@ abstract class TextScaler {
 
   /// Returns a new [TextScaler] that restricts the scaled font size to within
   /// the range `[minScaleFactor * fontSize, maxScaleFactor * fontSize]`.
-  TextScaler clamp(double minScaleFactor, double maxScaleFactor) {
+  TextScaler clamp({ double minScaleFactor = 0, double maxScaleFactor = double.infinity }) {
     assert(maxScaleFactor >= minScaleFactor);
     assert(maxScaleFactor.isFinite);
     assert(minScaleFactor.isFinite);
@@ -332,8 +332,8 @@ final class _LinearTextScaler implements TextScaler {
   }
 
   @override
-  TextScaler clamp(double minScale, double maxScale) {
-    final double newScaleFactor = clampDouble(textScaleFactor, minScale, maxScale);
+  TextScaler clamp({ double minScaleFactor = 0, double maxScaleFactor = double.infinity }) {
+    final double newScaleFactor = clampDouble(textScaleFactor, minScaleFactor, maxScaleFactor);
     return newScaleFactor == textScaleFactor ? this : _LinearTextScaler(newScaleFactor);
   }
 
@@ -365,10 +365,10 @@ final class _ClampedTextScaler implements TextScaler {
   }
 
   @override
-  TextScaler clamp(double minScale, double maxScale) {
-    return minScale == maxScale
-      ? _LinearTextScaler(minScale)
-      : _ClampedTextScaler(scaler, max(minScale, this.minScale), min(maxScale, this.maxScale));
+  TextScaler clamp({ double minScaleFactor = 0, double maxScaleFactor = double.infinity }) {
+    return minScaleFactor == maxScaleFactor
+      ? _LinearTextScaler(minScaleFactor)
+      : _ClampedTextScaler(scaler, max(minScaleFactor, minScale), min(maxScaleFactor, maxScale));
   }
 
   @override
