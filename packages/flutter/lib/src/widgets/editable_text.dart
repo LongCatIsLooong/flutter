@@ -3326,6 +3326,7 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
   }
 
   TextSelectionOverlay _createSelectionOverlay() {
+    final EditableTextContextMenuBuilder? contextMenuBuilder = widget.contextMenuBuilder;
     final TextSelectionOverlay selectionOverlay = TextSelectionOverlay(
       clipboardStatus: clipboardStatus,
       context: context,
@@ -3339,10 +3340,10 @@ class EditableTextState extends State<EditableText> with AutomaticKeepAliveClien
       selectionDelegate: this,
       dragStartBehavior: widget.dragStartBehavior,
       onSelectionHandleTapped: widget.onSelectionHandleTapped,
-      contextMenuBuilder: widget.contextMenuBuilder == null
+      contextMenuBuilder: contextMenuBuilder == null
         ? null
         : (BuildContext context) {
-          return widget.contextMenuBuilder!(
+          return contextMenuBuilder(
             context,
             this,
           );
