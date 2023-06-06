@@ -398,10 +398,11 @@ class _CupertinoSearchTextFieldState extends State<CupertinoSearchTextField>
     final TextStyle placeholderStyle = widget.placeholderStyle ??
         const TextStyle(color: CupertinoColors.systemGrey);
 
+    final double placeholderSize = placeholderStyle.fontSize ?? 14.0;
     // The icon size will be scaled by a factor of the accessibility text scale,
     // to follow the behavior of `UISearchTextField`.
-    final double scaledIconSize =
-        MediaQuery.textScaleFactorOf(context) * widget.itemSize;
+    // For simplicity it's scaled by the same factor placeholder text uses.
+    final double scaledIconSize = MediaQuery.textScalerOf(context).scale(placeholderSize) / placeholderSize * widget.itemSize;
 
     // If decoration was not provided, create a decoration with the provided
     // background color and border radius.

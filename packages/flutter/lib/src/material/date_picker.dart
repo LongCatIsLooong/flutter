@@ -436,9 +436,7 @@ class _DatePickerDialogState extends State<DatePickerDialog> with RestorationMix
   }
 
   void _handleOnDatePickerModeChange() {
-    if (widget.onDatePickerModeChange != null) {
-      widget.onDatePickerModeChange!(_entryMode.value);
-    }
+    widget.onDatePickerModeChange?.call(_entryMode.value);
   }
 
   void _handleEntryModeToggle() {
@@ -454,7 +452,7 @@ class _DatePickerDialogState extends State<DatePickerDialog> with RestorationMix
            _handleOnDatePickerModeChange();
         case DatePickerEntryMode.calendarOnly:
         case DatePickerEntryMode.inputOnly:
-          assert(false, 'Can not change entry mode from _entryMode');
+          assert(false, 'Can not change entry mode from ${_entryMode.value}');
       }
     });
   }
@@ -465,28 +463,29 @@ class _DatePickerDialogState extends State<DatePickerDialog> with RestorationMix
     });
   }
 
-  Size _dialogSize(BuildContext context) {
-    final bool useMaterial3 = Theme.of(context).useMaterial3;
+  static Size _dialogSize(BuildContext context, DatePickerEntryMode entryMode) {
     final Orientation orientation = MediaQuery.orientationOf(context);
 
-    switch (_entryMode.value) {
-      case DatePickerEntryMode.calendar:
-      case DatePickerEntryMode.calendarOnly:
-        switch (orientation) {
-          case Orientation.portrait:
-            return useMaterial3 ? _calendarPortraitDialogSizeM3 : _calendarPortraitDialogSizeM2;
-          case Orientation.landscape:
-            return _calendarLandscapeDialogSize;
-        }
-      case DatePickerEntryMode.input:
-      case DatePickerEntryMode.inputOnly:
-        switch (orientation) {
-          case Orientation.portrait:
-            return useMaterial3 ? _inputPortraitDialogSizeM3 : _inputPortraitDialogSizeM2;
-          case Orientation.landscape:
-            return _inputLandscapeDialogSize;
-        }
-    }
+    // The effectiveFontSize retrived here will be used to compute the effective
+    // text scale factor. The theme properties used to get the font sizes (e.g.
+    // "bodyLarge") are largely arbitrarily chosen so feel free to tweak.
+    final (Size unscaled, double? effectiveFontSize) = switch ((entryMode, orientation)) {
+      (DatePickerEntryMode.calendar || DatePickerEntryMode.calendarOnly, Orientation.portrait) when Theme.of(context).useMaterial3
+        => (_calendarPortraitDialogSizeM3, DatePickerTheme.maybeOf(context)?.dayStyle?.fontSize),
+      (DatePickerEntryMode.calendar || DatePickerEntryMode.calendarOnly, Orientation.portrait)
+        => (_calendarPortraitDialogSizeM2, DatePickerTheme.maybeOf(context)?.dayStyle?.fontSize),
+      (DatePickerEntryMode.calendar || DatePickerEntryMode.calendarOnly, Orientation.landscape)
+        => (_calendarLandscapeDialogSize, DatePickerTheme.maybeOf(context)?.dayStyle?.fontSize),
+      (DatePickerEntryMode.input || DatePickerEntryMode.inputOnly, Orientation.portrait) when Theme.of(context).useMaterial3
+        => (_inputPortraitDialogSizeM3, Theme.of(context).textTheme.bodyLarge?.fontSize),
+      (DatePickerEntryMode.input || DatePickerEntryMode.inputOnly, Orientation.portrait)
+        => (_inputPortraitDialogSizeM2, Theme.of(context).textTheme.titleMedium?.fontSize),
+      (DatePickerEntryMode.input || DatePickerEntryMode.inputOnly, Orientation.landscape)
+        => (_inputLandscapeDialogSize, Theme.of(context).textTheme.bodyLarge?.fontSize),
+    };
+    final double fontSize = effectiveFontSize ?? 14.0;
+    final double effectiveScaleFactor = MediaQuery.textScalerOf(context).scale(fontSize) / fontSize;
+    return unscaled * effectiveScaleFactor;
   }
 
   static const Map<ShortcutActivator, Intent> _formShortcutMap = <ShortcutActivator, Intent>{
@@ -642,8 +641,7 @@ class _DatePickerDialogState extends State<DatePickerDialog> with RestorationMix
 
     // Constrain the textScaleFactor to the largest supported value to prevent
     // layout issues.
-    final double textScaleFactor = math.min(MediaQuery.textScaleFactorOf(context), 1.3);
-    final Size dialogSize = _dialogSize(context) * textScaleFactor;
+    final Size dialogSize = _dialogSize(context, _entryMode.value);
     final DialogTheme dialogTheme = theme.dialogTheme;
     return Dialog(
       backgroundColor: datePickerTheme.backgroundColor ?? defaults.backgroundColor,
@@ -662,10 +660,10 @@ class _DatePickerDialogState extends State<DatePickerDialog> with RestorationMix
         height: dialogSize.height,
         duration: _dialogSizeAnimationDuration,
         curve: Curves.easeIn,
-        child: MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaleFactor: textScaleFactor,
-          ),
+        child: MediaQuery.withClampedTextScaling(
+          // Constrain the textScaleFactor to the largest supported value to prevent
+          // layout issues.
+          maxScale: 1.3,
           child: Builder(builder: (BuildContext context) {
             switch (orientation) {
               case Orientation.portrait:
@@ -1391,7 +1389,6 @@ class _DateRangePickerDialogState extends State<DateRangePickerDialog> with Rest
     final ThemeData theme = Theme.of(context);
     final bool useMaterial3 = theme.useMaterial3;
     final Orientation orientation = MediaQuery.orientationOf(context);
-    final double textScaleFactor = math.min(MediaQuery.textScaleFactorOf(context), 1.3);
     final MaterialLocalizations localizations = MaterialLocalizations.of(context);
     final DatePickerThemeData datePickerTheme = DatePickerTheme.of(context);
     final DatePickerThemeData defaults =  DatePickerTheme.defaults(context);
@@ -1535,10 +1532,8 @@ class _DateRangePickerDialogState extends State<DateRangePickerDialog> with Rest
         height: size.height,
         duration: _dialogSizeAnimationDuration,
         curve: Curves.easeIn,
-        child: MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            textScaleFactor: textScaleFactor,
-          ),
+        child: MediaQuery.withClampedTextScaling(
+          maxScale: 1.3,
           child: Builder(builder: (BuildContext context) {
             return contents;
           }),

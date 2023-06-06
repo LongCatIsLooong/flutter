@@ -305,6 +305,9 @@ abstract class TextScaler {
   /// scaled to the same value.
   double scale(double fontSize);
 
+  // STUB
+  double scaleDimension(double dimension) => throw UnimplementedError('stub');
+
   /// Returns a new [TextScaler] that restricts the scaled font size to within
   /// the range `[minScaleFactor * fontSize, maxScaleFactor * fontSize]`.
   TextScaler clamp({ double minScaleFactor = 0, double maxScaleFactor = double.infinity }) {
@@ -330,6 +333,9 @@ final class _LinearTextScaler implements TextScaler {
     assert(fontSize.isFinite);
     return fontSize * textScaleFactor;
   }
+
+  @override
+  double scaleDimension(double dimension) => throw UnimplementedError('stub');
 
   @override
   TextScaler clamp({ double minScaleFactor = 0, double maxScaleFactor = double.infinity }) {
@@ -363,6 +369,9 @@ final class _ClampedTextScaler implements TextScaler {
       ? minScale * fontSize
       : clampDouble(scaler.scale(fontSize), minScale * fontSize, maxScale * fontSize);
   }
+
+  @override
+  double scaleDimension(double dimension) => throw UnimplementedError('stub');
 
   @override
   TextScaler clamp({ double minScaleFactor = 0, double maxScaleFactor = double.infinity }) {
@@ -887,6 +896,10 @@ class TextPainter {
     _textScaler = TextScaler.linear(value);
   }
 
+  /// The text scaling strategy to be used when laying out and rendering [text].
+  ///
+  /// The [layout] method must be called after [textScaler] changes as it
+  /// affects the text layout.
   TextScaler get textScaler => _textScaler;
   TextScaler _textScaler;
   set textScaler(TextScaler value) {

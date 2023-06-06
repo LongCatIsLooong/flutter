@@ -3782,7 +3782,7 @@ class _MenuButtonDefaultsM3 extends ButtonStyle {
         8 + visualDensity.baseSizeAdjustment.dx,
       )),
       const EdgeInsets.symmetric(horizontal: _kMenuViewPadding),
-      MediaQuery.textScaleFactorOf(context),
+      MediaQuery.maybeTextScaleFactorOf(context) ?? 1,
     );
   }
 }

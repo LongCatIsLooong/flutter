@@ -696,7 +696,7 @@ class _AmPmButton extends StatelessWidget {
     final Color resolvedBackgroundColor = MaterialStateProperty.resolveAs<Color>(timePickerTheme.dayPeriodColor ?? defaultTheme.dayPeriodColor, states);
     final Color resolvedTextColor = MaterialStateProperty.resolveAs<Color>(timePickerTheme.dayPeriodTextColor ?? defaultTheme.dayPeriodTextColor, states);
     final TextStyle? resolvedTextStyle = MaterialStateProperty.resolveAs<TextStyle?>(timePickerTheme.dayPeriodTextStyle ?? defaultTheme.dayPeriodTextStyle, states)?.copyWith(color: resolvedTextColor);
-    final double buttonTextScaleFactor = math.min(MediaQuery.textScaleFactorOf(context), 2);
+    final TextScaler buttonTextScaler = MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 2.0);
 
     return Material(
       color: resolvedBackgroundColor,
@@ -710,7 +710,7 @@ class _AmPmButton extends StatelessWidget {
             child: Text(
               label,
               style: resolvedTextStyle,
-              textScaleFactor: buttonTextScaleFactor,
+              textScaler: buttonTextScaler,
             ),
           ),
         ),
@@ -1394,14 +1394,13 @@ class _DialState extends State<_Dial> with SingleTickerProviderStateMixin {
     required String label,
     required VoidCallback onTap,
   }) {
-    final double labelScaleFactor = math.min(MediaQuery.textScaleFactorOf(context), 2);
     return _TappableLabel(
       value: value,
       inner: inner,
       painter: TextPainter(
         text: TextSpan(style: textStyle, text: label),
         textDirection: TextDirection.ltr,
-        textScaleFactor: labelScaleFactor,
+        textScaler: MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 2.0),
       )..layout(),
       onTap: onTap,
     );

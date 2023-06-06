@@ -257,7 +257,7 @@ class CupertinoAlertDialog extends StatelessWidget {
   final Curve insetAnimationCurve;
 
   Widget _buildContent(BuildContext context) {
-    final double textScaleFactor = MediaQuery.textScaleFactorOf(context);
+    final TextScaler textScaler = MediaQuery.textScalerOf(context);
 
     final List<Widget> children = <Widget>[
       if (title != null || content != null)
@@ -271,12 +271,12 @@ class CupertinoAlertDialog extends StatelessWidget {
               left: _kDialogEdgePadding,
               right: _kDialogEdgePadding,
               bottom: content == null ? _kDialogEdgePadding : 1.0,
-              top: _kDialogEdgePadding * textScaleFactor,
+              top: textScaler.scaleDimension(_kDialogEdgePadding),
             ),
             messagePadding: EdgeInsets.only(
               left: _kDialogEdgePadding,
               right: _kDialogEdgePadding,
-              bottom: _kDialogEdgePadding * textScaleFactor,
+              bottom: textScaler.scaleDimension(_kDialogEdgePadding),
               top: title == null ? _kDialogEdgePadding : 1.0,
             ),
             titleTextStyle: _kCupertinoDialogTitleStyle.copyWith(
@@ -1629,9 +1629,7 @@ class CupertinoDialogAction extends StatelessWidget {
   /// value.
   bool get enabled => onPressed != null;
 
-  double _calculatePadding(BuildContext context) {
-    return 8.0 * MediaQuery.textScaleFactorOf(context);
-  }
+  static double _calculatePadding(BuildContext context) => MediaQuery.textScalerOf(context).scaleDimension(8.0);
 
   // Dialog action content shrinks to fit, up to a certain point, and if it still
   // cannot fit at the minimum size, the text content is ellipsized.

@@ -1002,13 +1002,13 @@ class _RenderRangeSlider extends RenderBox with RelayoutWhenSystemFontsChangeMix
     markNeedsPaint();
   }
 
-  double get textScaleFactor => _textScaleFactor;
-  double _textScaleFactor;
-  set textScaleFactor(double value) {
-    if (value == _textScaleFactor) {
+  TextScaler get textScaler => _textScaler;
+  TextScaler _textScaler;
+  set textScaler(TextScaler value) {
+    if (value == _textScaler) {
       return;
     }
-    _textScaleFactor = value;
+    _textScaler = value;
     _updateLabelPainters();
   }
 
@@ -1151,7 +1151,7 @@ class _RenderRangeSlider extends RenderBox with RelayoutWhenSystemFontsChangeMix
         text: text,
       )
       ..textDirection = textDirection
-      ..textScaleFactor = textScaleFactor
+      ..textScaler = textScaler
       ..layout();
     // Changing the textDirection can result in the layout changing, because the
     // bidi algorithm might line up the glyphs differently which can result in
@@ -1444,7 +1444,7 @@ class _RenderRangeSlider extends RenderBox with RelayoutWhenSystemFontsChangeMix
           sliderTheme: _sliderTheme,
           textDirection: _textDirection,
           value: startValue,
-          textScaleFactor: _textScaleFactor,
+          textScaler: _textScaler,
           sizeWithOverflow: resolvedscreenSize,
         );
       }
@@ -1460,7 +1460,7 @@ class _RenderRangeSlider extends RenderBox with RelayoutWhenSystemFontsChangeMix
           sliderTheme: _sliderTheme,
           textDirection: _textDirection,
           value: endValue,
-          textScaleFactor: _textScaleFactor,
+          textScaler: _textScaler,
           sizeWithOverflow: resolvedscreenSize,
         );
       }
@@ -1526,7 +1526,7 @@ class _RenderRangeSlider extends RenderBox with RelayoutWhenSystemFontsChangeMix
             textDirection: _textDirection,
             thumb: bottomThumb,
             value: bottomValue,
-            textScaleFactor: textScaleFactor,
+            textScaler: textScaler,
             sizeWithOverflow: resolvedscreenSize,
           );
         }
@@ -1552,7 +1552,7 @@ class _RenderRangeSlider extends RenderBox with RelayoutWhenSystemFontsChangeMix
         center: _startThumbCenter,
         labelPainter: _startLabelPainter,
         activationAnimation: _valueIndicatorAnimation,
-        textScaleFactor: textScaleFactor,
+        textScaler: textScaler,
         sizeWithOverflow: resolvedscreenSize,
       );
       final double endOffset = sliderTheme.rangeValueIndicatorShape!.getHorizontalShift(
@@ -1560,20 +1560,22 @@ class _RenderRangeSlider extends RenderBox with RelayoutWhenSystemFontsChangeMix
         center: _endThumbCenter,
         labelPainter: _endLabelPainter,
         activationAnimation: _valueIndicatorAnimation,
-        textScaleFactor: textScaleFactor,
+        textScaler: textScaler,
         sizeWithOverflow: resolvedscreenSize,
       );
       final double startHalfWidth = sliderTheme.rangeValueIndicatorShape!.getPreferredSize(
         isEnabled,
         isDiscrete,
         labelPainter: _startLabelPainter,
-        textScaleFactor: textScaleFactor,
+        textScaleFactor: 1.0,
+        textScaler: textScaler,
       ).width / 2;
       final double endHalfWidth = sliderTheme.rangeValueIndicatorShape!.getPreferredSize(
         isEnabled,
         isDiscrete,
         labelPainter: _endLabelPainter,
-        textScaleFactor: textScaleFactor,
+        textScaleFactor: 1.0,
+        textScaler: textScaler,
       ).width / 2;
       double innerOverflow = startHalfWidth + endHalfWidth;
       switch (textDirection) {
@@ -1600,7 +1602,7 @@ class _RenderRangeSlider extends RenderBox with RelayoutWhenSystemFontsChangeMix
             textDirection: _textDirection,
             thumb: topThumb,
             value: topValue,
-            textScaleFactor: textScaleFactor,
+            textScaler: textScaler,
             sizeWithOverflow: resolvedscreenSize,
           );
         }

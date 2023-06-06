@@ -3473,11 +3473,16 @@ class DropSliderValueIndicatorShape extends SliderComponentShape {
     bool isEnabled,
     bool isDiscrete, {
     TextPainter? labelPainter,
+    @Deprecated(
+      'Use textScaler instead. '
+      'This feature was deprecated after [TBD].',
+    )
     double? textScaleFactor,
+    TextScaler textScaler = TextScaler.noScaling,
   }) {
     assert(labelPainter != null);
     assert(textScaleFactor != null && textScaleFactor >= 0);
-    return _pathPainter.getPreferredSize(labelPainter!, textScaleFactor!);
+    return _pathPainter.getPreferredSize(labelPainter!, textScaler);
   }
 
   @override
@@ -3508,7 +3513,7 @@ class DropSliderValueIndicatorShape extends SliderComponentShape {
       center: center,
       scale: scale,
       labelPainter: labelPainter,
-      textScaleFactor: textScaleFactor,
+      textScaler: textScaler,
       sizeWithOverflow: sizeWithOverflow,
       backgroundPaintColor: sliderTheme.valueIndicatorColor!,
     );
@@ -3530,9 +3535,9 @@ class _DropSliderValueIndicatorPathPainter {
 
   Size getPreferredSize(
     TextPainter labelPainter,
-    double textScaleFactor,
+    TextScaler textScaler,
   ) {
-    final double width = math.max(_minLabelWidth, labelPainter.width) + _labelPadding * 2 * textScaleFactor;
+    final double width = math.max(_minLabelWidth, labelPainter.width) + textScaler.scaleDimension(_labelPadding) * 2;
     return Size(width, _preferredHeight * textScaleFactor);
   }
 
@@ -3540,7 +3545,7 @@ class _DropSliderValueIndicatorPathPainter {
     required RenderBox parentBox,
     required Offset center,
     required TextPainter labelPainter,
-    required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
     required double scale,
   }) {
@@ -3562,9 +3567,9 @@ class _DropSliderValueIndicatorPathPainter {
     if (rectangleWidth < sizeWithOverflow.width) {
       return overflowLeft - overflowRight;
     } else if (overflowLeft - overflowRight > 0) {
-      return overflowLeft - (edgePadding * textScaleFactor);
+      return overflowLeft - textScaler.scaleDimension(edgePadding);
     } else {
-      return -overflowRight + (edgePadding * textScaleFactor);
+      return -overflowRight + textScaler.scaleDimension(edgePadding);
     }
   }
 
@@ -3588,7 +3593,7 @@ class _DropSliderValueIndicatorPathPainter {
     required Offset center,
     required double scale,
     required TextPainter labelPainter,
-    required double textScaleFactor,
+    required TextScaler textScaler,
     required Size sizeWithOverflow,
     required Color backgroundPaintColor,
     Color? strokePaintColor,
@@ -3604,7 +3609,7 @@ class _DropSliderValueIndicatorPathPainter {
       parentBox: parentBox,
       center: center,
       labelPainter: labelPainter,
-      textScaleFactor: textScaleFactor,
+      textScaler: textScaler,
       sizeWithOverflow: sizeWithOverflow,
       scale: scale,
     );

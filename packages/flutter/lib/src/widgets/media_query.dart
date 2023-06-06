@@ -146,8 +146,10 @@ enum _MediaQueryAspect {
 class MediaQueryData {
   /// Creates data for a media query with explicit values.
   ///
-  /// Consider using [MediaQueryData.fromView] to create data based on a
-  /// [dart:ui.FlutterView].
+  /// In a typical application, calling this constructor directly is rarely
+  /// needed. Consider using [MediaQueryData.fromView] to create data based on a
+  /// [dart:ui.FlutterView], or [MediaQueryData.copyWith] to create a new copy
+  /// of [MediaQueryData] with updated properties from a base [MediaQueryData].
   const MediaQueryData({
     this.size = Size.zero,
     this.devicePixelRatio = 1.0,
@@ -156,7 +158,7 @@ class MediaQueryData {
       'This feature was deprecated after [TBD].',
     )
     this.textScaleFactor = 1.0,
-    this.textScaler = TextScaler.noScaling,
+    TextScaler textScaler = const _UnspecifiedTextScaler(),
     this.platformBrightness = Brightness.light,
     this.padding = EdgeInsets.zero,
     this.viewInsets = EdgeInsets.zero,
@@ -171,7 +173,7 @@ class MediaQueryData {
     this.navigationMode = NavigationMode.traditional,
     this.gestureSettings = const DeviceGestureSettings(touchSlop: kTouchSlop),
     this.displayFeatures = const <ui.DisplayFeature>[],
-  });
+  }) : _textScaler = textScaler;
 
   /// Deprecated. Use [MediaQueryData.fromView] instead.
   ///
@@ -223,7 +225,7 @@ class MediaQueryData {
     : size = view.physicalSize / view.devicePixelRatio,
       devicePixelRatio = view.devicePixelRatio,
       textScaleFactor = platformData?.textScaleFactor ?? view.platformDispatcher.textScaleFactor,
-      textScaler = TextScaler.linear(platformData?.textScaleFactor ?? view.platformDispatcher.textScaleFactor),
+      _textScaler = _textScalerFromView(view, platformData),
       platformBrightness = platformData?.platformBrightness ?? view.platformDispatcher.platformBrightness,
       padding = EdgeInsets.fromViewPadding(view.padding, view.devicePixelRatio),
       viewPadding = EdgeInsets.fromViewPadding(view.viewPadding, view.devicePixelRatio),
@@ -238,6 +240,19 @@ class MediaQueryData {
       navigationMode = platformData?.navigationMode ?? NavigationMode.traditional,
       gestureSettings = DeviceGestureSettings.fromView(view),
       displayFeatures = view.displayFeatures;
+
+  static TextScaler _textScalerFromView(ui.FlutterView view, MediaQueryData? platformData) {
+    final double scaleFactor = platformData?.textScaleFactor ?? view.platformDispatcher.textScaleFactor;
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.android when scaleFactor > 1.0 => _NonlinearTextScaler(math.min(scaleFactor, 2.0)),
+      TargetPlatform.android ||
+      TargetPlatform.fuchsia ||
+      TargetPlatform.iOS ||
+      TargetPlatform.linux ||
+      TargetPlatform.macOS ||
+      TargetPlatform.windows => TextScaler.linear(scaleFactor),
+    };
+  }
 
   /// The size of the media in logical pixels (e.g, the size of the screen).
   ///
@@ -290,8 +305,26 @@ class MediaQueryData {
   )
   final double textScaleFactor;
 
-  TextScaler get textScaler => _textScaler == TextScaler.noScaling
-  TextScaler _textScaler;
+  /// The scaling strategy to be used to scale textual contents.
+  ///
+  /// If this [MediaQueryData] is created by the [MediaQueryData.fromView]
+  /// constructor, this property reflects the platform's preferred text scaling
+  /// strategy, and may change as the user changes the scaling factor in the
+  /// operating system's accessibility settings.
+  ///
+  /// See also:
+  ///
+  ///  * [MediaQuery.textScalerOf], a method to find and depend on the
+  ///    [textScaler] defined for a [BuildContext].
+  ///  * [TextPainter], a class that lays out and paints text.
+  TextScaler get textScaler {
+    if (!identical(_textScaler, const _UnspecifiedTextScaler())) {
+      return _textScaler;
+    }
+    // The user omitted textScaleFactor in the constructor.
+    return textScaleFactor == 1.0 ? TextScaler.noScaling : TextScaler.linear(textScaleFactor);
+  }
+  final TextScaler _textScaler;
 
   /// The current brightness mode of the host platform.
   ///
@@ -502,6 +535,10 @@ class MediaQueryData {
 
   /// Creates a copy of this media query data but with the given fields replaced
   /// with the new values.
+  ///
+  /// When replacing `textScaler`, consider also replacing the deprecated
+  /// `textScaleFactor` if possible, so widgets that haven't been migrated to
+  /// using `textScaler` could use a reasonable `textScaleFactor` value.
   MediaQueryData copyWith({
     Size? size,
     double? devicePixelRatio,
@@ -526,6 +563,9 @@ class MediaQueryData {
     DeviceGestureSettings? gestureSettings,
     List<ui.DisplayFeature>? displayFeatures,
   }) {
+    if (textScaleFactor != null) {
+      textScaler ??= TextScaler.linear(textScaleFactor);
+    }
     return MediaQueryData(
       size: size ?? this.size,
       devicePixelRatio: devicePixelRatio ?? this.devicePixelRatio,
@@ -1007,6 +1047,14 @@ class MediaQuery extends InheritedModel<_MediaQueryAspect> {
     );
   }
 
+  /// Wraps the `child` in a [MediaQuery] with its [MediaQueryData.textScaler]
+  /// set to [TextScaler.noScaling].
+  ///
+  /// The returned widget must be inserted in a widget tree below an existing
+  /// [MediaQuery] widget.
+  ///
+  /// This can be used to prevent, for example, icon fonts from scaling as the
+  /// user adjusts the platform's text scaling value.
   static Widget disableTextScaling({
     Key? key,
     required Widget child,
@@ -1014,17 +1062,18 @@ class MediaQuery extends InheritedModel<_MediaQueryAspect> {
     return Builder(
       key: key,
       builder: (BuildContext context) {
+        assert(debugCheckHasMediaQuery(context));
         return MediaQuery(
-          data: of(context).copyWith(textScaler: TextScaler.noScaling),
+          data: of(context).copyWith(textScaler: TextScaler.noScaling, textScaleFactor: 1.0),
           child: child,
         );
       },
     );
   }
 
-  static Widget withSystemTextScaling({Key? key, required Widget child}) {
-    throw UnimplementedError();
-  }
+  //static Widget withSystemTextScaling({Key? key, required Widget child}) {
+  //  throw UnimplementedError();
+  //}
 
   /// Creates a [MediaQuery] with a clamped [TextScaler], and inherits all other
   /// properties from the closest ancestor MediaQuery.
@@ -1035,9 +1084,13 @@ class MediaQuery extends InheritedModel<_MediaQueryAspect> {
     required Widget child,
   }) {
     return Builder(builder: (BuildContext context) {
+      assert(debugCheckHasMediaQuery(context));
       final MediaQueryData data = of(context);
       return MediaQuery(
-        data: data.copyWith(textScaler: data.textScaler.clamp(minScale, maxScale)),
+        data: data.copyWith(
+          textScaler: data.textScaler.clamp(minScaleFactor: minScale, maxScaleFactor: maxScale),
+          textScaleFactor: clampDouble(data.textScaleFactor, minScale, maxScale),
+        ),
         child: child,
       );
     });
@@ -1185,7 +1238,8 @@ class MediaQuery extends InheritedModel<_MediaQueryAspect> {
   /// null, if no such ancestor exists.
   ///
   /// Use of this method will cause the given [context] to rebuild any time that
-  /// the [MediaQueryData.textScaleFactor] property of the ancestor [MediaQuery] changes.
+  /// the [MediaQueryData.textScaleFactor] property of the ancestor [MediaQuery]
+  /// changes.
   ///
   /// Deprecated. Will be removed in a future version of Flutter. Use
   /// [maybeTextScalerOf] instead.
@@ -1195,8 +1249,20 @@ class MediaQuery extends InheritedModel<_MediaQueryAspect> {
   )
   static double? maybeTextScaleFactorOf(BuildContext context) => _maybeOf(context, _MediaQueryAspect.textScaleFactor)?.textScaleFactor;
 
+  /// Returns the [TextScaler] for the nearest [MediaQuery] ancestor or null if
+  /// no such ancestor exists.
+  ///
+  /// Use of this method will cause the given [context] to rebuild any time that
+  /// the [MediaQueryData.textScaler] property of the ancestor [MediaQuery]
+  /// changes.
   static TextScaler textScalerOf(BuildContext context) => maybeTextScalerOf(context) ?? TextScaler.noScaling;
 
+  /// Returns the [TextScaler] for the nearest [MediaQuery] ancestor or
+  /// [TextScaler.noScaling] if no such ancestor exists.
+  ///
+  /// Use of this method will cause the given [context] to rebuild any time that
+  /// the [MediaQueryData.textScaler] property of the ancestor [MediaQuery]
+  /// changes.
   static TextScaler? maybeTextScalerOf(BuildContext context) => _maybeOf(context, _MediaQueryAspect.textScaler)?.textScaler;
 
   /// Returns platformBrightness for the nearest MediaQuery ancestor or
@@ -1659,4 +1725,48 @@ class _MediaQueryFromViewState extends State<_MediaQueryFromView> with WidgetsBi
       child: widget.child,
     );
   }
+}
+
+// This is used by the MediaQueryData constructor to represent an "unspecified
+// TextScaler". It is used as the default parameter value of textScaler in the
+// constructor.
+//
+// This class should be removed when textScaleFactor is removed from
+// MediaQueryData.
+final class _UnspecifiedTextScaler implements TextScaler {
+  const _UnspecifiedTextScaler();
+
+  @override
+  double scale(double fontSize) => throw UnimplementedError();
+
+  @override
+  double scaleDimension(double dimension) => throw UnimplementedError();
+
+  @override
+  TextScaler clamp({ double minScaleFactor = 0, double maxScaleFactor = double.infinity }) => throw UnimplementedError();
+}
+
+final class _NonlinearTextScaler extends TextScaler {
+  const _NonlinearTextScaler(this.textScaleFactor) : assert(textScaleFactor > 0);
+
+  final double textScaleFactor;
+
+  @override
+  double scale(double fontSize) {
+    assert(fontSize >= 0);
+    assert(fontSize.isFinite);
+    final double exponent = textScaleFactor - fontSize;
+    return fontSize + fontSize * math.pow(1.22, exponent);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is _NonlinearTextScaler && other.textScaleFactor == textScaleFactor;
+  }
+
+  @override
+  int get hashCode => textScaleFactor.hashCode;
 }
