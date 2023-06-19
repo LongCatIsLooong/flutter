@@ -705,28 +705,18 @@ class AlertDialog extends StatelessWidget {
     final DialogTheme dialogTheme = DialogTheme.of(context);
     final DialogTheme defaults = theme.useMaterial3 ? _DialogDefaultsM3(context) : _DialogDefaultsM2(context);
 
-    String? label = semanticLabel;
-    switch (theme.platform) {
-      case TargetPlatform.iOS:
-      case TargetPlatform.macOS:
-        break;
-      case TargetPlatform.android:
-      case TargetPlatform.fuchsia:
-      case TargetPlatform.linux:
-      case TargetPlatform.windows:
-        label ??= MaterialLocalizations.of(context).alertDialogLabel;
-    }
+    final String? label = semanticLabel ?? switch (theme.platform) {
+      TargetPlatform.macOS || TargetPlatform.iOS => null,
+      TargetPlatform.android ||
+      TargetPlatform.fuchsia ||
+      TargetPlatform.linux ||
+      TargetPlatform.windows => MaterialLocalizations.of(context).alertDialogLabel,
+    };
 
-    // The paddingScaleFactor is used to adjust the padding of Dialog's
-    // children.
-    final double paddingScaleFactor = _paddingScaleFactor(MediaQuery.textScalerOf(context).textScaleFactor);
     final TextDirection? textDirection = Directionality.maybeOf(context);
+    late final double defaultFontSize = DefaultTextStyle.of(context).style.fontSize ?? 14.0;
 
     Widget? iconWidget;
-    Widget? titleWidget;
-    Widget? contentWidget;
-    Widget? actionsWidget;
-
     if (icon != null) {
       final bool belowIsTitle = title != null;
       final bool belowIsContent = !belowIsTitle && content != null;
@@ -737,6 +727,7 @@ class AlertDialog extends StatelessWidget {
         bottom: belowIsTitle ? 16.0 : belowIsContent ? 0.0 : 24.0,
       );
       final EdgeInsets effectiveIconPadding = iconPadding?.resolve(textDirection) ?? defaultIconPadding;
+      final double paddingScaleFactor = _paddingScaleFactor(MediaQuery.textScalerOf(context), defaultFontSize);
       iconWidget = Padding(
         padding: EdgeInsets.only(
           left: effectiveIconPadding.left * paddingScaleFactor,
@@ -753,6 +744,7 @@ class AlertDialog extends StatelessWidget {
       );
     }
 
+    Widget? titleWidget;
     if (title != null) {
       final EdgeInsets defaultTitlePadding = EdgeInsets.only(
         left: 24.0,
@@ -761,6 +753,8 @@ class AlertDialog extends StatelessWidget {
         bottom: content == null ? 20.0 : 0.0,
       );
       final EdgeInsets effectiveTitlePadding = titlePadding?.resolve(textDirection) ?? defaultTitlePadding;
+      final TextStyle titleStyle = titleTextStyle ?? DialogTheme.of(context).titleTextStyle ?? theme.textTheme.titleLarge!;
+      final double paddingScaleFactor = _paddingScaleFactor(MediaQuery.textScalerOf(context), titleStyle.fontSize ?? defaultFontSize);
       titleWidget = Padding(
         padding: EdgeInsets.only(
           left: effectiveTitlePadding.left * paddingScaleFactor,
@@ -769,7 +763,7 @@ class AlertDialog extends StatelessWidget {
           bottom: effectiveTitlePadding.bottom,
         ),
         child: DefaultTextStyle(
-          style: titleTextStyle ?? dialogTheme.titleTextStyle ?? defaults.titleTextStyle!,
+          style: titleStyle,
           textAlign: icon == null ? TextAlign.start : TextAlign.center,
           child: Semantics(
             // For iOS platform, the focus always lands on the title.
@@ -782,6 +776,7 @@ class AlertDialog extends StatelessWidget {
       );
     }
 
+    Widget? contentWidget;
     if (content != null) {
       final EdgeInsets defaultContentPadding = EdgeInsets.only(
         left: 24.0,
@@ -790,6 +785,8 @@ class AlertDialog extends StatelessWidget {
         bottom: 24.0,
       );
       final EdgeInsets effectiveContentPadding = contentPadding?.resolve(textDirection) ?? defaultContentPadding;
+      final TextStyle contentStyle = contentTextStyle ?? dialogTheme.contentTextStyle ?? defaults.contentTextStyle!;
+      final double paddingScaleFactor = _paddingScaleFactor(MediaQuery.textScalerOf(context), contentStyle.fontSize ?? defaultFontSize);
       contentWidget = Padding(
         padding: EdgeInsets.only(
           left: effectiveContentPadding.left * paddingScaleFactor,
@@ -800,7 +797,7 @@ class AlertDialog extends StatelessWidget {
           bottom: effectiveContentPadding.bottom,
         ),
         child: DefaultTextStyle(
-          style: contentTextStyle ?? dialogTheme.contentTextStyle ?? defaults.contentTextStyle!,
+          style: contentStyle,
           child: Semantics(
             container: true,
             child: content,
@@ -809,6 +806,7 @@ class AlertDialog extends StatelessWidget {
       );
     }
 
+    Widget? actionsWidget;
     if (actions != null) {
       final double spacing = (buttonPadding?.horizontal ?? 16) / 2;
       actionsWidget = Padding(
@@ -836,22 +834,21 @@ class AlertDialog extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
-                  if (icon != null) iconWidget!,
-                  if (title != null) titleWidget!,
-                  if (content != null) contentWidget!,
+                  if (iconWidget != null) iconWidget,
+                  if (titleWidget != null) titleWidget,
+                  if (contentWidget != null) contentWidget,
                 ],
               ),
             ),
           ),
-        if (actions != null)
-          actionsWidget!,
+        if (actionsWidget != null) actionsWidget,
       ];
     } else {
       columnChildren = <Widget>[
-        if (icon != null) iconWidget!,
-        if (title != null) titleWidget!,
-        if (content != null) Flexible(child: contentWidget!),
-        if (actions != null) actionsWidget!,
+        if (iconWidget != null) iconWidget,
+        if (titleWidget != null) titleWidget,
+        if (contentWidget != null) Flexible(child: contentWidget),
+        if (actionsWidget != null) actionsWidget,
       ];
     }
 
@@ -1202,26 +1199,21 @@ class SimpleDialog extends StatelessWidget {
     assert(debugCheckHasMaterialLocalizations(context));
     final ThemeData theme = Theme.of(context);
 
-    String? label = semanticLabel;
-    switch (theme.platform) {
-      case TargetPlatform.macOS:
-      case TargetPlatform.iOS:
-        break;
-      case TargetPlatform.android:
-      case TargetPlatform.fuchsia:
-      case TargetPlatform.linux:
-      case TargetPlatform.windows:
-        label ??= MaterialLocalizations.of(context).dialogLabel;
-    }
+    final String? label = semanticLabel ?? switch (theme.platform) {
+      TargetPlatform.macOS || TargetPlatform.iOS => null,
+      TargetPlatform.android ||
+      TargetPlatform.fuchsia ||
+      TargetPlatform.linux ||
+      TargetPlatform.windows => MaterialLocalizations.of(context).dialogLabel,
+    };
 
-    // The paddingScaleFactor is used to adjust the padding of Dialog
-    // children.
-    final double paddingScaleFactor = _paddingScaleFactor(MediaQuery.textScalerOf(context).textScaleFactor);
     final TextDirection? textDirection = Directionality.maybeOf(context);
-
+    late final double defaultFontSize = DefaultTextStyle.of(context).style.fontSize ?? 14.0;
     Widget? titleWidget;
     if (title != null) {
       final EdgeInsets effectiveTitlePadding = titlePadding.resolve(textDirection);
+      final TextStyle titleStyle = titleTextStyle ?? DialogTheme.of(context).titleTextStyle ?? theme.textTheme.titleLarge!;
+      final double paddingScaleFactor = _paddingScaleFactor(MediaQuery.textScalerOf(context), titleStyle.fontSize ?? defaultFontSize);
       titleWidget = Padding(
         padding: EdgeInsets.only(
           left: effectiveTitlePadding.left * paddingScaleFactor,
@@ -1230,7 +1222,7 @@ class SimpleDialog extends StatelessWidget {
           bottom: children == null ? effectiveTitlePadding.bottom * paddingScaleFactor : effectiveTitlePadding.bottom,
         ),
         child: DefaultTextStyle(
-          style: titleTextStyle ?? DialogTheme.of(context).titleTextStyle ?? theme.textTheme.titleLarge!,
+          style: titleStyle,
           child: Semantics(
             // For iOS platform, the focus always lands on the title.
             // Set nameRoute to false to avoid title being announce twice.
@@ -1245,6 +1237,7 @@ class SimpleDialog extends StatelessWidget {
     Widget? contentWidget;
     if (children != null) {
       final EdgeInsets effectiveContentPadding = contentPadding.resolve(textDirection);
+      final double paddingScaleFactor = _paddingScaleFactor(MediaQuery.textScalerOf(context), defaultFontSize);
       contentWidget = Flexible(
         child: SingleChildScrollView(
           padding: EdgeInsets.only(
@@ -1266,8 +1259,8 @@ class SimpleDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            if (title != null) titleWidget!,
-            if (children != null) contentWidget!,
+            if (titleWidget != null) titleWidget,
+            if (contentWidget != null) contentWidget,
           ],
         ),
       ),
@@ -1580,11 +1573,11 @@ class DialogRoute<T> extends RawDialogRoute<T> {
        );
 }
 
-double _paddingScaleFactor(double textScaleFactor) {
-  final double clampedTextScaleFactor = clampDouble(textScaleFactor, 1.0, 2.0);
+double _paddingScaleFactor(TextScaler textScaler, double fontSize) {
+  final double clampedScaleFactor = clampDouble(textScaler.scale(fontSize) / fontSize, 1.0, 2.0);
   // The final padding scale factor is clamped between 1/3 and 1. For example,
   // a non-scaled padding of 24 will produce a padding between 24 and 8.
-  return lerpDouble(1.0, 1.0 / 3.0, clampedTextScaleFactor - 1.0)!;
+  return lerpDouble(1.0, 1.0 / 3.0, clampedScaleFactor - 1.0)!;
 }
 
 // Hand coded defaults based on Material Design 2.

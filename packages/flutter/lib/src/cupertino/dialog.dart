@@ -22,20 +22,22 @@ import 'theme.dart';
 // Adobe XD template for iOS 13, which can be found in
 // Apple Design Resources(https://developer.apple.com/design/resources/).
 // However the values are not exactly the same as native, so eyeballing is needed.
+const double _kCupertinoDialogTitleFontSize = 17.0;
 const TextStyle _kCupertinoDialogTitleStyle = TextStyle(
   fontFamily: '.SF UI Display',
   inherit: false,
-  fontSize: 17.0,
+  fontSize: _kCupertinoDialogTitleFontSize,
   fontWeight: FontWeight.w600,
   height: 1.3,
   letterSpacing: -0.5,
   textBaseline: TextBaseline.alphabetic,
 );
 
+const double _kCupertinoDialogContentFontSize = 13.0;
 const TextStyle _kCupertinoDialogContentStyle = TextStyle(
   fontFamily: '.SF UI Text',
   inherit: false,
-  fontSize: 13.0,
+  fontSize: _kCupertinoDialogContentFontSize,
   fontWeight: FontWeight.w400,
   height: 1.35,
   letterSpacing: -0.2,
@@ -149,7 +151,8 @@ const double _kMaxRegularTextScaleFactor = 1.4;
 // Accessibility mode on iOS is determined by the text scale factor that the
 // user has selected.
 bool _isInAccessibilityMode(BuildContext context) {
-  final double? factor = MediaQuery.maybeTextScalerOf(context)?.textScaleFactor;
+  // iOS scaling are currently linear.
+  final double? factor = MediaQuery.maybeTextScalerOf(context)?.scale(1.0);
   return factor != null && factor > _kMaxRegularTextScaleFactor;
 }
 
@@ -257,7 +260,7 @@ class CupertinoAlertDialog extends StatelessWidget {
   final Curve insetAnimationCurve;
 
   Widget _buildContent(BuildContext context) {
-    final double textScaleFactor = MediaQuery.textScalerOf(context).textScaleFactor;
+    final TextScaler textScaler = MediaQuery.textScalerOf(context);
 
     final List<Widget> children = <Widget>[
       if (title != null || content != null)
@@ -271,12 +274,12 @@ class CupertinoAlertDialog extends StatelessWidget {
               left: _kDialogEdgePadding,
               right: _kDialogEdgePadding,
               bottom: content == null ? _kDialogEdgePadding : 1.0,
-              top: _kDialogEdgePadding * textScaleFactor,
+              top: _kDialogEdgePadding * textScaler.scale(_kCupertinoDialogTitleFontSize) / _kCupertinoDialogTitleFontSize,
             ),
             messagePadding: EdgeInsets.only(
               left: _kDialogEdgePadding,
               right: _kDialogEdgePadding,
-              bottom: _kDialogEdgePadding * textScaleFactor,
+              bottom: _kDialogEdgePadding * textScaler.scale(_kCupertinoDialogContentFontSize) / _kCupertinoDialogContentFontSize,
               top: title == null ? _kDialogEdgePadding : 1.0,
             ),
             titleTextStyle: _kCupertinoDialogTitleStyle.copyWith(
@@ -1629,8 +1632,10 @@ class CupertinoDialogAction extends StatelessWidget {
   /// value.
   bool get enabled => onPressed != null;
 
-  double _calculatePadding(BuildContext context) {
-    return 8.0 * MediaQuery.textScalerOf(context).textScaleFactor;
+  double _calculatePadding(BuildContext context, double fontSize) {
+    return fontSize == 0.0
+      ? 0.0
+      : 8.0 * MediaQuery.textScalerOf(context).scale(fontSize) / fontSize;
   }
 
   // Dialog action content shrinks to fit, up to a certain point, and if it still
@@ -1650,8 +1655,9 @@ class CupertinoDialogAction extends StatelessWidget {
     // iOS scale factor) vs the minimum text size that we allow in action
     // buttons. This ratio information is used to automatically scale down action
     // button text to fit the available space.
-    final double fontSizeRatio = MediaQuery.textScalerOf(context).scale(textStyle.fontSize!) / _kDialogMinButtonFontSize;
-    final double padding = _calculatePadding(context);
+    final double fontSize = textStyle.fontSize!;
+    final double fontSizeRatio = MediaQuery.textScalerOf(context).scale(fontSize) / _kDialogMinButtonFontSize;
+    final double padding = _calculatePadding(context, fontSize);
 
     return IntrinsicHeight(
       child: SizedBox(
@@ -1740,7 +1746,7 @@ class CupertinoDialogAction extends StatelessWidget {
           ),
           child: Container(
             alignment: Alignment.center,
-            padding: EdgeInsets.all(_calculatePadding(context)),
+            padding: EdgeInsets.all(_calculatePadding(context, style.fontSize!)),
             child: sizedContent,
           ),
         ),
