@@ -5888,10 +5888,8 @@ void main() {
         }
         final Rect clipRect = arguments[0] as Rect;
         // _kFinalLabelScale = 0.75
-        const double width = bool.hasEnvironment('SKPARAGRAPH_REMOVE_ROUNDING_HACK')
-          ? 100 / 0.75
-          : 133.0;
-        expect(clipRect, rectMoreOrLessEquals(const Rect.fromLTWH(0, 0, width, 16.0), epsilon: 1e-5));
+        final double width = TextPainter.shouldDisableRoundingHack ? 100 / 0.75 : 133.0;
+        expect(clipRect, rectMoreOrLessEquals(Rect.fromLTWH(0, 0, width, 16.0), epsilon: 1e-5));
         return true;
       }),
     );

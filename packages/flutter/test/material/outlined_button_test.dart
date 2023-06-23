@@ -1066,8 +1066,8 @@ void main() {
     );
 
     expect(tester.getSize(find.byType(OutlinedButton)), equals(const Size(88.0, 48.0)));
-    expect(tester.getSize(find.byType(Text)), const Size(
-      bool.hasEnvironment('SKPARAGRAPH_REMOVE_ROUNDING_HACK') ? 52.5 : 53.0,
+    expect(tester.getSize(find.byType(Text)), Size(
+      TextPainter.shouldDisableRoundingHack ? 52.5 : 53.0,
       18.0,
     ));
 

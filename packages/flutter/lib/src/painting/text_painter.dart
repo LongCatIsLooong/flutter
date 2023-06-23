@@ -278,13 +278,10 @@ class _TextLayout {
   // object when it's no logner needed.
   ui.Paragraph _paragraph;
 
-  /// Whether to enable the rounding in _applyFloatingPointHack and SkParagraph.
-  static const bool _shouldApplyFloatingPointHack = !bool.hasEnvironment('SKPARAGRAPH_REMOVE_ROUNDING_HACK');
-
   // TODO(LongCatIsLooong): https://github.com/flutter/flutter/issues/31707
   // remove this hack as well as the flooring in `layout`.
   @pragma('vm:prefer-inline')
-  static double _applyFloatingPointHack(double layoutValue) => _shouldApplyFloatingPointHack ? layoutValue.ceilToDouble() : layoutValue;
+  static double _applyFloatingPointHack(double layoutValue) => TextPainter.shouldDisableRoundingHack ? layoutValue : layoutValue.ceilToDouble();
 
   /// Whether this layout has been invalidated and disposed.
   ///
@@ -362,7 +359,7 @@ class _TextPainterLayoutCacheWithOffset {
   static double _contentWidthFor(double minWidth, double maxWidth, TextWidthBasis widthBasis, _TextLayout layout) {
     // TODO(LongCatIsLooong): remove the rounding when _applyFloatingPointHack
     // is removed.
-    if (_TextLayout._shouldApplyFloatingPointHack) {
+    if (!TextPainter.shouldDisableRoundingHack) {
       minWidth = minWidth.floorToDouble();
       maxWidth = maxWidth.floorToDouble();
     }
@@ -592,6 +589,29 @@ class TextPainter {
     } finally {
       painter.dispose();
     }
+  }
+
+  /// Whether the rounding hack enabled by default in SkParagraph and TextPainter
+  /// is disabled.
+  ///
+  /// Do not rely on this getter as it exists for migration purposes only and
+  /// will soon be removed.
+  @visibleForTesting
+  static bool get shouldDisableRoundingHack {
+    return const bool.hasEnvironment('SKPARAGRAPH_REMOVE_ROUNDING_HACK')
+        || _floatingPointHackDisabledInDebugMode;
+  }
+  static bool _floatingPointHackDisabledInDebugMode = true;
+
+  /// Disables the rounding hack enabled by default in SkParagraph and TextPainter.
+  ///
+  /// Only works in debug mode. Do not call this method as it is for migration
+  /// purposes only and will soon be removed.
+  @visibleForTesting
+  static void disableRoundingHack() {
+    // bool.hasEnvironment does not work in internal tests so an additional flag
+    // is needed for tests.
+    assert(_floatingPointHackDisabledInDebugMode = true);
   }
 
   // Whether textWidthBasis has changed after the most recent `layout` call.
@@ -925,6 +945,7 @@ class TextPainter {
       textHeightBehavior: _textHeightBehavior,
       ellipsis: ellipsis,
       locale: locale,
+      applyRoundingHack: !TextPainter.shouldDisableRoundingHack,
     );
   }
 

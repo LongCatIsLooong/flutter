@@ -1351,6 +1351,8 @@ class TextStyle with Diagnosticable {
       maxLines: maxLines,
       ellipsis: ellipsis,
       locale: locale,
+      // ignore: invalid_use_of_visible_for_testing_member, https://github.com/flutter/flutter/issues/31707
+      applyRoundingHack: !TextPainter.shouldDisableRoundingHack,
     );
   }
 

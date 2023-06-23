@@ -1509,9 +1509,6 @@ void main() {
   });
 
   test('TextPainter line breaking does not round to integers', () {
-    if (! const bool.hasEnvironment('SKPARAGRAPH_REMOVE_ROUNDING_HACK')) {
-      return;
-    }
     const double fontSize = 1.25;
     const String text = '12345';
     assert((fontSize * text.length).truncate() != fontSize * text.length);
@@ -1527,7 +1524,7 @@ void main() {
       case final List<ui.LineMetrics> metrics:
         expect(metrics, hasLength(1));
     }
-  }, skip: kIsWeb && !isCanvasKit); // [intended] Browsers seem to always round font/glyph metrics.
+  }, skip: !TextPainter.shouldDisableRoundingHack || (kIsWeb && !isCanvasKit)); // [intended] Browsers seem to always round font/glyph metrics.
 }
 
 class MockCanvas extends Fake implements Canvas {

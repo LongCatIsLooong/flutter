@@ -489,7 +489,7 @@ void main() {
     const double indicatorWeight = 3.0;
 
 
-    final RRect rrect = const bool.hasEnvironment('SKPARAGRAPH_REMOVE_ROUNDING_HACK')
+    final RRect rrect = TextPainter.shouldDisableRoundingHack
       ? RRect.fromLTRBAndCorners(
           64.75,
           tabBarBox.size.height - indicatorWeight,
