@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:ui' as ui show ParagraphBuilder, StringAttribute;
+import 'dart:ui' as ui show ParagraphBuilder, StringAttribute, PlaceholderAlignment;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
@@ -399,4 +399,76 @@ abstract class InlineSpan extends DiagnosticableTree {
     properties.defaultDiagnosticsTreeStyle = DiagnosticsTreeStyle.whitespace;
     style?.debugFillProperties(properties);
   }
+}
+
+extension Hyperlinks on StyledString {
+  StyledString _addLinkToMatch(Match linkRange, List<TapGestureRecognizer> recognizers) {
+    final recognizer = TapGestureRecognizer()..onTap = ....;
+    recognizers.add(recognizer);
+    return addStyle(
+      const TextStyle(decoration: TextDecoration.underline, ...),
+      forRange: TextRange(start: linkRange.start, end: linkRange.end),
+    );
+  }
+
+  StyledString addHyperlinks(List<TapGestureRecognizer> recognizers) {
+    const Pattern pattern = '<LINK_PATTERN>';
+    return pattern.allMatches(string).fold(this, (styledString, match) => styledString._addLinkToMatch(match, recognizers));
+  }
+}
+
+class StyledString with Diagnosticable {
+  const StyledString._(this.string);
+
+  final String string;
+
+  (int, TextStyle) getStyleAt(int index) {
+    throw UnimplementedError();
+  }
+
+  Iterable<(int, TextStyle)> get getStyles => throw UnimplementedError();
+
+  StyledString addStyle(TextStyle newStyle, { required TextRange forRange }) {
+    throw UnimplementedError();
+  }
+
+  StyledString addAnnotation(StringAnnotation annotation, { required TextRange forRange }) {
+    throw UnimplementedError();
+  }
+}
+
+abstract class StringAnnotation {
+  const factory StringAnnotation.gestureRecognizer(GestureRecognizer recognizer) = InlineGestureRecognizer;
+}
+
+sealed class SemanticsAttribute extends StringAnnotation {
+  const factory SemanticsAttribute.locale(Locale locale) = _Locale;
+  static const SemanticsAttribute spellOut = _SpellOut();
+}
+
+final class _SpellOut implements SemanticsAttribute {
+  const _SpellOut();
+}
+
+final class _Locale implements SemanticsAttribute {
+  const _Locale(this.locale);
+  final Locale locale;
+}
+
+class InlineGestureRecognizer implements SemanticsAttribute, HitTestTarget {
+  const InlineGestureRecognizer(GestureRecognizer recognizer) : _recognizer = recognizer;
+
+  final GestureRecognizer _recognizer;
+
+  @override
+  void handleEvent(PointerEvent event, HitTestEntry<HitTestTarget> entry) {
+    if (event is PointerDownEvent) {
+      _recognizer.addPointer(event);
+    }
+  }
+}
+
+abstract class InlineElementAttribute implements StringAnnotation {
+  Size get size;
+  ui.PlaceholderAlignment get alignment;
 }
