@@ -60,6 +60,7 @@ sealed class _TriNode {
   final int prefix;
 
   _TriNode insert(int key, Object? value);
+  _TriNode insertRange(int keyStart, int keyEnd, Object? value);
 }
 
 final class _Branch extends _TriNode {
@@ -87,6 +88,15 @@ final class _Branch extends _TriNode {
       ? _Branch(prefix, mask, left.insert(key, value), right)
       : _Branch(prefix, mask, left, right.insert(key, value));
   }
+
+@override
+  _TriNode insertRange(int keyStart, int keyEnd, Object? value) {
+    assert(keyStart < keyEnd);
+    // ???
+
+    final int rangePrefix = keyStart ^ keyEnd;
+    throw UnimplementedError();
+  }
 }
 
 final class _Leaf extends _TriNode {
@@ -98,6 +108,21 @@ final class _Leaf extends _TriNode {
   _TriNode insert(int key, Object? value) {
     final _Leaf newLeaf = _Leaf(key, value);
     return key == prefix ? newLeaf : join(key, newLeaf);
+  }
+
+  @override
+  _TriNode insertRange(int keyStart, int keyEnd, Object? value) {
+    assert(keyStart < keyEnd);
+    if (keyEnd == prefix) {
+      return insert(keyStart, value);
+    }
+    if (keyEnd < prefix) {
+      return insert(keyStart, value).insert(keyEnd, null);
+    }
+    if (prefix <= keyStart) {
+      return insert(keyStart, value).insert(keyEnd, this.value);
+    }
+    return _Leaf(keyStart, value).insert(keyEnd, this.value);
   }
 }
 
