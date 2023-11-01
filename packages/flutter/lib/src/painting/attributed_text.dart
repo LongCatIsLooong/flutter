@@ -2,18 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
 
-import 'basic_types.dart' show RenderComparison;
-import 'text_style.dart';
 
 /// A node in a persistent red-black tree.
 ///
 /// A red-black tree is binary search tree that maintains the following
-/// additional invariants:
+/// invariants, in addition to the BST invariant:
 ///
 ///  1. A red node can only have black children.
 ///  2. Every path from the a node to a leaf node must have the same number of
@@ -31,6 +31,7 @@ final class _Node {
   final int key;
   final Object? value;
   final bool isBlack;
+  // The number of black nodes in each path of this subtree.
   final int height;
 
   final _Node? left;
@@ -190,6 +191,7 @@ class AttributedText {
   const AttributedText._(this.text, [this._attributeStorage = const PersistentHashMap<Type, _Node>.empty()]);
 
   final String text;
+  final TextStyle _baseStyle;
 
   (int, T?) getAttributeAt<T extends TextAttribute>(int index) {
     final _Node? attribute = _attributeStorage[T]?.getNodeLessThanOrEqualTo(index);
@@ -198,7 +200,7 @@ class AttributedText {
       : (attribute.key, attribute.value as T?);
   }
 
-  static PersistentHashMap<Type, _Node> _addAttribute(PersistentHashMap<Type, _Node> storage, TextAttribute attribute, int start, int? end) {
+  static PersistentHashMap<Type, _Node?> _addAttribute(PersistentHashMap<Type, _Node?> storage, TextAttribute attribute, int start, int? end) {
     assert(end == null || end > start);
     final Type runtimeType = attribute.runtimeType;
     final _Node node = storage[runtimeType]?.insertRange(start, end, attribute)
@@ -227,26 +229,73 @@ class AttributedText {
     }
     final int start = forRange.start;
     final int? end = forRange.end == text.length ? null : forRange.end;
-    final PersistentHashMap<Type, _Node> storage = attributes.fold(
-      _attributeStorage,
-      (PersistentHashMap<Type, _Node> storage, TextAttribute attribute) => _addAttribute(storage, attribute, start, end),
-    );
-    return AttributedText._(text, storage);
+    PersistentHashMap<Type, _Node?> addAttribute(PersistentHashMap<Type, _Node?> storage, TextAttribute attribute) {
+      return _addAttribute(storage, attribute, start, end);
+    }
+    return AttributedText._(text, attributes.fold(_attributeStorage, addAttribute));
   }
 
-
+  // TextDecoration is additive.
   AttributedText addTextStyle(TextStyle textStyle, { required ui.TextRange forRange }) {
-    return addAttributes(_TextStyleAttribute.fromTextStyle(textStyle), forRange: forRange);
+    assert(forRange.isValid);
+    assert(forRange.isNormalized);
+    assert(forRange.end <= text.length);
+    return forRange.isCollapsed ? this : addAttributes(_TextStyleAttribute._fromTextStyle(textStyle), forRange: forRange);
   }
 
-  (int, TextStyle?) getTextStyleAt(int index) {
+  (int, TextStyle) getTextStyleAt(int index) {
+    assert(0 <= index);
+    assert(index < text.length);
+
+    int startIndex = 0;
+    void updateIndex(int? key) {
+      if (key != null) {
+        startIndex = math.max(key, startIndex);
+      }
+    }
+    final bool? lineThrough = _getAttributeOfType<_TextDecorationLineThrough>(startIndex, updateIndex)?._enabled;
+    final bool? overline = _getAttributeOfType<_TextDecorationOverline>(startIndex, updateIndex)?._enabled;
+    final bool? underline = _getAttributeOfType<_TextDecorationUnderline>(startIndex, updateIndex)?._enabled;
+
+    final TextStyle textStyle = TextStyle(
+      color: _getAttributeOfType<_Color>(startIndex, updateIndex)?.color,
+      decorationColor: _getAttributeOfType<_TextDecorationColor>(startIndex, updateIndex)?.decorationColor,
+      decorationStyle: _getAttributeOfType<_TextDecorationStyle>(startIndex, updateIndex)?.decorationStyle,
+      decorationThickness: _getAttributeOfType<_TextDecorationThickness>(startIndex, updateIndex)?.decorationThickness,
+      fontWeight: _getAttributeOfType<_FontWeight>(startIndex, updateIndex)?.fontWeight,
+      fontStyle: _getAttributeOfType<_FontStyle>(startIndex, updateIndex)?.fontStyle,
+      textBaseline: _getAttributeOfType<_TextBaseline>(startIndex, updateIndex)?.textBaseline,
+      leadingDistribution: _getAttributeOfType<_LeadingDistribution>(startIndex, updateIndex)?.leadingDistribution,
+      fontFamily: _getAttributeOfType<_FontFamily>(startIndex, updateIndex)?.fontFamily,
+      fontFamilyFallback: _getAttributeOfType<_FontFamilyFallback>(startIndex, updateIndex)?.fontFamilyFallback,
+      fontSize: _getAttributeOfType<_FontSize>(startIndex, updateIndex)?.fontSize,
+      letterSpacing: _getAttributeOfType<_LetterSpacing>(startIndex, updateIndex)?.letterSpacing,
+      wordSpacing: _getAttributeOfType<_WordSpacing>(startIndex, updateIndex)?.wordSpacing,
+      height: _getAttributeOfType<_Height>(startIndex, updateIndex)?.height,
+      locale: _getAttributeOfType<_Locale>(startIndex, updateIndex)?.locale,
+      foreground: _getAttributeOfType<_Foreground>(startIndex, updateIndex)?.foreground,
+      background: _getAttributeOfType<_Background>(startIndex, updateIndex)?.background,
+      shadows: _getAttributeOfType<_Shadows>(startIndex, updateIndex)?.shadows,
+      fontFeatures: _getAttributeOfType<_FontFeatures>(startIndex, updateIndex)?.fontFeatures,
+      fontVariations: _getAttributeOfType<_FontVariations>(startIndex, updateIndex)?.fontVariations,
+    );
+    return (startIndex, textStyle);
   }
 
   Iterable<(int, TextStyle)> getStyles() {
-
   }
 
-  final PersistentHashMap<Type, _Node> _attributeStorage;
+  @pragma('vm:prefer-inline')
+  T? _getAttributeOfType<T extends TextAttribute>(int index, void Function(int? key) callback) {
+    final _Node? node = _attributeStorage[T]?.getNodeLessThanOrEqualTo(index);
+    if (node == null) {
+      return null;
+    }
+    callback(node.key);
+    return node.value as T?;
+  }
+
+  final PersistentHashMap<Type, _Node?> _attributeStorage;
 }
 
 // A piece of data that annotates an [AttributedText] object, or part of it.
@@ -257,18 +306,40 @@ class AttributedText {
 @immutable
 abstract class TextAttribute {
   //RenderComparison compare(covariant TextAttribute other);
+
+  @protected
+  Object get key => runtimeType;
 }
 
 sealed class _TextStyleAttribute implements TextAttribute {
-  static List<_TextStyleAttribute> fromTextStyle(TextStyle style) {
+  _TextStyleAttribute();
+
+  static List<_TextStyleAttribute> _fromTextStyle(TextStyle style) {
     final ui.Paint? background = switch ((style.background, style.backgroundColor)) {
       (final ui.Paint paint, _) => paint,
       (_, final ui.Color color) => ui.Paint()..color = color,
       _ => null,
     };
+
+    final TextDecoration? decoration = style.decoration;
+    final List<_TextStyleAttribute>? decorations = switch (decoration) {
+      null => null,
+      TextDecoration.none => <_TextStyleAttribute>[
+        TextDecorationAttribute.noLineThrough,
+        TextDecorationAttribute.noUnderline,
+        TextDecorationAttribute.noOverline,
+      ],
+      _ => <_TextStyleAttribute>[
+        if (decoration.contains(TextDecoration.underline)) TextDecorationAttribute.underline,
+        if (decoration.contains(TextDecoration.overline)) TextDecorationAttribute.overline,
+        if (decoration.contains(TextDecoration.lineThrough)) TextDecorationAttribute.lineThrough,
+      ],
+    };
+
     return <_TextStyleAttribute>[
       if (style.color != null) _Color(style.color!),
-      if (style.decoration != null) _TextDecoration(style.decoration!),
+      // Make sure the TextDecorations are additive.
+      if (decorations != null) ...decorations,
       if (style.decorationColor != null) _TextDecorationColor(style.decorationColor!),
       if (style.decorationStyle != null) _TextDecorationStyle(style.decorationStyle!),
       if (style.decorationThickness != null) _TextDecorationThickness(style.decorationThickness!),
@@ -290,110 +361,133 @@ sealed class _TextStyleAttribute implements TextAttribute {
       if (style.fontVariations != null) _FontVariations(style.fontVariations!),
     ];
   }
+
+  @protected
+  @override
+  late final Object key = runtimeType;
 }
 
-final class _FontWeight implements _TextStyleAttribute {
-  const _FontWeight(this.fontWeight);
+final class _FontWeight extends _TextStyleAttribute {
+  _FontWeight(this.fontWeight);
   final ui.FontWeight fontWeight;
 }
 
-final class _FontStyle implements _TextStyleAttribute {
-  const _FontStyle(this.fontStyle);
+final class _FontStyle extends _TextStyleAttribute {
+  _FontStyle(this.fontStyle);
   final ui.FontStyle fontStyle;
 }
 
-final class _TextBaseline implements _TextStyleAttribute {
-  const _TextBaseline(this.textBaseline);
+final class _TextBaseline extends _TextStyleAttribute {
+  _TextBaseline(this.textBaseline);
   final ui.TextBaseline textBaseline;
 }
 
-final class _LeadingDistribution implements _TextStyleAttribute {
-  const _LeadingDistribution(this.leadingDistribution);
+final class _LeadingDistribution extends _TextStyleAttribute {
+  _LeadingDistribution(this.leadingDistribution);
   final ui.TextLeadingDistribution leadingDistribution;
 }
 
-final class _FontFamily implements _TextStyleAttribute {
-  const _FontFamily(this.fontFamily);
+final class _FontFamily extends _TextStyleAttribute {
+  _FontFamily(this.fontFamily);
   final String fontFamily;
 }
 
-final class _FontFamilyFallback implements _TextStyleAttribute {
-  const _FontFamilyFallback(this.fontFamilyFallback);
+final class _FontFamilyFallback extends _TextStyleAttribute {
+  _FontFamilyFallback(this.fontFamilyFallback);
   final List<String> fontFamilyFallback;
 }
 
-final class _FontSize implements _TextStyleAttribute {
-  const _FontSize(this.fontSize);
+final class _FontSize extends _TextStyleAttribute {
+  _FontSize(this.fontSize);
   final double fontSize;
 }
 
-final class _LetterSpacing implements _TextStyleAttribute {
-  const _LetterSpacing(this.letterSpacing);
+final class _LetterSpacing extends _TextStyleAttribute {
+  _LetterSpacing(this.letterSpacing);
   final double letterSpacing;
 }
 
-final class _WordSpacing implements _TextStyleAttribute {
-  const _WordSpacing(this.wordSpacing);
+final class _WordSpacing extends _TextStyleAttribute {
+  _WordSpacing(this.wordSpacing);
   final double wordSpacing;
 }
 
-final class _Height implements _TextStyleAttribute {
-  const _Height(this.height);
+final class _Height extends _TextStyleAttribute {
+  _Height(this.height);
   final double height;
 }
 
-final class _FontFeatures implements _TextStyleAttribute {
-  const _FontFeatures(this.fontFeatures);
+final class _FontFeatures extends _TextStyleAttribute {
+  _FontFeatures(this.fontFeatures);
   final List<ui.FontFeature> fontFeatures;
 }
 
-final class _FontVariations implements _TextStyleAttribute {
-  const _FontVariations(this.fontVariations);
+final class _FontVariations extends _TextStyleAttribute {
+  _FontVariations(this.fontVariations);
   final List<ui.FontVariation> fontVariations;
 }
 
-final class _Color implements _TextStyleAttribute {
-  const _Color(this.color);
+final class _Color extends _TextStyleAttribute {
+  _Color(this.color);
   final ui.Color color;
 }
 
-final class _TextDecoration implements _TextStyleAttribute {
-  const _TextDecoration(this.decoration);
-  final ui.TextDecoration decoration;
+sealed class TextDecorationAttribute extends _TextStyleAttribute {
+  TextDecorationAttribute._(this._enabled);
+
+  static final TextDecorationAttribute underline = _TextDecorationUnderline(true);
+  static final TextDecorationAttribute noUnderline = _TextDecorationUnderline(false);
+  static final TextDecorationAttribute overline = _TextDecorationOverline(true);
+  static final TextDecorationAttribute noOverline = _TextDecorationOverline(false);
+  static final TextDecorationAttribute lineThrough = _TextDecorationLineThrough(true);
+  static final TextDecorationAttribute noLineThrough = _TextDecorationLineThrough(false);
+
+  final bool _enabled;
 }
 
-final class _TextDecorationColor implements _TextStyleAttribute {
-  const _TextDecorationColor(this.decorationColor);
+final class _TextDecorationUnderline extends TextDecorationAttribute {
+  _TextDecorationUnderline(super._enabled) : super._();
+}
+final class _TextDecorationOverline extends TextDecorationAttribute {
+  _TextDecorationOverline(super._enabled) : super._();
+}
+final class _TextDecorationLineThrough extends TextDecorationAttribute {
+  _TextDecorationLineThrough(super._enabled) : super._();
+}
+
+final class _TextDecorationColor extends _TextStyleAttribute {
+  _TextDecorationColor(this.decorationColor);
   final ui.Color decorationColor;
 }
 
-final class _TextDecorationStyle implements _TextStyleAttribute {
-  const _TextDecorationStyle(this.decorationStyle);
+final class _TextDecorationStyle extends _TextStyleAttribute {
+  _TextDecorationStyle(this.decorationStyle);
   final ui.TextDecorationStyle decorationStyle;
 }
 
-final class _TextDecorationThickness implements _TextStyleAttribute {
-  const _TextDecorationThickness(this.decorationThickness);
+final class _TextDecorationThickness extends _TextStyleAttribute {
+  _TextDecorationThickness(this.decorationThickness);
   final double decorationThickness;
 }
 
-final class _Foreground implements _TextStyleAttribute {
-  const _Foreground(this.foreground);
+final class _Foreground extends _TextStyleAttribute {
+  _Foreground(this.foreground);
   final ui.Paint foreground;
 }
 
-final class _Background implements _TextStyleAttribute {
-  const _Background(this.background);
+final class _Background extends _TextStyleAttribute {
+  _Background(this.background);
   final ui.Paint background;
 }
 
-final class _Shadows implements _TextStyleAttribute {
-  const _Shadows(this.shadows);
+final class _Shadows extends _TextStyleAttribute {
+  _Shadows(this.shadows);
   final List<ui.Shadow> shadows;
 }
 
-sealed class SemanticsAttribute extends TextAttribute {
-  const factory SemanticsAttribute.locale(ui.Locale locale) = _Locale;
+sealed class SemanticsAttribute implements TextAttribute {
+  factory SemanticsAttribute.locale(ui.Locale locale) = _Locale;
+
   static const SemanticsAttribute spellOut = _SpellOut();
 }
 
@@ -401,7 +495,7 @@ final class _SpellOut implements SemanticsAttribute {
   const _SpellOut();
 
   @override
-  RenderComparison compare(_Locale other) => RenderComparison.identical;
+  Object get key => runtimeType;
 }
 
 final class _Locale implements SemanticsAttribute, _TextStyleAttribute {
@@ -410,25 +504,18 @@ final class _Locale implements SemanticsAttribute, _TextStyleAttribute {
   final ui.Locale locale;
 
   @override
-  RenderComparison compare(_Locale other) {
-    return identical(this, other) || locale == other.locale
-      ? RenderComparison.identical
-      : RenderComparison.metadata;
-  }
+  Object get key => runtimeType;
 }
 
 
-final class PlaceholderStyleAttribute implements _TextStyleAttribute {
-  @override
-  RenderComparison compare(PlaceholderStyleAttribute other) {
-    return identical(this, other)
-      ? RenderComparison.identical
-      : RenderComparison.metadata;
-  }
+final class PlaceholderStyleAttribute extends _TextStyleAttribute {
 }
 
 class HitTestableText implements SemanticsAttribute, HitTestTarget {
   @override
   void handleEvent(PointerEvent event, HitTestEntry entry) {
   }
+
+  @override
+  Object get key => runtimeType;
 }
