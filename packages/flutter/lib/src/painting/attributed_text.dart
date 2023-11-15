@@ -192,13 +192,16 @@ class AttributedText {
   const AttributedText._(this.text, [this._attributeStorage = const PersistentHashMap<Type, _Node>.empty()]);
 
   final String text;
-  final TextStyle _baseStyle;
 
   (int, T?) getAttributeAt<T extends TextAttribute>(int index) {
     final _Node? attribute = _attributeStorage[T]?.getNodeLessThanOrEqualTo(index);
     return attribute == null
       ? (0, null)
       : (attribute.key, attribute.value as T?);
+  }
+
+  (int, T?)? getAttributeAfter<T extends TextAttribute>(int index) {
+
   }
 
   static PersistentHashMap<Type, _Node?> _addAttribute(PersistentHashMap<Type, _Node?> storage, TextAttribute attribute, int start, int? end) {
@@ -244,6 +247,7 @@ class AttributedText {
     return forRange.isCollapsed ? this : addAttributes(_TextStyleAttribute._fromTextStyle(textStyle), forRange: forRange);
   }
 
+  // not a good API?
   (int, TextStyle) getTextStyleAt(int index) {
     assert(0 <= index);
     assert(index < text.length);
@@ -258,7 +262,6 @@ class AttributedText {
     final bool? overline = _getAttributeOfType<_TextDecorationOverline>(startIndex, updateIndex)?._enabled;
     final bool? underline = _getAttributeOfType<_TextDecorationUnderline>(startIndex, updateIndex)?._enabled;
     final ui.TextDecoration decoration = ui.TextDecoration.combine(<ui.TextDecoration>[
-
     ]);
 
     final TextStyle textStyle = TextStyle(
@@ -266,7 +269,7 @@ class AttributedText {
       decorationColor: _getAttributeOfType<_TextDecorationColor>(startIndex, updateIndex)?.decorationColor,
       decorationStyle: _getAttributeOfType<_TextDecorationStyle>(startIndex, updateIndex)?.decorationStyle,
       decorationThickness: _getAttributeOfType<_TextDecorationThickness>(startIndex, updateIndex)?.decorationThickness,
-      decoration: ui.T,
+      //decoration: ui.T,
       fontWeight: _getAttributeOfType<_FontWeight>(startIndex, updateIndex)?.fontWeight,
       fontStyle: _getAttributeOfType<_FontStyle>(startIndex, updateIndex)?.fontStyle,
       textBaseline: _getAttributeOfType<_TextBaseline>(startIndex, updateIndex)?.textBaseline,
@@ -287,8 +290,21 @@ class AttributedText {
     return (startIndex, textStyle);
   }
 
-  Iterable<(int, TextStyle)> getStyles() {
+  Iterable<(int, TextStyle)> getStyles(TextStyle baseStyle) {
+    final List<(int, TextStyle)> styles = <(int, TextStyle)>[];
+    if (text.isEmpty) {
+      return <(int, TextStyle)>[];
+    }
 
+    (int, ui.Color?) color = (0, getAttributeAt<_Color>(0).$2?.color);
+    (int, ui.Color?) decorationColor = (0, getAttributeAt<_TextDecorationColor>(0).$2?.decorationColor);
+    (int, ui.TextDecorationStyle?) decorationStyle = (0, getAttributeAt<_TextDecorationStyle>(0).$2?.decorationStyle);
+    (int, double?) decorationThickness = (0, getAttributeAt<_TextDecorationThickness>(0).$2?.decorationThickness);
+    (int, bool?) textDecorationUnderline = (0, getAttributeAt<_TextDecorationUnderline>(0).$2?._enabled);
+    (int, bool?) textDecorationOverline = (0, getAttributeAt<_TextDecorationOverline>(0).$2?._enabled);
+    (int, bool?) textDecorationLineThrough = (0, getAttributeAt<_TextDecorationLineThrough>(0).$2?._enabled);
+
+    return styles;
   }
 
   @pragma('vm:prefer-inline')
