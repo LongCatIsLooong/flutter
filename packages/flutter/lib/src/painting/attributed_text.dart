@@ -7,7 +7,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/material.dart';
+
+import 'text_style.dart';
 
 
 /// A node in a persistent red-black tree.
@@ -256,12 +257,16 @@ class AttributedText {
     final bool? lineThrough = _getAttributeOfType<_TextDecorationLineThrough>(startIndex, updateIndex)?._enabled;
     final bool? overline = _getAttributeOfType<_TextDecorationOverline>(startIndex, updateIndex)?._enabled;
     final bool? underline = _getAttributeOfType<_TextDecorationUnderline>(startIndex, updateIndex)?._enabled;
+    final ui.TextDecoration decoration = ui.TextDecoration.combine(<ui.TextDecoration>[
+
+    ]);
 
     final TextStyle textStyle = TextStyle(
       color: _getAttributeOfType<_Color>(startIndex, updateIndex)?.color,
       decorationColor: _getAttributeOfType<_TextDecorationColor>(startIndex, updateIndex)?.decorationColor,
       decorationStyle: _getAttributeOfType<_TextDecorationStyle>(startIndex, updateIndex)?.decorationStyle,
       decorationThickness: _getAttributeOfType<_TextDecorationThickness>(startIndex, updateIndex)?.decorationThickness,
+      decoration: ui.T,
       fontWeight: _getAttributeOfType<_FontWeight>(startIndex, updateIndex)?.fontWeight,
       fontStyle: _getAttributeOfType<_FontStyle>(startIndex, updateIndex)?.fontStyle,
       textBaseline: _getAttributeOfType<_TextBaseline>(startIndex, updateIndex)?.textBaseline,
@@ -283,6 +288,7 @@ class AttributedText {
   }
 
   Iterable<(int, TextStyle)> getStyles() {
+
   }
 
   @pragma('vm:prefer-inline')
@@ -321,18 +327,18 @@ sealed class _TextStyleAttribute implements TextAttribute {
       _ => null,
     };
 
-    final TextDecoration? decoration = style.decoration;
+    final ui.TextDecoration? decoration = style.decoration;
     final List<_TextStyleAttribute>? decorations = switch (decoration) {
       null => null,
-      TextDecoration.none => <_TextStyleAttribute>[
+      ui.TextDecoration.none => <_TextStyleAttribute>[
         TextDecorationAttribute.noLineThrough,
         TextDecorationAttribute.noUnderline,
         TextDecorationAttribute.noOverline,
       ],
       _ => <_TextStyleAttribute>[
-        if (decoration.contains(TextDecoration.underline)) TextDecorationAttribute.underline,
-        if (decoration.contains(TextDecoration.overline)) TextDecorationAttribute.overline,
-        if (decoration.contains(TextDecoration.lineThrough)) TextDecorationAttribute.lineThrough,
+        if (decoration.contains(ui.TextDecoration.underline)) TextDecorationAttribute.underline,
+        if (decoration.contains(ui.TextDecoration.overline)) TextDecorationAttribute.overline,
+        if (decoration.contains(ui.TextDecoration.lineThrough)) TextDecorationAttribute.lineThrough,
       ],
     };
 
