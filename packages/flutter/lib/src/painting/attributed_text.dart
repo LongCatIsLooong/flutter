@@ -19,7 +19,7 @@ import 'text_style.dart';
 ///  1. A red node can only have black children.
 ///  2. Every path from the a node to a leaf node must have the same number of
 ///     black nodes.
-final class _Node {
+final class _Node extends Iterable<_Node> {
   _Node(this.key, this.value, this.isBlack, this.height, this.left, this.right);
 
   _Node.red(this.key, this.value, { this.left, this.right })
@@ -139,7 +139,7 @@ final class _Node {
   }
 
   @pragma('vm:prefer-inline')
-  _Node join(_Node rightTree, int key, Object? value) => (height < rightTree.height ? _joinTaller(rightTree, key, value) : _joinShorter(rightTree, key, value))._turnBlack();
+  _Node joinRight(_Node rightTree, int key, Object? value) => (height < rightTree.height ? _joinTaller(rightTree, key, value) : _joinShorter(rightTree, key, value))._turnBlack();
 
   _Node? _takeLessThan(int key) {
     if (this.key == key) {
@@ -151,7 +151,7 @@ final class _Node {
     final _Node? newRightSubtree = right?._takeLessThan(key);
     return newRightSubtree == null
       ? _turnBlack()
-      : left?.join(newRightSubtree, key, value) ?? newRightSubtree.insert(key, value);
+      : left?.joinRight(newRightSubtree, key, value) ?? newRightSubtree.insert(key, value);
   }
 
   _Node? _skipUntil(int key) {
@@ -164,7 +164,7 @@ final class _Node {
     final _Node? right = this.right;
     return right == null
       ? null
-      : left?._skipUntil(key)?.join(right, key, value) ?? right.insert(key, value);
+      : left?._skipUntil(key)?.joinRight(right, key, value) ?? right.insert(key, value);
   }
 
   // When end is null, it is treated as +∞ and is special cased to enable faster
@@ -182,9 +182,20 @@ final class _Node {
       : rightTreeWithoutEnd?.insert(end!, nodeAtEnd.value) ?? _Node.black(end!, nodeAtEnd.value);
 
     return leftTree != null && rightTree != null
-      ? leftTree.join(rightTree, start, value)
+      ? leftTree.joinRight(rightTree, start, value)
       : (leftTree ?? rightTree)?.insert(start, value) ?? _Node.black(start, value);
   }
+
+  // O(N)
+  void visitAllAscending(void Function(_Node) visitor) {
+    left?.visitAllAscending(visitor);
+    visitor(this);
+    right?.visitAllAscending(visitor);
+  }
+
+  @override
+  // TODO: implement iterator
+  Iterator<_Node> get iterator => throw UnimplementedError();
 }
 
 /// An immutable
@@ -258,34 +269,34 @@ class AttributedText {
         startIndex = math.max(key, startIndex);
       }
     }
-    final bool? lineThrough = _getAttributeOfType<_TextDecorationLineThrough>(startIndex, updateIndex)?._enabled;
-    final bool? overline = _getAttributeOfType<_TextDecorationOverline>(startIndex, updateIndex)?._enabled;
-    final bool? underline = _getAttributeOfType<_TextDecorationUnderline>(startIndex, updateIndex)?._enabled;
+    final bool? lineThrough = _getStyleAttributeOfType<_TextDecorationLineThrough>(startIndex, updateIndex)?.value;
+    final bool? overline = _getStyleAttributeOfType<_TextDecorationOverline>(startIndex, updateIndex)?.value;
+    final bool? underline = _getStyleAttributeOfType<_TextDecorationUnderline>(startIndex, updateIndex)?.value;
     final ui.TextDecoration decoration = ui.TextDecoration.combine(<ui.TextDecoration>[
     ]);
 
     final TextStyle textStyle = TextStyle(
-      color: _getAttributeOfType<_Color>(startIndex, updateIndex)?.color,
-      decorationColor: _getAttributeOfType<_TextDecorationColor>(startIndex, updateIndex)?.decorationColor,
-      decorationStyle: _getAttributeOfType<_TextDecorationStyle>(startIndex, updateIndex)?.decorationStyle,
-      decorationThickness: _getAttributeOfType<_TextDecorationThickness>(startIndex, updateIndex)?.decorationThickness,
+      color: _getStyleAttributeOfType<_Color>(startIndex, updateIndex)?.value,
+      decorationColor: _getStyleAttributeOfType<_TextDecorationColor>(startIndex, updateIndex)?.value,
+      decorationStyle: _getStyleAttributeOfType<_TextDecorationStyle>(startIndex, updateIndex)?.value,
+      decorationThickness: _getStyleAttributeOfType<_TextDecorationThickness>(startIndex, updateIndex)?.value,
       //decoration: ui.T,
-      fontWeight: _getAttributeOfType<_FontWeight>(startIndex, updateIndex)?.fontWeight,
-      fontStyle: _getAttributeOfType<_FontStyle>(startIndex, updateIndex)?.fontStyle,
-      textBaseline: _getAttributeOfType<_TextBaseline>(startIndex, updateIndex)?.textBaseline,
-      leadingDistribution: _getAttributeOfType<_LeadingDistribution>(startIndex, updateIndex)?.leadingDistribution,
-      fontFamily: _getAttributeOfType<_FontFamily>(startIndex, updateIndex)?.fontFamily,
-      fontFamilyFallback: _getAttributeOfType<_FontFamilyFallback>(startIndex, updateIndex)?.fontFamilyFallback,
-      fontSize: _getAttributeOfType<_FontSize>(startIndex, updateIndex)?.fontSize,
-      letterSpacing: _getAttributeOfType<_LetterSpacing>(startIndex, updateIndex)?.letterSpacing,
-      wordSpacing: _getAttributeOfType<_WordSpacing>(startIndex, updateIndex)?.wordSpacing,
-      height: _getAttributeOfType<_Height>(startIndex, updateIndex)?.height,
-      locale: _getAttributeOfType<_Locale>(startIndex, updateIndex)?.locale,
-      foreground: _getAttributeOfType<_Foreground>(startIndex, updateIndex)?.foreground,
-      background: _getAttributeOfType<_Background>(startIndex, updateIndex)?.background,
-      shadows: _getAttributeOfType<_Shadows>(startIndex, updateIndex)?.shadows,
-      fontFeatures: _getAttributeOfType<_FontFeatures>(startIndex, updateIndex)?.fontFeatures,
-      fontVariations: _getAttributeOfType<_FontVariations>(startIndex, updateIndex)?.fontVariations,
+      fontWeight: _getStyleAttributeOfType<_FontWeight>(startIndex, updateIndex)?.value,
+      fontStyle: _getStyleAttributeOfType<_FontStyle>(startIndex, updateIndex)?.value,
+      textBaseline: _getStyleAttributeOfType<_TextBaseline>(startIndex, updateIndex)?.value,
+      leadingDistribution: _getStyleAttributeOfType<_LeadingDistribution>(startIndex, updateIndex)?.value,
+      fontFamily: _getStyleAttributeOfType<_FontFamily>(startIndex, updateIndex)?.value,
+      fontFamilyFallback: _getStyleAttributeOfType<_FontFamilyFallback>(startIndex, updateIndex)?.value,
+      fontSize: _getStyleAttributeOfType<_FontSize>(startIndex, updateIndex)?.value,
+      letterSpacing: _getStyleAttributeOfType<_LetterSpacing>(startIndex, updateIndex)?.value,
+      wordSpacing: _getStyleAttributeOfType<_WordSpacing>(startIndex, updateIndex)?.value,
+      height: _getStyleAttributeOfType<_Height>(startIndex, updateIndex)?.value,
+      locale: _getStyleAttributeOfType<_Locale>(startIndex, updateIndex)?.value,
+      foreground: _getStyleAttributeOfType<_Foreground>(startIndex, updateIndex)?.value,
+      background: _getStyleAttributeOfType<_Background>(startIndex, updateIndex)?.value,
+      shadows: _getStyleAttributeOfType<_Shadows>(startIndex, updateIndex)?.value,
+      fontFeatures: _getStyleAttributeOfType<_FontFeatures>(startIndex, updateIndex)?.value,
+      fontVariations: _getStyleAttributeOfType<_FontVariations>(startIndex, updateIndex)?.value,
     );
     return (startIndex, textStyle);
   }
@@ -296,19 +307,46 @@ class AttributedText {
       return <(int, TextStyle)>[];
     }
 
-    (int, ui.Color?) color = (0, getAttributeAt<_Color>(0).$2?.color);
-    (int, ui.Color?) decorationColor = (0, getAttributeAt<_TextDecorationColor>(0).$2?.decorationColor);
-    (int, ui.TextDecorationStyle?) decorationStyle = (0, getAttributeAt<_TextDecorationStyle>(0).$2?.decorationStyle);
-    (int, double?) decorationThickness = (0, getAttributeAt<_TextDecorationThickness>(0).$2?.decorationThickness);
-    (int, bool?) textDecorationUnderline = (0, getAttributeAt<_TextDecorationUnderline>(0).$2?._enabled);
-    (int, bool?) textDecorationOverline = (0, getAttributeAt<_TextDecorationOverline>(0).$2?._enabled);
-    (int, bool?) textDecorationLineThrough = (0, getAttributeAt<_TextDecorationLineThrough>(0).$2?._enabled);
+    (int, ui.Color?)? color = (0, getAttributeAt<_Color>(0).$2?.color);
+    (int, ui.Color?)? decorationColor = (0, getAttributeAt<_TextDecorationColor>(0).$2?.decorationColor);
+    (int, ui.TextDecorationStyle?)? decorationStyle = (0, getAttributeAt<_TextDecorationStyle>(0).$2?.decorationStyle);
+    (int, double?)? decorationThickness = (0, getAttributeAt<_TextDecorationThickness>(0).$2?.decorationThickness);
+    (int, bool?)? textDecorationUnderline = (0, getAttributeAt<_TextDecorationUnderline>(0).$2?._enabled);
+    (int, bool?)? textDecorationOverline = (0, getAttributeAt<_TextDecorationOverline>(0).$2?._enabled);
+    (int, bool?)? textDecorationLineThrough = (0, getAttributeAt<_TextDecorationLineThrough>(0).$2?._enabled);
+    (int, FontWeight?)? fontWeight = (0, getAttributeAt<_FontWeight>(0).$2?.fontWeight);
+    (int, FontStyle?)? fontStyle = (0, getAttributeAt<_FontStyle>(0).$2?.fontStyle);
+    (int, TextBaseline?)? textBaseline = (0, getAttributeAt<_TextBaseline>(0).$2?.textBaseline);
+    (int, ui.TextLeadingDistribution?)? textLeadingDistribution = (0, getAttributeAt<_LeadingDistribution>(0).$2?.leadingDistribution);
+    (int, String?)? fontFamily = (0, getAttributeAt<_FontFamily>(0).$2?.fontFamily);
+    (int, List<String>?)? fontFamilyFallback = (0, getAttributeAt<_FontFamilyFallback>(0).$2?.fontFamilyFallback);
+    (int, double?)? letterSpacing = (0, getAttributeAt<_LetterSpacing>(0).$2?.letterSpacing);
+    (int, double?)? wordSpacing = (0, getAttributeAt<_WordSpacing>(0).$2?.wordSpacing);
+    (int, double?)? height = (0, getAttributeAt<_Height>(0).$2?.height);
+    (int, ui.Locale?)? locale = (0, getAttributeAt<_Locale>(0).$2?.locale);
+    (int, ui.Paint?)? foreground = (0, getAttributeAt<_Foreground>(0).$2?.foreground);
+    (int, ui.Paint?)? background = (0, getAttributeAt<_Background>(0).$2?.background);
+    (int, List<ui.Shadow>?)? shadows = (0, getAttributeAt<_Shadows>(0).$2?.shadows);
+    (int, List<ui.FontFeature>?)? fontFeatures = (0, getAttributeAt<_FontFeatures>(0).$2?.fontFeatures);
+    (int, List<ui.FontVariation>?)? fontVariations = (0, getAttributeAt<_FontVariations>(0).$2?.fontVariations);
+
+    void nextColor() {
+      final currentColor = color;
+      if (currentColor == null) {
+        return;
+      }
+      color = _attributeStorage[T]?.visitAllAscending()
+    }
+
+    while (color != null || decorationColor != null || decorationColor != null || decorationStyle != null || decorationThickness != null || textDecorationUnderline != null || ) {
+
+    }
 
     return styles;
   }
 
   @pragma('vm:prefer-inline')
-  T? _getAttributeOfType<T extends TextAttribute>(int index, void Function(int? key) callback) {
+  T? _getStyleAttributeOfType<T extends TextAttribute>(int index, void Function(int? key) callback) {
     final _Node? node = _attributeStorage[T]?.getNodeLessThanOrEqualTo(index);
     if (node == null) {
       return null;
@@ -333,10 +371,12 @@ abstract class TextAttribute {
   Object get key => runtimeType;
 }
 
-sealed class _TextStyleAttribute implements TextAttribute {
-  _TextStyleAttribute();
+sealed class _TextStyleAttribute<T extends Object> implements TextAttribute {
+  _TextStyleAttribute(this.value);
 
-  static List<_TextStyleAttribute> _fromTextStyle(TextStyle style) {
+  final T value;
+
+  static List<_TextStyleAttribute<Object>> _fromTextStyle(TextStyle style) {
     final ui.Paint? background = switch ((style.background, style.backgroundColor)) {
       (final ui.Paint paint, _) => paint,
       (_, final ui.Color color) => ui.Paint()..color = color,
@@ -344,21 +384,21 @@ sealed class _TextStyleAttribute implements TextAttribute {
     };
 
     final ui.TextDecoration? decoration = style.decoration;
-    final List<_TextStyleAttribute>? decorations = switch (decoration) {
+    final List<_TextStyleAttribute<Object>>? decorations = switch (decoration) {
       null => null,
-      ui.TextDecoration.none => <_TextStyleAttribute>[
+      ui.TextDecoration.none => <_TextStyleAttribute<Object>>[
         TextDecorationAttribute.noLineThrough,
         TextDecorationAttribute.noUnderline,
         TextDecorationAttribute.noOverline,
       ],
-      _ => <_TextStyleAttribute>[
+      _ => <_TextStyleAttribute<Object>>[
         if (decoration.contains(ui.TextDecoration.underline)) TextDecorationAttribute.underline,
         if (decoration.contains(ui.TextDecoration.overline)) TextDecorationAttribute.overline,
         if (decoration.contains(ui.TextDecoration.lineThrough)) TextDecorationAttribute.lineThrough,
       ],
     };
 
-    return <_TextStyleAttribute>[
+    return <_TextStyleAttribute<Object>>[
       if (style.color != null) _Color(style.color!),
       // Make sure the TextDecorations are additive.
       if (decorations != null) ...decorations,
@@ -389,73 +429,60 @@ sealed class _TextStyleAttribute implements TextAttribute {
   late final Object key = runtimeType;
 }
 
-final class _FontWeight extends _TextStyleAttribute {
-  _FontWeight(this.fontWeight);
-  final ui.FontWeight fontWeight;
+final class _FontWeight extends _TextStyleAttribute<ui.FontWeight> {
+  _FontWeight(super.value);
 }
 
-final class _FontStyle extends _TextStyleAttribute {
-  _FontStyle(this.fontStyle);
-  final ui.FontStyle fontStyle;
+final class _FontStyle extends _TextStyleAttribute<ui.FontStyle> {
+  _FontStyle(super.value);
 }
 
-final class _TextBaseline extends _TextStyleAttribute {
-  _TextBaseline(this.textBaseline);
-  final ui.TextBaseline textBaseline;
+final class _TextBaseline extends _TextStyleAttribute<ui.TextBaseline> {
+  _TextBaseline(super.value);
 }
 
-final class _LeadingDistribution extends _TextStyleAttribute {
-  _LeadingDistribution(this.leadingDistribution);
-  final ui.TextLeadingDistribution leadingDistribution;
+final class _LeadingDistribution extends _TextStyleAttribute<ui.TextLeadingDistribution> {
+  _LeadingDistribution(super.value);
 }
 
-final class _FontFamily extends _TextStyleAttribute {
-  _FontFamily(this.fontFamily);
-  final String fontFamily;
+final class _FontFamily extends _TextStyleAttribute<String> {
+  _FontFamily(super.value);
 }
 
-final class _FontFamilyFallback extends _TextStyleAttribute {
-  _FontFamilyFallback(this.fontFamilyFallback);
-  final List<String> fontFamilyFallback;
+final class _FontFamilyFallback extends _TextStyleAttribute<List<String>> {
+  _FontFamilyFallback(super.value);
 }
 
-final class _FontSize extends _TextStyleAttribute {
-  _FontSize(this.fontSize);
-  final double fontSize;
+final class _FontSize extends _TextStyleAttribute<double> {
+  _FontSize(super.value);
 }
 
-final class _LetterSpacing extends _TextStyleAttribute {
-  _LetterSpacing(this.letterSpacing);
-  final double letterSpacing;
+final class _LetterSpacing extends _TextStyleAttribute<double> {
+  _LetterSpacing(super.value);
 }
 
-final class _WordSpacing extends _TextStyleAttribute {
-  _WordSpacing(this.wordSpacing);
-  final double wordSpacing;
+final class _WordSpacing extends _TextStyleAttribute<double> {
+  _WordSpacing(super.value);
 }
 
-final class _Height extends _TextStyleAttribute {
-  _Height(this.height);
-  final double height;
+final class _Height extends _TextStyleAttribute<double> {
+  _Height(super.value);
 }
 
-final class _FontFeatures extends _TextStyleAttribute {
-  _FontFeatures(this.fontFeatures);
-  final List<ui.FontFeature> fontFeatures;
+final class _FontFeatures extends _TextStyleAttribute<List<ui.FontFeature>> {
+  _FontFeatures(super.value);
 }
 
-final class _FontVariations extends _TextStyleAttribute {
-  _FontVariations(this.fontVariations);
-  final List<ui.FontVariation> fontVariations;
+final class _FontVariations extends _TextStyleAttribute<List<ui.FontVariation>> {
+  _FontVariations(super.value);
 }
 
-final class _Color extends _TextStyleAttribute {
-  _Color(this.color);
-  final ui.Color color;
+final class _Color extends _TextStyleAttribute<ui.Color> {
+  _Color(super.value);
 }
 
-sealed class TextDecorationAttribute extends _TextStyleAttribute {
-  TextDecorationAttribute._(this._enabled);
+sealed class TextDecorationAttribute extends _TextStyleAttribute<bool> {
+  TextDecorationAttribute._(super.value);
 
   static final TextDecorationAttribute underline = _TextDecorationUnderline(true);
   static final TextDecorationAttribute noUnderline = _TextDecorationUnderline(false);
@@ -463,8 +490,6 @@ sealed class TextDecorationAttribute extends _TextStyleAttribute {
   static final TextDecorationAttribute noOverline = _TextDecorationOverline(false);
   static final TextDecorationAttribute lineThrough = _TextDecorationLineThrough(true);
   static final TextDecorationAttribute noLineThrough = _TextDecorationLineThrough(false);
-
-  final bool _enabled;
 }
 
 final class _TextDecorationUnderline extends TextDecorationAttribute {
@@ -477,34 +502,28 @@ final class _TextDecorationLineThrough extends TextDecorationAttribute {
   _TextDecorationLineThrough(super._enabled) : super._();
 }
 
-final class _TextDecorationColor extends _TextStyleAttribute {
-  _TextDecorationColor(this.decorationColor);
-  final ui.Color decorationColor;
+final class _TextDecorationColor extends _TextStyleAttribute<ui.Color> {
+  _TextDecorationColor(super.value);
 }
 
-final class _TextDecorationStyle extends _TextStyleAttribute {
-  _TextDecorationStyle(this.decorationStyle);
-  final ui.TextDecorationStyle decorationStyle;
+final class _TextDecorationStyle extends _TextStyleAttribute<ui.TextDecorationStyle> {
+  _TextDecorationStyle(super.value);
 }
 
-final class _TextDecorationThickness extends _TextStyleAttribute {
-  _TextDecorationThickness(this.decorationThickness);
-  final double decorationThickness;
+final class _TextDecorationThickness extends _TextStyleAttribute<double> {
+  _TextDecorationThickness(super.value);
 }
 
-final class _Foreground extends _TextStyleAttribute {
-  _Foreground(this.foreground);
-  final ui.Paint foreground;
+final class _Foreground extends _TextStyleAttribute<ui.Paint> {
+  _Foreground(super.value);
 }
 
-final class _Background extends _TextStyleAttribute {
-  _Background(this.background);
-  final ui.Paint background;
+final class _Background extends _TextStyleAttribute<ui.Paint> {
+  _Background(super.value);
 }
 
-final class _Shadows extends _TextStyleAttribute {
-  _Shadows(this.shadows);
-  final List<ui.Shadow> shadows;
+final class _Shadows extends _TextStyleAttribute<List<ui.Shadow>> {
+  _Shadows(super.value);
 }
 
 sealed class SemanticsAttribute implements TextAttribute {
@@ -520,18 +539,19 @@ final class _SpellOut implements SemanticsAttribute {
   Object get key => runtimeType;
 }
 
-final class _Locale implements SemanticsAttribute, _TextStyleAttribute {
-  const _Locale(this.locale);
+final class _Locale implements SemanticsAttribute, _TextStyleAttribute<ui.Locale> {
+  const _Locale(this.value);
 
-  final ui.Locale locale;
+  @override
+  final ui.Locale value;
 
   @override
   Object get key => runtimeType;
 }
 
 
-final class PlaceholderStyleAttribute extends _TextStyleAttribute {
-}
+//final class PlaceholderStyleAttribute extends _TextStyleAttribute {
+//}
 
 class HitTestableText implements SemanticsAttribute, HitTestTarget {
   @override
