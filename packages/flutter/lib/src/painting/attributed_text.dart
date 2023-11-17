@@ -19,7 +19,7 @@ import 'text_style.dart';
 ///  1. A red node can only have black children.
 ///  2. Every path from the a node to a leaf node must have the same number of
 ///     black nodes.
-final class _Node extends Iterable<_Node> {
+final class _Node {
   _Node(this.key, this.value, this.isBlack, this.height, this.left, this.right);
 
   _Node.red(this.key, this.value, { this.left, this.right })
@@ -193,9 +193,63 @@ final class _Node extends Iterable<_Node> {
     right?.visitAllAscending(visitor);
   }
 
+  late final Iterable<_Node> ascending = _getAscending();
+
+  Iterable<_Node> _getAscending() {
+    final List<_Node> nodes = <_Node>[];
+    visitAllAscending(nodes.add);
+    return nodes;
+  }
+}
+
+sealed class _NodeIteratorState {
+  const _NodeIteratorState(this.nextState);
+  final _NodeIteratorState? nextState;
+}
+final class _IteratingSubtree extends _NodeIteratorState {
+  _IteratingSubtree(this.subtreeRoot, super.nextState);
+  final _Node subtreeRoot;
+
+  // The subtree iterator is lazily created to avoid eager evaluation of the
+  // entire subtree.
+  late final _NodeIterator subtreeIterator = _NodeIterator(subtreeRoot);
+}
+
+final class _IteratingRoot extends _NodeIteratorState {
+  const _IteratingRoot(this.root, super.nextState);
+  final _Node root;
+}
+
+// This is bad.
+final class _NodeIterator implements Iterator<_Node> {
+  _NodeIterator(_Node root) : this._(root.left, root, root.right);
+
+  _NodeIterator._(_Node? left, _Node root, _Node? right)
+    : state = left == null
+      ? _IteratingRoot(root, right == null ? null : _IteratingSubtree(right, null))
+      : _IteratingSubtree(left, _IteratingRoot(root, right == null ? null : _IteratingSubtree(right, null)));
+
+  _NodeIteratorState state;
+
   @override
-  // TODO: implement iterator
-  Iterator<_Node> get iterator => throw UnimplementedError();
+  _Node get current => switch (state) {
+    _IteratingRoot(:final _Node root) => root,
+    _IteratingSubtree(:final _NodeIterator subtreeIterator) => subtreeIterator.current,
+  };
+
+  @override
+  bool moveNext() {
+    final _NodeIteratorState? nextStats = switch (state) {
+      _IteratingRoot(:final _NodeIteratorState? nextState) => nextState,
+      _IteratingSubtree(:final _NodeIterator subtreeIterator, :final _NodeIteratorState? nextState) when !subtreeIterator.moveNext() => nextState,
+      final _IteratingSubtree state => state,
+    };
+    if (nextStats == null) {
+      return false;
+    }
+    state = nextStats;
+    return true;
+  }
 }
 
 /// An immutable
@@ -307,7 +361,27 @@ class AttributedText {
       return <(int, TextStyle)>[];
     }
 
-    (int, ui.Color?)? color = (0, getAttributeAt<_Color>(0).$2?.color);
+    final Iterator<_Node>? colorIterator = _attributeStorage[_Color]?.ascending.iterator;
+    final Iterator<_Node>? decorationColorIterator = _attributeStorage[_TextDecorationColor]?.ascending.iterator;
+    const List<Type> types = <Type>[
+      _Color, _TextDecorationColor, _TextDecorationStyle, _TextDecorationThickness, _TextDecorationUnderline, _TextDecorationOverline, _TextDecorationLineThrough,
+      _FontWeight, _FontStyle, _TextBaseline, _LeadingDistribution, _FontFamily, _FontFamilyFallback, _LetterSpacing, _WordSpacing, _Height, _Locale, _Foreground,
+      _Background, _Shadows, _FontFeatures, _FontVariations,
+    ];
+
+    final List<_Node> runStartIndices = types.fold(<int>{}, (Set<int> set, Type type) {
+      final Iterable<_Node>? indices = _attributeStorage[type]?.ascending;
+      if (indices != null && indices.isNotEmpty) {
+        set.addAll(indices.map((_Node element) => element.key));
+      }
+      return set;
+    }).toList()..sort();
+
+
+
+
+
+    (int, ui.Color?)? color = _attributeStorage[_Color].ascending.iterator;
     (int, ui.Color?)? decorationColor = (0, getAttributeAt<_TextDecorationColor>(0).$2?.decorationColor);
     (int, ui.TextDecorationStyle?)? decorationStyle = (0, getAttributeAt<_TextDecorationStyle>(0).$2?.decorationStyle);
     (int, double?)? decorationThickness = (0, getAttributeAt<_TextDecorationThickness>(0).$2?.decorationThickness);
@@ -330,15 +404,26 @@ class AttributedText {
     (int, List<ui.FontFeature>?)? fontFeatures = (0, getAttributeAt<_FontFeatures>(0).$2?.fontFeatures);
     (int, List<ui.FontVariation>?)? fontVariations = (0, getAttributeAt<_FontVariations>(0).$2?.fontVariations);
 
-    void nextColor() {
-      final currentColor = color;
-      if (currentColor == null) {
-        return;
-      }
-      color = _attributeStorage[T]?.visitAllAscending()
+    final List<Iterator<_Node>> nonnullIterators = <Iterator<_Node>>[
+      if (colorIterator != null && colorIterator.moveNext()) colorIterator,
+      if (decorationColorIterator != null && decorationColorIterator.moveNext()) decorationColorIterator,
+    ];
+
+    int? findStyleRunStartIndex() {
+      nonnullIterators.fold(null, (int? currentMin, _Node node) {
+        return currentMin == null
+          ? node.key
+          : math.min(node.key, currentMin);
+      });
     }
 
-    while (color != null || decorationColor != null || decorationColor != null || decorationStyle != null || decorationThickness != null || textDecorationUnderline != null || ) {
+    while (nonnullIterators.) {
+      final TextStyle styleToPush = TextStyle(
+        color: colorIterator == null ?
+      );
+    }
+
+    while (color  || decorationColor != null || decorationColor != null || decorationStyle != null || decorationThickness != null || textDecorationUnderline != null || ) {
 
     }
 
