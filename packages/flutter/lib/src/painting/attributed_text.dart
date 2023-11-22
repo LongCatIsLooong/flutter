@@ -179,7 +179,7 @@ final class _Node {
     final _Node? nodeAtEnd = end == null ? null : getNodeLessThanOrEqualTo(end);
     final _Node? rightTree = nodeAtEnd == null || nodeAtEnd.key == end
       ? rightTreeWithoutEnd
-      : rightTreeWithoutEnd?.insert(end!, nodeAtEnd.value) ?? _Node.black(end!, nodeAtEnd.value);
+      : rightTreeWithoutEnd?.insert(nodeAtEnd.key, nodeAtEnd.value) ?? _Node.black(nodeAtEnd.key, nodeAtEnd.value);
 
     return leftTree != null && rightTree != null
       ? leftTree.joinRight(rightTree, start, value)
@@ -193,62 +193,39 @@ final class _Node {
     right?.visitAllAscending(visitor);
   }
 
-  late final Iterable<_Node> ascending = _getAscending();
+  late final List<_Node> ascending = _getAscending();
+  _Iterator get ascendingIterator => _Iterator(ascending);
 
-  Iterable<_Node> _getAscending() {
+  List<_Node> _getAscending() {
     final List<_Node> nodes = <_Node>[];
     visitAllAscending(nodes.add);
     return nodes;
   }
 }
 
-sealed class _NodeIteratorState {
-  const _NodeIteratorState(this.nextState);
-  final _NodeIteratorState? nextState;
-}
-final class _IteratingSubtree extends _NodeIteratorState {
-  _IteratingSubtree(this.subtreeRoot, super.nextState);
-  final _Node subtreeRoot;
+final class _Iterator {
+  _Iterator(this._nodes) : assert(_nodes.isNotEmpty);
+  final List<_Node> _nodes;
+  int _currentIndex = 0;
 
-  // The subtree iterator is lazily created to avoid eager evaluation of the
-  // entire subtree.
-  late final _NodeIterator subtreeIterator = _NodeIterator(subtreeRoot);
-}
+  _Node? get current => _currentIndex >= _nodes.length ? null : _nodes[_currentIndex];
 
-final class _IteratingRoot extends _NodeIteratorState {
-  const _IteratingRoot(this.root, super.nextState);
-  final _Node root;
-}
-
-// This is bad.
-final class _NodeIterator implements Iterator<_Node> {
-  _NodeIterator(_Node root) : this._(root.left, root, root.right);
-
-  _NodeIterator._(_Node? left, _Node root, _Node? right)
-    : state = left == null
-      ? _IteratingRoot(root, right == null ? null : _IteratingSubtree(right, null))
-      : _IteratingSubtree(left, _IteratingRoot(root, right == null ? null : _IteratingSubtree(right, null)));
-
-  _NodeIteratorState state;
-
-  @override
-  _Node get current => switch (state) {
-    _IteratingRoot(:final _Node root) => root,
-    _IteratingSubtree(:final _NodeIterator subtreeIterator) => subtreeIterator.current,
-  };
-
-  @override
-  bool moveNext() {
-    final _NodeIteratorState? nextStats = switch (state) {
-      _IteratingRoot(:final _NodeIteratorState? nextState) => nextState,
-      _IteratingSubtree(:final _NodeIterator subtreeIterator, :final _NodeIteratorState? nextState) when !subtreeIterator.moveNext() => nextState,
-      final _IteratingSubtree state => state,
-    };
-    if (nextStats == null) {
-      return false;
+  // If the iterator is at the given runStartIndex, returns the associated
+  // value and move the iterator forward.
+  //
+  // This method returns null if the given the attribute does not change at the
+  // given index.
+  T? emitStyleForRunAndIncrement<T extends Object>(int runStartIndex) {
+    final _Node? current = this.current;
+    if (current == null || current.key != runStartIndex) {
+      return null;
     }
-    state = nextStats;
-    return true;
+    _currentIndex += 1;
+    // For TextStyles there's no point in setting node.value to null (in which
+    // case the style attribute defaults to the corresponding attribute from the
+    // "base" style).
+    // setting )
+    return (current.value! as _TextStyleAttribute<T>).value;
   }
 }
 
@@ -355,76 +332,83 @@ class AttributedText {
     return (startIndex, textStyle);
   }
 
+  /// Retrives the sequence of TextStyle runs, given the base [TextStyle].
+  ///
+  /// A [TextStyle] run is a subsequnce of the text within which the [TextStyle]
+  /// stays the same. Attributes in the [TextStyle] may be left unspecified, if
+  /// the
   Iterable<(int, TextStyle)> getStyles(TextStyle baseStyle) {
-    final List<(int, TextStyle)> styles = <(int, TextStyle)>[];
     if (text.isEmpty) {
-      return <(int, TextStyle)>[];
+      return const <(int, TextStyle)>[];
     }
-
-    final Iterator<_Node>? colorIterator = _attributeStorage[_Color]?.ascending.iterator;
-    final Iterator<_Node>? decorationColorIterator = _attributeStorage[_TextDecorationColor]?.ascending.iterator;
+    final List<(int, TextStyle)> styles = <(int, TextStyle)>[ (0, baseStyle) ];
     const List<Type> types = <Type>[
-      _Color, _TextDecorationColor, _TextDecorationStyle, _TextDecorationThickness, _TextDecorationUnderline, _TextDecorationOverline, _TextDecorationLineThrough,
-      _FontWeight, _FontStyle, _TextBaseline, _LeadingDistribution, _FontFamily, _FontFamilyFallback, _LetterSpacing, _WordSpacing, _Height, _Locale, _Foreground,
-      _Background, _Shadows, _FontFeatures, _FontVariations,
+      _Color, _TextDecorationColor, _TextDecorationStyle, _TextDecorationThickness, _TextDecorationUnderline,
+      _TextDecorationOverline, _TextDecorationLineThrough, _FontWeight, _FontStyle, _TextBaseline,
+      _LeadingDistribution, _FontFamily, _FontFamilyFallback, _FontSize, _LetterSpacing,
+      _WordSpacing, _Height, _Locale, _Foreground, _Background,
+      _Shadows, _FontFeatures, _FontVariations,
     ];
 
-    final List<_Node> runStartIndices = types.fold(<int>{}, (Set<int> set, Type type) {
-      final Iterable<_Node>? indices = _attributeStorage[type]?.ascending;
-      if (indices != null && indices.isNotEmpty) {
-        set.addAll(indices.map((_Node element) => element.key));
-      }
-      return set;
-    }).toList()..sort();
-
-
-
-
-
-    (int, ui.Color?)? color = _attributeStorage[_Color].ascending.iterator;
-    (int, ui.Color?)? decorationColor = (0, getAttributeAt<_TextDecorationColor>(0).$2?.decorationColor);
-    (int, ui.TextDecorationStyle?)? decorationStyle = (0, getAttributeAt<_TextDecorationStyle>(0).$2?.decorationStyle);
-    (int, double?)? decorationThickness = (0, getAttributeAt<_TextDecorationThickness>(0).$2?.decorationThickness);
-    (int, bool?)? textDecorationUnderline = (0, getAttributeAt<_TextDecorationUnderline>(0).$2?._enabled);
-    (int, bool?)? textDecorationOverline = (0, getAttributeAt<_TextDecorationOverline>(0).$2?._enabled);
-    (int, bool?)? textDecorationLineThrough = (0, getAttributeAt<_TextDecorationLineThrough>(0).$2?._enabled);
-    (int, FontWeight?)? fontWeight = (0, getAttributeAt<_FontWeight>(0).$2?.fontWeight);
-    (int, FontStyle?)? fontStyle = (0, getAttributeAt<_FontStyle>(0).$2?.fontStyle);
-    (int, TextBaseline?)? textBaseline = (0, getAttributeAt<_TextBaseline>(0).$2?.textBaseline);
-    (int, ui.TextLeadingDistribution?)? textLeadingDistribution = (0, getAttributeAt<_LeadingDistribution>(0).$2?.leadingDistribution);
-    (int, String?)? fontFamily = (0, getAttributeAt<_FontFamily>(0).$2?.fontFamily);
-    (int, List<String>?)? fontFamilyFallback = (0, getAttributeAt<_FontFamilyFallback>(0).$2?.fontFamilyFallback);
-    (int, double?)? letterSpacing = (0, getAttributeAt<_LetterSpacing>(0).$2?.letterSpacing);
-    (int, double?)? wordSpacing = (0, getAttributeAt<_WordSpacing>(0).$2?.wordSpacing);
-    (int, double?)? height = (0, getAttributeAt<_Height>(0).$2?.height);
-    (int, ui.Locale?)? locale = (0, getAttributeAt<_Locale>(0).$2?.locale);
-    (int, ui.Paint?)? foreground = (0, getAttributeAt<_Foreground>(0).$2?.foreground);
-    (int, ui.Paint?)? background = (0, getAttributeAt<_Background>(0).$2?.background);
-    (int, List<ui.Shadow>?)? shadows = (0, getAttributeAt<_Shadows>(0).$2?.shadows);
-    (int, List<ui.FontFeature>?)? fontFeatures = (0, getAttributeAt<_FontFeatures>(0).$2?.fontFeatures);
-    (int, List<ui.FontVariation>?)? fontVariations = (0, getAttributeAt<_FontVariations>(0).$2?.fontVariations);
-
-    final List<Iterator<_Node>> nonnullIterators = <Iterator<_Node>>[
-      if (colorIterator != null && colorIterator.moveNext()) colorIterator,
-      if (decorationColorIterator != null && decorationColorIterator.moveNext()) decorationColorIterator,
+    final List<_Iterator?> iterators = <_Iterator?>[
+      for (final Type type in types) _attributeStorage[type]?.ascendingIterator,
     ];
 
     int? findStyleRunStartIndex() {
-      nonnullIterators.fold(null, (int? currentMin, _Node node) {
-        return currentMin == null
-          ? node.key
-          : math.min(node.key, currentMin);
+      return iterators.fold(null, (int? currentMin, _Iterator? iterator) {
+        final int? startIndex = iterator?.current?.key;
+        return (startIndex == null || currentMin == null)
+          ? (startIndex ?? currentMin)
+          : math.min(startIndex, currentMin);
       });
     }
 
-    while (nonnullIterators.) {
+    bool underline = baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
+    bool overline = baseStyle.decoration?.contains(ui.TextDecoration.overline) ?? false;
+    bool lineThrough = baseStyle.decoration?.contains(ui.TextDecoration.overline) ?? false;
+
+    for (int? runStartIndex = findStyleRunStartIndex(); runStartIndex != null; runStartIndex = findStyleRunStartIndex()) {
+      final bool? newUnderline = iterators[4]?.emitStyleForRunAndIncrement(runStartIndex);
+      final bool? newOverline = iterators[5]?.emitStyleForRunAndIncrement(runStartIndex);
+      final bool? newLineThrough = iterators[6]?.emitStyleForRunAndIncrement(runStartIndex);
+      final ui.TextDecoration? decoration;
+      if (newUnderline != null || newOverline != null || newLineThrough != null) {
+        underline = newUnderline ?? underline;
+        overline = newOverline ?? overline;
+        lineThrough = newLineThrough ?? lineThrough;
+        decoration = ui.TextDecoration.combine(<ui.TextDecoration>[
+          if (underline) ui.TextDecoration.underline,
+          if (overline) ui.TextDecoration.overline,
+          if (lineThrough) ui.TextDecoration.lineThrough,
+        ]);
+      } else {
+        decoration = null;
+      }
+
       final TextStyle styleToPush = TextStyle(
-        color: colorIterator == null ?
+        color: iterators[0]?.emitStyleForRunAndIncrement(runStartIndex),
+        decorationColor: iterators[1]?.emitStyleForRunAndIncrement(runStartIndex),
+        decorationStyle: iterators[2]?.emitStyleForRunAndIncrement(runStartIndex),
+        decorationThickness: iterators[3]?.emitStyleForRunAndIncrement(runStartIndex),
+        decoration: decoration,
+        fontWeight: iterators[7]?.emitStyleForRunAndIncrement(runStartIndex),
+        fontStyle: iterators[8]?.emitStyleForRunAndIncrement(runStartIndex),
+        textBaseline: iterators[9]?.emitStyleForRunAndIncrement(runStartIndex),
+        leadingDistribution: iterators[10]?.emitStyleForRunAndIncrement(runStartIndex),
+        fontFamily: iterators[11]?.emitStyleForRunAndIncrement(runStartIndex),
+        fontFamilyFallback: iterators[12]?.emitStyleForRunAndIncrement(runStartIndex),
+        fontSize: iterators[13]?.emitStyleForRunAndIncrement(runStartIndex),
+        letterSpacing: iterators[14]?.emitStyleForRunAndIncrement(runStartIndex),
+        wordSpacing: iterators[15]?.emitStyleForRunAndIncrement(runStartIndex),
+        height: iterators[16]?.emitStyleForRunAndIncrement(runStartIndex),
+        locale: iterators[17]?.emitStyleForRunAndIncrement(runStartIndex),
+        foreground: iterators[18]?.emitStyleForRunAndIncrement(runStartIndex),
+        background: iterators[19]?.emitStyleForRunAndIncrement(runStartIndex),
+        shadows: iterators[20]?.emitStyleForRunAndIncrement(runStartIndex),
+        fontFeatures: iterators[21]?.emitStyleForRunAndIncrement(runStartIndex),
+        fontVariations: iterators[22]?.emitStyleForRunAndIncrement(runStartIndex),
       );
-    }
-
-    while (color  || decorationColor != null || decorationColor != null || decorationStyle != null || decorationThickness != null || textDecorationUnderline != null || ) {
-
+      styles.add((runStartIndex, styleToPush));
     }
 
     return styles;
