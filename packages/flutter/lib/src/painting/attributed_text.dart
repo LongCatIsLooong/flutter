@@ -27,6 +27,8 @@ final class _Node {
     : isBlack = true,
       height = (left?.height ?? 0) + 1;
 
+  //_Node.fromSortedList(List<(int, Object?)> sortedList);
+
   final int key;
   final Object? value;
   final bool isBlack;
