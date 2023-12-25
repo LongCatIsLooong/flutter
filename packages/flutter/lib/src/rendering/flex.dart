@@ -1005,6 +1005,7 @@ class RenderFlex extends RenderBox with ContainerRenderObjectMixin<RenderBox, Fl
             final double? distance = child.getDistanceToBaseline(textBaseline!, onlyReal: true);
             if (distance != null) {
               childCrossPosition = maxBaselineDistance - distance;
+              print('child height: ${child.size.height} baseline: $distance, maxBaseline: $maxBaselineDistance, diff = $childCrossPosition');
             } else {
               childCrossPosition = 0.0;
             }

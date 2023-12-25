@@ -1058,7 +1058,7 @@ class TextPainter {
   /// Valid only after [layout] has been called.
   double computeDistanceToActualBaseline(TextBaseline baseline) {
     assert(_debugAssertTextLayoutIsValid);
-    return _layoutCache!.layout.getDistanceToBaseline(baseline);
+    return _layoutCache!.layout.getDistanceToBaseline(baseline) + _layoutCache!.paintOffset.dy;
   }
 
   /// Whether any text was truncated or ellipsized.
