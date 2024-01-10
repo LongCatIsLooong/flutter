@@ -8,42 +8,100 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/src/foundation/persistent_rb_tree.dart';
 
-import 'attributed_text.dart';
 import 'text_style.dart';
 
-final class TypographicAnnotations implements RandomAccesssibleStringAnnotation<TypographicAnnotation>, IterableStringAnnotation<TextStyle> {
-  TypographicAnnotations._(this._fontWeights);
+final class _Iterator {
+  _Iterator(this._nodes) : assert(_nodes.isNotEmpty);
+  final List<RBTree<Object>> _nodes;
+  int _currentIndex = 0;
 
-  final RBTreeNode<ui.FontWeight> _fontWeights;
+  RBTree<Object>? get current => _currentIndex >= _nodes.length ? null : _nodes[_currentIndex];
+}
 
-  @override
-  (int, TypographicAnnotation) getAnnotationAt(int index) {
-    final weight = _fontWeights.getNodeLessThanOrEqualTo(index)?.value;
-  }
+@immutable
+class TypographicAnnotations {
+  TypographicAnnotations._(
+    this.fontFamily,
+    this.fontFamilyFallback,
+    this.locale,
+    this.fontWeights,
+    this.fontStyle,
+    this.fontFeatures,
+    this.fontVariations,
+    this.textBaseline,
+    this.textLeadingDistribution,
+    this.fontSize,
+    this.height,
+    this.letterSpacing,
+    this.wordSpacing,
+  );
 
-  @override
-  Iterator<(int, TextStyle)> iterator([int startIndex = 0]) {
-  }
+  final RBTree<String> fontFamily;
+  final RBTree<List<String>> fontFamilyFallback;
+  final RBTree<ui.Locale> locale;
+
+  final RBTree<ui.FontWeight> fontWeights;
+  final RBTree<ui.FontStyle> fontStyle;
+  final PersistentHashMap<String, RBTree<int>> fontFeatures;
+  final PersistentHashMap<String, RBTree<double>> fontVariations;
+
+  final RBTree<ui.TextBaseline> textBaseline;
+  final RBTree<ui.TextLeadingDistribution> textLeadingDistribution;
+
+  final RBTree<double> fontSize;
+  final RBTree<double> height;
+  final RBTree<double> letterSpacing;
+  final RBTree<double> wordSpacing;
+
+  //(int, TypographicAnnotation) getAnnotationAt(int index) {
+  //  final weight = fontWeights.getNodeLessThanOrEqualTo(index)?.value;
+  //}
+
+  //Iterator<(int, TextStyle)> iterator([int startIndex = 0]) {
+  //}
+}
+
+final class TextPaintAnnotations {
+  TextPaintAnnotations(
+    this.underline,
+    this.overline,
+    this.lineThrough,
+    this.decorationColor,
+    this.decorationStyle,
+    this.decorationThickness,
+    this.shadow,
+  );
+
+  final RBTree<bool> underline;
+  final RBTree<bool> overline;
+  final RBTree<bool> lineThrough;
+
+  final RBTree<ui.Color> decorationColor;
+  final RBTree<ui.TextDecorationStyle> decorationStyle;
+  final RBTree<double> decorationThickness;
+
+  final RBTree<ui.Shadow> shadow;
 }
 
 typedef TypographicAnnotation = ({
   ui.FontWeight fontWeight,
   ui.FontStyle fontStyle,
+  PersistentHashMap<String, int> fontFeatures,
+  PersistentHashMap<String, double> fontVariations,
 
   ui.TextBaseline textBaseline,
   ui.TextLeadingDistribution textLeadingDistribution,
+
   String fontFamily,
   List<String> fontFamilyFallback,
   ui.Locale locale,
+
   double fontSize,
   double height,
-
   double letterSpacing,
   double wordSpacing,
-
-  PersistentHashMap<String, int> fontFeatures,
-  PersistentHashMap<String, double> fontVariations,
 });
+
 
 typedef TextPaintAnnotation = ({
   ui.Paint foregroundPainter,

@@ -2,44 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:math' as math;
-import 'dart:ui' as ui;
-
 import 'package:flutter/foundation.dart';
-import 'package:flutter/src/foundation/persistent_rb_tree.dart';
-
-import 'text_style.dart';
 
 /// An immutable
 class AnnotatedString {
-  const AnnotatedString._(this.text, [this._attributeStorage = const PersistentHashMap<Type, RBTreeNode<Object>>.empty()]);
+  const AnnotatedString._(this.string, [this._attributeStorage = const PersistentHashMap<Type, Object?>.empty()]);
 
-  final String text;
-  final PersistentHashMap<Type, RBTreeNode<Object>> _attributeStorage;
+  final String string;
 
-  (int, Annotation) getAnnotationAt<Annotation, AnnotationType extends RandomAccesssibleStringAnnotation<Annotation>>(int index) {
+  // The PersistentHashMap class currently does not have a delete method.
+  final PersistentHashMap<Type, Object?> _attributeStorage;
 
+   // Read annotations of a specific type.
+  T? getAnnotationOfType<T extends Object>() => _attributeStorage[T] as T?;
+
+  /// Update annotations of a specific type `T` and return a new [AnnotatedString].
+  ///
+  /// The static type `T` is used as the key insead of the runtime type of
+  /// newAnnotations, in case newAnnotations is null (and for consistency too).
+  AnnotatedString setAnnotationOfType<T extends Object>(T? newAnnotations) {
+    return AnnotatedString._(string, _attributeStorage.put(T, newAnnotations));
   }
-}
-
-abstract class RandomAccesssibleStringAnnotation<Annotation extends Object?> {
-  (int, Annotation) getAnnotationAt(int index);
-}
-
-abstract class IterableStringAnnotation<Annotation extends Object?> {
-  Iterator<(int, Annotation)> iterator([int startIndex = 0]);
-}
-
-abstract class ReplaceableStringAnnotation<Self extends ReplaceableStringAnnotation<Self, T>, T> {
-  Self replace(ui.TextRange range, T? newAnnotation, {int? newLength});
-}
-
-final class _Iterator {
-  _Iterator(this._nodes) : assert(_nodes.isNotEmpty);
-  final List<RBTreeNode<Object>> _nodes;
-  int _currentIndex = 0;
-
-  RBTreeNode<Object>? get current => _currentIndex >= _nodes.length ? null : _nodes[_currentIndex];
 }
 
 /// A node in a persistent red-black tree.
@@ -367,4 +350,3 @@ final class _Iterator {
   //  return styles;
   //}
 
-}
