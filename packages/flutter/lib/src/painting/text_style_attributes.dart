@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:math' as math show max;
+import 'dart:math' as math show min, max;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -10,59 +10,179 @@ import 'package:flutter/src/foundation/persistent_rb_tree.dart';
 
 import 'text_style.dart';
 
-final class _Iterator {
-  _Iterator(this._nodes) : assert(_nodes.isNotEmpty);
-  final List<RBTree<Object>> _nodes;
-  int _currentIndex = 0;
+typedef _TextStyleAttribute<T extends Object> = ({
+  RBTree<T?> attribute,
+  TextStyle Function(T attribute) lift,
+});
 
-  RBTree<Object>? get current => _currentIndex >= _nodes.length ? null : _nodes[_currentIndex];
+class _IndexedTextStyleIterator {
+  _IndexedTextStyleIterator(this.list) : assert(list.isNotEmpty);
+  final List<(int, TextStyle)> list;
+  // Being negative means this has reached end.
+  int nextIndex = 0;
+  (int, TextStyle)? get currentValue => nextIndex >= 0 ? list[nextIndex] : null;
+
+  TextStyle? consume(int index) {
+    final currentValue = this.currentValue;
+    if (currentValue == null) {
+      return null;
+    }
+    final (int nextStart, TextStyle style) = currentValue;
+    if (nextStart > index) {
+      return null;
+    }
+    assert(nextStart == index);
+    nextIndex += 1;
+    if (nextStart >= list.length) {
+      nextIndex = -1;
+    }
+    return style;
+  }
 }
+
+const TypographicAnnotation defaultTypographicAnnotation = (
+  fontWeight: ui.FontWeight.w400,
+  fontStyle: ui.FontStyle.normal,
+  fontFeatures: [],
+  fontVariations: [],
+
+  textBaseline: ui.TextBaseline.alphabetic,
+  textLeadingDistribution: ui.TextLeadingDistribution.proportional,
+
+  fontFamilies: <String>[''],
+  locale: '',
+
+  fontSize: 14.0,
+  height: null,
+  letterSpacing: 0.0,
+  wordSpacing: 0.0,
+);
 
 @immutable
 class TypographicAnnotations {
   TypographicAnnotations._(
-    this.fontFamily,
-    this.fontFamilyFallback,
-    this.locale,
-    this.fontWeights,
-    this.fontStyle,
-    this.fontFeatures,
-    this.fontVariations,
-    this.textBaseline,
-    this.textLeadingDistribution,
-    this.fontSize,
-    this.height,
-    this.letterSpacing,
-    this.wordSpacing,
+    this._fontFamilies,
+    this._locale,
+    this._fontWeight,
+    this._fontStyle,
+    this._fontFeatures,
+    this._fontVariations,
+    this._textBaseline,
+    this._textLeadingDistribution,
+    this._fontSize,
+    this._height,
+    this._letterSpacing,
+    this._wordSpacing,
+    this.defaults,
   );
 
-  final RBTree<String> fontFamily;
-  final RBTree<List<String>> fontFamilyFallback;
-  final RBTree<ui.Locale> locale;
+  final TypographicAnnotation defaults;
 
-  final RBTree<ui.FontWeight> fontWeights;
-  final RBTree<ui.FontStyle> fontStyle;
-  final PersistentHashMap<String, RBTree<int>> fontFeatures;
-  final PersistentHashMap<String, RBTree<double>> fontVariations;
+  final _TextStyleAttribute<List<String>> _fontFamilies;
+  final _TextStyleAttribute<ui.Locale> _locale;
 
-  final RBTree<ui.TextBaseline> textBaseline;
-  final RBTree<ui.TextLeadingDistribution> textLeadingDistribution;
+  final _TextStyleAttribute<ui.FontWeight> _fontWeight;
+  final _TextStyleAttribute<ui.FontStyle> _fontStyle;
+  final PersistentHashMap<String, RBTree<int>> _fontFeatures;
+  final PersistentHashMap<String, RBTree<double>> _fontVariations;
 
-  final RBTree<double> fontSize;
-  final RBTree<double> height;
-  final RBTree<double> letterSpacing;
-  final RBTree<double> wordSpacing;
+  final _TextStyleAttribute<ui.TextBaseline> _textBaseline;
+  final _TextStyleAttribute<ui.TextLeadingDistribution> _textLeadingDistribution;
 
-  //(int, TypographicAnnotation) getAnnotationAt(int index) {
-  //  final weight = fontWeights.getNodeLessThanOrEqualTo(index)?.value;
-  //}
+  final _TextStyleAttribute<double> _fontSize;
+  final _TextStyleAttribute<double> _height;
+  final _TextStyleAttribute<double> _letterSpacing;
+  final _TextStyleAttribute<double> _wordSpacing;
 
-  //Iterator<(int, TextStyle)> iterator([int startIndex = 0]) {
-  //}
+  (int, TextStyle?) getAnnotationAt(int index) {
+    (int, TextStyle?) lift<T extends Object>(_TextStyleAttribute<T> attribute) {
+      final RBTree<T?>? value = attribute.attribute.getNodeLessThanOrEqualTo(index);
+      final T? v = value?.value;
+      final TextStyle? style = v == null ? null : attribute.lift(v);
+      return (value?.key ?? 0, style);
+    }
+    final xs = [
+      lift(_fontFamilies),
+      lift(_locale),
+      lift(_fontWeight),
+      lift(_fontStyle),
+      lift(_textBaseline),
+      lift(_textLeadingDistribution),
+      lift(_fontSize),
+      lift(_height),
+      lift(_letterSpacing),
+      lift(_wordSpacing),
+      //..._f
+    ];
+    int styleIndex = 0;
+    TextStyle? textStyle;
+    for (final (int index, TextStyle? style) in xs) {
+      styleIndex = math.max(index, styleIndex);
+      textStyle = textStyle?.merge(style) ?? style;
+    }
+    return (styleIndex, textStyle);
+  }
+
+  static List<(int, Value)> _serializeToList<Value>(RBTree<Value>? tree, int startingKey, [List<(int, Value)> list = const <(int, Value)>[]]) {
+    if (tree == null) {
+      return list;
+    }
+    if (startingKey < tree.key) {
+      _serializeToList(tree.left, startingKey, list);
+    }
+    if (startingKey <= tree.key) {
+      list.add((tree.key, tree.value));
+    }
+    _serializeToList(tree.right, startingKey, list);
+    return list;
+  }
+
+  static List<(int, TextStyle?)> _merge(Iterable<_IndexedTextStyleIterator> iterators) {
+    int? runStartIndex = 0;
+    final List<(int, TextStyle?)> returnValue = <(int, TextStyle?)>[];
+    while (runStartIndex != null) {
+      int? nextRunStartIndex;
+      TextStyle? runTextStyle;
+      for (final iterator in iterators) {
+        runTextStyle = iterator.consume(runStartIndex)?.merge(runTextStyle) ?? runTextStyle;
+        final iteratorNextIndex = iterator.nextIndex;
+        if (iteratorNextIndex >= 0 && (nextRunStartIndex == null || iteratorNextIndex < nextRunStartIndex)) {
+          nextRunStartIndex = iteratorNextIndex;
+        }
+      }
+      runStartIndex = nextRunStartIndex;
+    }
+    return returnValue;
+  }
+
+  List<(int, TextStyle?)> getIterable( [int startIndex = 0]) {
+    Iterable<(int, TextStyle)> lift<T extends Object>(_TextStyleAttribute<T> attribute) {
+      (int, TextStyle) mapEntry((int, T?) entry) {
+        final T? value = entry.$2;
+        return (entry.$1, value == null ? null : attribute.lift(value));
+      }
+      return _serializeToList(attribute.attribute, startIndex).map(mapEntry);
+    }
+
+    final xs = [
+      //lift(_fontFamilies),
+      lift(_locale),
+      lift(_fontWeight),
+      lift(_fontStyle),
+      lift(_textBaseline),
+      lift(_textLeadingDistribution),
+      lift(_fontSize),
+      lift(_height),
+      lift(_letterSpacing),
+      lift(_wordSpacing),
+      //..._f
+    ].where((element) => element.isNotEmpty).map((e) => e.toList()).map(_IndexedTextStyleIterator.new);
+    return _merge(xs);
+  }
 }
 
-final class TextPaintAnnotations {
-  TextPaintAnnotations(
+final class TextPaintStyle {
+  TextPaintStyle(
     this.underline,
     this.overline,
     this.lineThrough,
@@ -114,248 +234,3 @@ typedef TextPaintAnnotation = ({
   double decorationThickness,
 });
 
-//sealed class TextStyleAttribute<T extends Object> implements TextAttribute {
-//  TextStyleAttribute(this.value);
-//
-//  final T value;
-//
-//  static List<TextStyleAttribute<Object>> _fromTextStyle(TextStyle style) {
-//    final ui.Paint? background = switch ((style.background, style.backgroundColor)) {
-//      (final ui.Paint paint, _) => paint,
-//      (_, final ui.Color color) => ui.Paint()..color = color,
-//      _ => null,
-//    };
-//
-//    final ui.TextDecoration? decoration = style.decoration;
-//    final List<TextStyleAttribute<Object>>? decorations = switch (decoration) {
-//      null => null,
-//      ui.TextDecoration.none => <TextStyleAttribute<Object>>[
-//        TextDecorationAttribute.noLineThrough,
-//        TextDecorationAttribute.noUnderline,
-//        TextDecorationAttribute.noOverline,
-//      ],
-//      _ => <TextStyleAttribute<Object>>[
-//        if (decoration.contains(ui.TextDecoration.underline)) TextDecorationAttribute.underline,
-//        if (decoration.contains(ui.TextDecoration.overline)) TextDecorationAttribute.overline,
-//        if (decoration.contains(ui.TextDecoration.lineThrough)) TextDecorationAttribute.lineThrough,
-//      ],
-//    };
-//
-//    return <TextStyleAttribute<Object>>[
-//      if (style.color != null) _Color(style.color!),
-//      if (style.foreground != null) _Foreground(style.foreground!),
-//      if (background != null) _Background(background),
-//      if (style.shadows != null) _Shadows(style.shadows!),
-//
-//      // Make sure the TextDecorations are additive.
-//      if (decorations != null) ...decorations,
-//      if (style.decorationColor != null) _TextDecorationColor(style.decorationColor!),
-//      if (style.decorationStyle != null) _TextDecorationStyle(style.decorationStyle!),
-//      if (style.decorationThickness != null) _TextDecorationThickness(style.decorationThickness!),
-//
-//      if (style.fontWeight != null) _FontWeight(style.fontWeight!),
-//      if (style.fontStyle != null) _FontStyle(style.fontStyle!),
-//      if (style.textBaseline != null) _TextBaseline(style.textBaseline!),
-//      if (style.leadingDistribution != null) _LeadingDistribution(style.leadingDistribution!),
-//      if (style.fontFamily != null) _FontFamily(style.fontFamily!),
-//      if (style.fontFamilyFallback != null) _FontFamilyFallback(style.fontFamilyFallback!),
-//      if (style.fontSize != null) _FontSize(style.fontSize!),
-//      if (style.letterSpacing != null) _LetterSpacing(style.letterSpacing!),
-//      if (style.wordSpacing != null) _WordSpacing(style.wordSpacing!),
-//      if (style.height != null) _Height(style.height!),
-//      if (style.locale != null) _Locale(style.locale!),
-//      if (style.fontFeatures != null) _FontFeatures(style.fontFeatures!),
-//      if (style.fontVariations != null) _FontVariations(style.fontVariations!),
-//    ];
-//  }
-//
-//
-//  @pragma('vm:prefer-inline')
-//  T? _getStyleAttributeOfType<T extends TextAttribute>(int index, void Function(int? key) callback) {
-//    final _Node? node = _attributeStorage[T]?.getNodeLessThanOrEqualTo(index);
-//    if (node == null) {
-//      return null;
-//    }
-//    callback(node.key);
-//    return node.value as T?;
-//  }
-//
-//  // not a good API?
-//  (int, TextStyle) getTextStyleAt(int index) {
-//    assert(0 <= index);
-//    assert(index < text.length);
-//
-//    int startIndex = 0;
-//    void updateIndex(int? key) {
-//      if (key != null) {
-//        startIndex = math.max(key, startIndex);
-//      }
-//    }
-//    final bool? lineThrough = _getStyleAttributeOfType<_TextDecorationLineThrough>(startIndex, updateIndex)?.value;
-//    final bool? overline = _getStyleAttributeOfType<_TextDecorationOverline>(startIndex, updateIndex)?.value;
-//    final bool? underline = _getStyleAttributeOfType<_TextDecorationUnderline>(startIndex, updateIndex)?.value;
-//    final ui.TextDecoration decoration = ui.TextDecoration.combine(<ui.TextDecoration>[
-//    ]);
-//
-//    final TextStyle textStyle = TextStyle(
-//      color: _getStyleAttributeOfType<_Color>(startIndex, updateIndex)?.value,
-//      decorationColor: _getStyleAttributeOfType<_TextDecorationColor>(startIndex, updateIndex)?.value,
-//      decorationStyle: _getStyleAttributeOfType<_TextDecorationStyle>(startIndex, updateIndex)?.value,
-//      decorationThickness: _getStyleAttributeOfType<_TextDecorationThickness>(startIndex, updateIndex)?.value,
-//      //decoration: ui.T,
-//      fontWeight: _getStyleAttributeOfType<_FontWeight>(startIndex, updateIndex)?.value,
-//      fontStyle: _getStyleAttributeOfType<_FontStyle>(startIndex, updateIndex)?.value,
-//      textBaseline: _getStyleAttributeOfType<_TextBaseline>(startIndex, updateIndex)?.value,
-//      leadingDistribution: _getStyleAttributeOfType<_LeadingDistribution>(startIndex, updateIndex)?.value,
-//      fontFamily: _getStyleAttributeOfType<_FontFamily>(startIndex, updateIndex)?.value,
-//      fontFamilyFallback: _getStyleAttributeOfType<_FontFamilyFallback>(startIndex, updateIndex)?.value,
-//      fontSize: _getStyleAttributeOfType<_FontSize>(startIndex, updateIndex)?.value,
-//      letterSpacing: _getStyleAttributeOfType<_LetterSpacing>(startIndex, updateIndex)?.value,
-//      wordSpacing: _getStyleAttributeOfType<_WordSpacing>(startIndex, updateIndex)?.value,
-//      height: _getStyleAttributeOfType<_Height>(startIndex, updateIndex)?.value,
-//      locale: _getStyleAttributeOfType<_Locale>(startIndex, updateIndex)?.value,
-//      foreground: _getStyleAttributeOfType<_Foreground>(startIndex, updateIndex)?.value,
-//      background: _getStyleAttributeOfType<_Background>(startIndex, updateIndex)?.value,
-//      shadows: _getStyleAttributeOfType<_Shadows>(startIndex, updateIndex)?.value,
-//      fontFeatures: _getStyleAttributeOfType<_FontFeatures>(startIndex, updateIndex)?.value,
-//      fontVariations: _getStyleAttributeOfType<_FontVariations>(startIndex, updateIndex)?.value,
-//    );
-//    return (startIndex, textStyle);
-//  }
-//
-//  @protected
-//  @override
-//  late final Object key = runtimeType;
-//}
-//
-//final class _FontWeight extends TextStyleAttribute<ui.FontWeight> {
-//  _FontWeight(super.value);
-//}
-//
-//final class _FontStyle extends TextStyleAttribute<ui.FontStyle> {
-//  _FontStyle(super.value);
-//}
-//
-//final class _TextBaseline extends TextStyleAttribute<ui.TextBaseline> {
-//  _TextBaseline(super.value);
-//}
-//
-//final class _LeadingDistribution extends TextStyleAttribute<ui.TextLeadingDistribution> {
-//  _LeadingDistribution(super.value);
-//}
-//
-//final class _FontFamily extends TextStyleAttribute<String> {
-//  _FontFamily(super.value);
-//}
-//
-//final class _FontFamilyFallback extends TextStyleAttribute<List<String>> {
-//  _FontFamilyFallback(super.value);
-//}
-//
-//final class _FontSize extends TextStyleAttribute<double> {
-//  _FontSize(super.value);
-//}
-//
-//final class _LetterSpacing extends TextStyleAttribute<double> {
-//  _LetterSpacing(super.value);
-//}
-//
-//final class _WordSpacing extends TextStyleAttribute<double> {
-//  _WordSpacing(super.value);
-//}
-//
-//final class _Height extends TextStyleAttribute<double> {
-//  _Height(super.value);
-//}
-//
-//final class _FontFeatures extends TextStyleAttribute<List<ui.FontFeature>> {
-//  _FontFeatures(super.value);
-//}
-//
-//final class _FontVariations extends TextStyleAttribute<List<ui.FontVariation>> {
-//  _FontVariations(super.value);
-//}
-//
-//final class _Color extends TextStyleAttribute<ui.Color> {
-//  _Color(super.value);
-//}
-//
-//sealed class TextDecorationAttribute extends TextStyleAttribute<bool> {
-//  TextDecorationAttribute._(super.value);
-//
-//  static final TextDecorationAttribute underline = _TextDecorationUnderline(true);
-//  static final TextDecorationAttribute noUnderline = _TextDecorationUnderline(false);
-//  static final TextDecorationAttribute overline = _TextDecorationOverline(true);
-//  static final TextDecorationAttribute noOverline = _TextDecorationOverline(false);
-//  static final TextDecorationAttribute lineThrough = _TextDecorationLineThrough(true);
-//  static final TextDecorationAttribute noLineThrough = _TextDecorationLineThrough(false);
-//}
-//
-//final class _TextDecorationUnderline extends TextDecorationAttribute {
-//  _TextDecorationUnderline(super._enabled) : super._();
-//}
-//final class _TextDecorationOverline extends TextDecorationAttribute {
-//  _TextDecorationOverline(super._enabled) : super._();
-//}
-//final class _TextDecorationLineThrough extends TextDecorationAttribute {
-//  _TextDecorationLineThrough(super._enabled) : super._();
-//}
-//
-//final class _TextDecorationColor extends TextStyleAttribute<ui.Color> {
-//  _TextDecorationColor(super.value);
-//}
-//
-//final class _TextDecorationStyle extends TextStyleAttribute<ui.TextDecorationStyle> {
-//  _TextDecorationStyle(super.value);
-//}
-//
-//final class _TextDecorationThickness extends TextStyleAttribute<double> {
-//  _TextDecorationThickness(super.value);
-//}
-//
-//final class _Foreground extends TextStyleAttribute<ui.Paint> {
-//  _Foreground(super.value);
-//}
-//
-//final class _Background extends TextStyleAttribute<ui.Paint> {
-//  _Background(super.value);
-//}
-//
-//final class _Shadows extends TextStyleAttribute<List<ui.Shadow>> {
-//  _Shadows(super.value);
-//}
-//
-//sealed class SemanticsAttribute implements TextAttribute {
-//  factory SemanticsAttribute.locale(ui.Locale locale) = _Locale;
-//
-//  static const SemanticsAttribute spellOut = _SpellOut();
-//}
-//
-//final class _SpellOut implements SemanticsAttribute {
-//  const _SpellOut();
-//
-//  @override
-//  Object get key => runtimeType;
-//}
-//
-//final class _Locale implements SemanticsAttribute, TextStyleAttribute<ui.Locale> {
-//  const _Locale(this.value);
-//
-//  @override
-//  final ui.Locale value;
-//
-//  @override
-//  Object get key => runtimeType;
-//}
-//
-////final class PlaceholderStyleAttribute extends _TextStyleAttribute {
-////}
-//
-//class HitTestableText implements SemanticsAttribute, HitTestTarget {
-//  @override
-//  void handleEvent(PointerEvent event, HitTestEntry entry) {
-//  }
-//
-//  @override
-//  Object get key => runtimeType;
-//}

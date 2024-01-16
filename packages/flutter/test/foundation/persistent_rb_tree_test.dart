@@ -11,7 +11,7 @@ List<RBTree<Value>> toSortedList<Value>(RBTree<Value> tree, { int startingKey = 
   final List<RBTree<Value>> list = <RBTree<Value>>[];
   tree.visitAscending((RBTree<Value> node) {
     list.add(node);
-    return false;
+    return true;
   }, startingKey);
   return list;
 }
@@ -19,53 +19,60 @@ List<RBTree<Value>> toSortedList<Value>(RBTree<Value> tree, { int startingKey = 
 void main() {
   group('RBTree constructors', () {
     test('red constructor checks for BST invariants', () {
-      final RBTree<Object?> less = RBTree<Object?>.black(0, null);
-      final RBTree<Object?> more = RBTree<Object?>.black(100, null);
-      final RBTree<Object?> mid = RBTree<Object?>.black(50, null);
+      final _TestTree less = _TestTree.black(0, null);
+      final _TestTree more = _TestTree.black(100, null);
+      final _TestTree mid = _TestTree.black(50, null);
 
-      expect(() => RBTree<Object?>.red(50, null, left: mid), throwsAssertionError);
-      expect(() => RBTree<Object?>.red(50, null, right: mid), throwsAssertionError);
-      expect(() => RBTree<Object?>.red(50, null, left: mid, right: mid), throwsAssertionError);
-      expect(() => RBTree<Object?>.red(50, null, right: less), throwsAssertionError);
-      expect(() => RBTree<Object?>.red(50, null, left: more, right: less), throwsAssertionError);
+      expect(() => _TestTree.red(50, null, left: mid), throwsAssertionError);
+      expect(() => _TestTree.red(50, null, right: mid), throwsAssertionError);
+      expect(() => _TestTree.red(50, null, left: mid, right: mid), throwsAssertionError);
+      expect(() => _TestTree.red(50, null, right: less), throwsAssertionError);
+      expect(() => _TestTree.red(50, null, left: more, right: less), throwsAssertionError);
 
-      expect(() => RBTree<Object?>.red(50, null, left: less, right: more), returnsNormally);
+      expect(() => _TestTree.red(50, null, left: less, right: more), returnsNormally);
     });
 
     test('black constructor checks for BST invariants', () {
-      final RBTree<Object?> less = RBTree<Object?>.black(0, null);
-      final RBTree<Object?> more = RBTree<Object?>.black(100, null);
-      final RBTree<Object?> mid = RBTree<Object?>.black(50, null);
+      final _TestTree less = _TestTree.red(0, null);
+      final _TestTree more = _TestTree.red(100, null);
+      final _TestTree mid = _TestTree.red(50, null);
 
-      expect(() => RBTree<Object?>.black(50, null, left: mid), throwsAssertionError);
-      expect(() => RBTree<Object?>.black(50, null, right: mid), throwsAssertionError);
-      expect(() => RBTree<Object?>.black(50, null, left: mid, right: mid), throwsAssertionError);
-      expect(() => RBTree<Object?>.black(50, null, right: less), throwsAssertionError);
-      expect(() => RBTree<Object?>.black(50, null, left: more, right: less), throwsAssertionError);
+      expect(() => _TestTree.black(50, null, left: mid), throwsAssertionError);
+      expect(() => _TestTree.black(50, null, right: mid), throwsAssertionError);
+      expect(() => _TestTree.black(50, null, left: mid, right: mid), throwsAssertionError);
+      expect(() => _TestTree.black(50, null, right: less), throwsAssertionError);
+      expect(() => _TestTree.black(50, null, left: more, right: less), throwsAssertionError);
 
-      expect(() => RBTree<Object?>.black(50, null, left: less, right: more), returnsNormally);
+      expect(() => _TestTree.black(50, null, left: less, right: more), returnsNormally);
+    });
+
+    test('red constructor checks for black violations', () {
+      final _TestTree child1 = _TestTree.red(0, null);
+      final _TestTree child2 = _TestTree.black(100, null);
+
+      expect(() => _TestTree.red(50, null, left: child1), returnsNormally);
+      expect(() => _TestTree.red(50, null, left: child1, right: child2), throwsAssertionError);
+      expect(() => _TestTree.red(50, null, right: child2), throwsAssertionError);
+    });
+
+    test('black constructor checks for black violations', () {
+      final _TestTree child1 = _TestTree.black(0, null);
+      final _TestTree child2 = _TestTree.black(100, null);
+
+      expect(() => _TestTree.black(50, null, left: child1, right: child2), returnsNormally);
+      expect(() => _TestTree.black(50, null, left: child1), throwsAssertionError);
+      expect(() => _TestTree.black(50, null, right: child2), throwsAssertionError);
     });
 
     test('fromSortedList expects a non-empty sorted list', () {
-      expect(() => RBTree<Object?>.fromSortedList(const <(int, Object?)>[]), throwsAssertionError);
+      expect(() => _TestTree.fromSortedList(const <(int, Object?)>[]), throwsAssertionError);
 
-      expect(() => RBTree<Object?>.fromSortedList(const <(int, Object?)>[(0, null)]), returnsNormally);
-
-      // Duplications are not allowed.
-      expect(() => RBTree<Object?>.fromSortedList(const <(int, Object?)>[(0, null), (0, null)]), throwsAssertionError);
-      expect(() => RBTree<Object?>.fromSortedList(const <(int, Object?)>[(1, null), (0, null)]), throwsAssertionError);
-      expect(() => RBTree<Object?>.fromSortedList(const <(int, Object?)>[(0, null), (1, null)]), returnsNormally);
-    });
-
-    test('fromSortedList expects a non-empty sorted list', () {
-      expect(() => RBTree<Object?>.fromSortedList(const <(int, Object?)>[]), throwsAssertionError);
-
-      expect(() => RBTree<Object?>.fromSortedList(const <(int, Object?)>[(0, null)]), returnsNormally);
+      expect(() => _TestTree.fromSortedList(const <(int, Object?)>[(0, null)]), returnsNormally);
 
       // Duplications are not allowed.
-      expect(() => RBTree<Object?>.fromSortedList(const <(int, Object?)>[(0, null), (0, null)]), throwsAssertionError);
-      expect(() => RBTree<Object?>.fromSortedList(const <(int, Object?)>[(1, null), (0, null)]), throwsAssertionError);
-      expect(() => RBTree<Object?>.fromSortedList(const <(int, Object?)>[(0, null), (1, null)]), returnsNormally);
+      expect(() => _TestTree.fromSortedList(const <(int, Object?)>[(0, null), (0, null)]), throwsAssertionError);
+      expect(() => _TestTree.fromSortedList(const <(int, Object?)>[(1, null), (0, null)]), throwsAssertionError);
+      expect(() => _TestTree.fromSortedList(const <(int, Object?)>[(0, null), (1, null)]), returnsNormally);
     });
 
     test('fromSortedList constructs a rb tree', () {
@@ -114,6 +121,70 @@ void main() {
       expect(tree.getNodeGreaterThan(1)?.key, 4);
       expect(tree.getNodeGreaterThan(0)?.key, 1);
       expect(tree.getNodeGreaterThan(-1)?.key, 0);
+    });
+  });
+
+  group('RB operations', () {
+    int getKey<Value>(RBTree<Value> tree) => tree.key;
+
+    test('insert', () {
+      _TestTree testTree = _TestTree.red(50, null);
+      List<int> insertAndFlatten(Iterable<int> keys) {
+        for (final int key in keys) {
+          testTree = testTree.insert(key, null);
+        }
+        return toSortedList(testTree).map(getKey).toList();
+      }
+
+      expect(toSortedList(testTree).map(getKey), <int>[50]);
+
+      expect(insertAndFlatten(List<int>.generate(5, (int index) => 51 + index * index)), <int>[50, 51, 52, 55, 60, 67]);
+      expect(insertAndFlatten(List<int>.generate(5, (int index) => index * index)), <int>[0, 1, 4, 9, 16, 50, 51, 52, 55, 60, 67]);
+      expect(insertAndFlatten(<int>[100]), <int>[0, 1, 4, 9, 16, 50, 51, 52, 55, 60, 67, 100]);
+      expect(insertAndFlatten(<int>[49]), <int>[0, 1, 4, 9, 16, 49, 50, 51, 52, 55, 60, 67, 100]);
+      // Duplicates
+      expect(
+        insertAndFlatten(<int>[0, 1, 4, 9, 16, 49, 50, 51, 52, 55, 60, 67, 100]),
+        <int>[0, 1, 4, 9, 16, 49, 50, 51, 52, 55, 60, 67, 100],
+      );
+    });
+
+    test('join', () {
+      // Right joins a taller tree.
+      _TestTree leftTree = _TestTree.fromSortedList(<(int, void)>[for (int i = 0; i < 5; i++) (i, null)]);
+      _TestTree rightTree = _TestTree.fromSortedList(<(int, void)>[for (int i = 50; i < 85; i++) (i, null)]);
+      expect(
+        toSortedList(leftTree.join(rightTree, 10, null)).map(getKey),
+        <int>[
+          for (int i = 0; i < 5; i++) i,
+          10,
+          for (int i = 50; i < 85; i++) i,
+        ],
+      );
+
+      // Right joins a shorter tree.
+      leftTree = _TestTree.fromSortedList(<(int, void)>[for (int i = 0; i < 55; i++) (i, null)]);
+      rightTree = _TestTree.fromSortedList(<(int, void)>[for (int i = 80; i < 88; i++) (i, null)]);
+      expect(
+        toSortedList(leftTree.join(rightTree, 60, null)).map(getKey),
+        <int>[
+          for (int i = 0; i < 55; i++) i,
+          60,
+          for (int i = 80; i < 88; i++) i,
+        ],
+      );
+
+      // Right joins a tree of the same height.
+      leftTree = _TestTree.fromSortedList(<(int, void)>[for (int i = 0; i < 18; i++) (i, null)]);
+      rightTree = _TestTree.fromSortedList(<(int, void)>[for (int i = 80; i < 88; i++) (i, null)]);
+      expect(
+        toSortedList(leftTree.join(rightTree, 60, null)).map(getKey),
+        <int>[
+          for (int i = 0; i < 18; i++) i,
+          60,
+          for (int i = 80; i < 88; i++) i,
+        ],
+      );
     });
   });
 }

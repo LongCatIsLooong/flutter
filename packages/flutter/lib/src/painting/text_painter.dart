@@ -18,6 +18,7 @@ import 'dart:ui' as ui show
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'attributed_text.dart';
 import 'basic_types.dart';
 import 'inline_span.dart';
 import 'placeholder_span.dart';
@@ -702,6 +703,20 @@ class TextPainter {
       _rebuildParagraphForPaint = true;
     }
     // Neither relayout or repaint is needed.
+  }
+
+  AnnotatedString get annotatedText {
+    final AnnotatedString? returnValue = _annotatedString;
+    if (returnValue == null) {
+      throw FlutterError('annotatedText must be set to non-null');
+    }
+    return returnValue;
+  }
+  AnnotatedString? _annotatedString;
+  set annotatedString(AnnotatedString value) {
+    if (value ==  _annotatedString) {
+      return;
+    }
   }
 
   /// Returns a plain text version of the text to paint.

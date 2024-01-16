@@ -6,7 +6,9 @@ import 'dart:ui' as ui show ParagraphBuilder, StringAttribute;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/src/painting/text_style_attributes.dart';
 
+import 'attributed_text.dart';
 import 'basic_types.dart';
 import 'text_painter.dart';
 import 'text_scaler.dart';
@@ -193,7 +195,7 @@ List<InlineSpanSemanticsInformation> combineSemanticsInfo(List<InlineSpanSemanti
 ///  * [RichText], a widget for finer control of text rendering.
 ///  * [TextPainter], a class for painting [InlineSpan] objects on a [Canvas].
 @immutable
-abstract class InlineSpan extends DiagnosticableTree {
+abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString {
   /// Creates an [InlineSpan] with the given values.
   const InlineSpan({
     this.style,
@@ -263,6 +265,23 @@ abstract class InlineSpan extends DiagnosticableTree {
     });
     return result;
   }
+
+  @override
+  String get string => toPlainText(includeSemanticsLabels: false);
+
+  @override
+  @protected
+  T? getAnnotationOfType<T extends Object>() {
+    return toAnnotatedString.getAnnotationOfType<T>();
+  }
+
+  @override
+  AnnotatedString setAnnotationOfType<T extends Object>(T? newAnnotations) {
+    return toAnnotatedString.setAnnotationOfType(newAnnotations);
+  }
+
+  @override
+  AnnotatedString get toAnnotatedString => AnnotatedString.fromInlineSpan(this);
 
   /// Performs the check at each [InlineSpan] for if the `position` falls within the range
   /// of the span and returns the span if it does.
