@@ -82,7 +82,6 @@ class _AnnotatedStringBuilder implements ui.ParagraphBuilder {
   List<double> get placeholderScales => throw UnimplementedError();
 }
 
-
 AnnotatedString _spanToAnnotatedString(InlineSpan span) {
   int placeholderCount = 0;
   span.visitChildren((InlineSpan span) {
@@ -94,8 +93,8 @@ AnnotatedString _spanToAnnotatedString(InlineSpan span) {
   final List<PlaceholderDimensions>? dimensions = placeholderCount == 0 ? null : List<PlaceholderDimensions>.filled(placeholderCount, PlaceholderDimensions.empty);
   final _AnnotatedStringBuilder builder = _AnnotatedStringBuilder();
   span.build(builder, dimensions: dimensions);
-  final PersistentHashMap<Type, Object?> storage = const PersistentHashMap<Type, Object?>.empty()
-    .put(, value);
+  final PersistentHashMap<Type, Object?> storage = const PersistentHashMap<Type, Object?>.empty();
+    //.put(, value);
 
   return AnnotatedString._(builder.buffer.toString(), storage);
 }

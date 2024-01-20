@@ -56,9 +56,8 @@ class PersistentHashMap<K extends Object, V> {
     return _root.get(0, key, key.hashCode) as V?;
   }
 
-  PersistentHashMap<K, U> mapValue<U>(U Function(V) transform) {
-
-  }
+  //PersistentHashMap<K, U> mapValue<U>(U Function(V) transform) {
+  //}
 }
 
 /// Base class for nodes in a hash trie.

@@ -29,8 +29,8 @@ RBTree<Value> _fromSortedList<Value>(List<(int, Value)> sortedList, int startInd
   // Whether the left branch and the right branch have the same cardinality.
   // This is a left-biased RB tree where the cardinality of left/right branches
   // differ by at most 1. This allows us to check whether we are in a "tall"
-  // branch where the deepest leaves needs to be red nodes to keep the black
-  // height balanced:
+  // branch where the deepest leaves needs to be red nodes to keep the tree
+  // black-height balanced:
   // The left branch is in a tall branch iff `isBalanced` is false, or `paintDeepestLeavesRed` is true.
   // The right branch is in a tall branch iff `isBalanced` is true and `paintDeepestLeavesRed` is true.
   final bool isBalanced = midIndex - startIndex == endIndex - midIndex - 1;
@@ -42,6 +42,83 @@ RBTree<Value> _fromSortedList<Value>(List<(int, Value)> sortedList, int startInd
   final RBTree<Value> left = _fromSortedList(sortedList, startIndex, midIndex, !isBalanced || paintDeepestLeavesRed);
   assert(left.blackHeight == (right?.blackHeight ?? 0));
   return RBTree<Value>.black(key, value, left: left, right: right);
+}
+
+/// The upward path from the [end] node to the root node of the binary tree.
+///
+/// This class is used for tree traversal.
+class _TreePath<Value> {
+  _TreePath(this.end, this.path, this.minKey);
+
+  // Creates the path to the node with the smallest key greater than or equal to
+  // `minKey` in the given tree, and concatenates that path after the given
+  // prefix path.
+  static _TreePath<T>? smallest<T>(RBTree<T>? root, int minKey, { _TreePath<T>? prefix }) {
+    if (root == null) {
+      return prefix;
+    }
+    return switch (root.key.compareTo(minKey)) {
+      -1 => _TreePath.smallest(root.right, minKey, prefix: prefix),
+      0  => _TreePath.smallest(root.right, minKey, prefix: _TreePath<T>(root, prefix, minKey)),
+      _  => _TreePath.smallest(root.left, minKey, prefix: _TreePath<T>(root, prefix, minKey)),
+    };
+  }
+
+  final int minKey;
+
+  /// The lowest (one with the largest depth) node in the path.
+  final RBTree<Value> end;
+
+  /// The path from [end]'s ancestor to the root node.
+  final _TreePath<Value>? path;
+
+  // Pop end nodes from the path recursively if the end node is a right node.
+  _TreePath<Value>? firstLeftAncestor() {
+    final _TreePath<Value>? path = this.path;
+    if (path == null) {
+      return null;
+    }
+    assert(path.end.left == end || path.end.right == end);
+    return path.end.left == end
+      ? path
+      : path.firstLeftAncestor();
+  }
+
+  /// The path to the next node (in ascending order) in the tree.
+  _TreePath<Value>? get next {
+    final RBTree<Value>? right = end.right;
+    if (right != null) {
+      // Search the right branch for the next node
+      return smallest(right, minKey, prefix: this);
+    }
+    final _TreePath<Value>? ancestor = firstLeftAncestor();
+    return ancestor != null && ancestor.end.key < minKey
+      ? ancestor.next
+      : ancestor;
+  }
+}
+
+class _TreeWalker<Value> implements Iterator<RBTree<Value>> {
+  _TreeWalker(this.root, this.startingIndex);
+
+  final RBTree<Value> root;
+  final int startingIndex;
+
+  bool moveNextCalled = false;
+  late _TreePath<Value>? path = _TreePath.smallest(root, startingIndex);
+
+  @override
+  RBTree<Value> get current => path!.end;
+
+  @override
+  bool moveNext() {
+    if (!moveNextCalled) {
+      moveNextCalled = true;
+    } else {
+      path = path?.next;
+    }
+    return path != null;
+  }
 }
 
 /// An int-keyed persistent red-black tree, specialized for storing text
@@ -309,14 +386,12 @@ class RBTree<Value> {
       : (leftTree ?? rightTree)?.insert(start, value) ?? RBTree<Value>.black(start, value);
   }
 
-  /// Visits the [RBTree] in ascending order, skipping nodes with keys less than
-  /// `startingKey`.
+  /// Returns an [Iterator] that emits nodes from this tree in ascending order,
+  /// skipping those with keys less than `startingKey`.
   ///
   /// O(N).
-  bool visitAscending(RBTreeVisitor<Value> visitor, [int startingKey = 0]) {
-    return (startingKey >= key || (left?.visitAscending(visitor, startingKey) ?? true))
-        && (startingKey > key || visitor(this))
-        && (right?.visitAscending(visitor, startingKey) ?? true);
+  Iterator<RBTree<Value>> getRunsEndAfter(int startingKey) {
+    return _TreeWalker<Value>(this, startingKey);
   }
 
   bool get debugCheckNoRedViolations {

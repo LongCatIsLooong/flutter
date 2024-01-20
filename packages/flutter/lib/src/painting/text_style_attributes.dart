@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:math' as math show min, max;
+import 'dart:math' as math show max, min;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -15,52 +15,100 @@ typedef _TextStyleAttribute<T extends Object> = ({
   TextStyle Function(T attribute) lift,
 });
 
-class _IndexedTextStyleIterator {
-  _IndexedTextStyleIterator(this.list) : assert(list.isNotEmpty);
-  final List<(int, TextStyle)> list;
-  // Being negative means this has reached end.
-  int nextIndex = 0;
-  (int, TextStyle)? get currentValue => nextIndex >= 0 ? list[nextIndex] : null;
+/// A wrapper iterator that allows safely querying the current value.
+class _Run<T> {
+  _Run(this.inner);
 
-  TextStyle? consume(int index) {
-    final currentValue = this.currentValue;
-    if (currentValue == null) {
-      return null;
+  bool? _canMoveNext;
+  final Iterator<(int, T)> inner;
+
+  (int, T)? get current => (_canMoveNext ??= moveNext()) ? inner.current : null;
+
+  bool moveNext() => _canMoveNext = inner.moveNext();
+}
+
+class _MergedRunIterator<T> implements Iterator<(int, T)> {
+  _MergedRunIterator(List<_Run<T>> runsToMerge, T Function(T, T) combine, T filler)
+    : this._(runsToMerge.where((_Run<T> run) => run.current != null).toList(), combine, filler);
+
+  _MergedRunIterator._(this.runs, this.combine, this.filler) : runsLength = runs.length;
+
+  final List<_Run<T>> runs;
+  int runsLength;
+
+  final T Function(T, T) combine;
+
+  final T filler;
+  late final List<(T, _Run<T>?)> _buffer = List<(T, _Run<T>?)>.filled(runs.length, (filler, null));
+
+  bool canMoveNext = true;
+
+  @override
+  late (int, T) current;
+
+  @override
+  bool moveNext() {
+    if (runsLength <= 0) {
+      return false;
     }
-    final (int nextStart, TextStyle style) = currentValue;
-    if (nextStart > index) {
-      return null;
+    int bufferLength = 0;
+    int? index;
+
+    for (int i = 0; i < runsLength; i += 1) {
+      final _Run<T> run = runs[i];
+      final (int newIndex, T newValue) = run.current!;
+      if (index != null && index < newIndex) {
+        continue;
+      }
+      if (newIndex != index) {
+        assert(index == null || index > newIndex);
+        bufferLength = 0;
+      }
+      index = newIndex;
+      _buffer[bufferLength] = (newValue, run);
+      bufferLength += 1;
     }
-    assert(nextStart == index);
-    nextIndex += 1;
-    if (nextStart >= list.length) {
-      nextIndex = -1;
+
+    if (index != null) {
+      assert(bufferLength > 0);
+      late T result;
+      for (int j = 0; j < bufferLength; j += 1) {
+        final (T value, _Run<T>? run) = _buffer[j];
+        assert(run?.current != null);
+        result = j == 0 ? value : combine(result, value);
+        if (!run!.moveNext()) {
+          runs
+        }
+      }
+      current = (index, result);
+      assert(canMoveNext);
+      return true;
     }
-    return style;
+    return canMoveNext = false;
   }
 }
 
-const TypographicAnnotation defaultTypographicAnnotation = (
-  fontWeight: ui.FontWeight.w400,
-  fontStyle: ui.FontStyle.normal,
-  fontFeatures: [],
-  fontVariations: [],
-
-  textBaseline: ui.TextBaseline.alphabetic,
-  textLeadingDistribution: ui.TextLeadingDistribution.proportional,
-
-  fontFamilies: <String>[''],
-  locale: '',
-
-  fontSize: 14.0,
-  height: null,
-  letterSpacing: 0.0,
-  wordSpacing: 0.0,
-);
+//const TextStyle defaultTypographicAnnotation = (
+//  fontWeight: ui.FontWeight.w400,
+//  fontStyle: ui.FontStyle.normal,
+//  fontFeatures: [],
+//  fontVariations: [],
+//
+//  textBaseline: ui.TextBaseline.alphabetic,
+//  textLeadingDistribution: ui.TextLeadingDistribution.proportional,
+//
+//  fontFamilies: <String>[''],
+//  locale: '',
+//
+//  fontSize: 14.0,
+//  height: null,
+//  letterSpacing: 0.0,
+//  wordSpacing: 0.0,
+//);
 
 @immutable
-class TypographicAnnotations {
-  TypographicAnnotations._(
+class TextStyleAnnotations {
+  TextStyleAnnotations._(
     this._fontFamilies,
     this._locale,
     this._fontWeight,
@@ -76,7 +124,7 @@ class TypographicAnnotations {
     this.defaults,
   );
 
-  final TypographicAnnotation defaults;
+  final TextStyle defaults;
 
   final _TextStyleAttribute<List<String>> _fontFamilies;
   final _TextStyleAttribute<ui.Locale> _locale;
@@ -123,7 +171,7 @@ class TypographicAnnotations {
     return (styleIndex, textStyle);
   }
 
-  static List<(int, Value)> _serializeToList<Value>(RBTree<Value>? tree, int startingKey, [List<(int, Value)> list = const <(int, Value)>[]]) {
+  static List<(int, Value)> _serializeToList<Value>(RBTree<Value>? tree, int startingKey, List<(int, Value)> list) {
     if (tree == null) {
       return list;
     }
@@ -137,31 +185,13 @@ class TypographicAnnotations {
     return list;
   }
 
-  static List<(int, TextStyle?)> _merge(Iterable<_IndexedTextStyleIterator> iterators) {
-    int? runStartIndex = 0;
-    final List<(int, TextStyle?)> returnValue = <(int, TextStyle?)>[];
-    while (runStartIndex != null) {
-      int? nextRunStartIndex;
-      TextStyle? runTextStyle;
-      for (final iterator in iterators) {
-        runTextStyle = iterator.consume(runStartIndex)?.merge(runTextStyle) ?? runTextStyle;
-        final iteratorNextIndex = iterator.nextIndex;
-        if (iteratorNextIndex >= 0 && (nextRunStartIndex == null || iteratorNextIndex < nextRunStartIndex)) {
-          nextRunStartIndex = iteratorNextIndex;
-        }
-      }
-      runStartIndex = nextRunStartIndex;
-    }
-    return returnValue;
-  }
-
-  List<(int, TextStyle?)> getIterable( [int startIndex = 0]) {
-    Iterable<(int, TextStyle)> lift<T extends Object>(_TextStyleAttribute<T> attribute) {
+  Iterator<(int, TextStyle)> getIterable( [int startIndex = 0]) {
+    Iterator<(int, TextStyle)> lift<T extends Object>(_TextStyleAttribute<T> attribute) {
       (int, TextStyle) mapEntry((int, T?) entry) {
         final T? value = entry.$2;
         return (entry.$1, value == null ? null : attribute.lift(value));
       }
-      return _serializeToList(attribute.attribute, startIndex).map(mapEntry);
+      return attribute.attribute.getRunsEndAfter(startIndex);
     }
 
     final xs = [
@@ -176,13 +206,46 @@ class TypographicAnnotations {
       lift(_letterSpacing),
       lift(_wordSpacing),
       //..._f
-    ].where((element) => element.isNotEmpty).map((e) => e.toList()).map(_IndexedTextStyleIterator.new);
-    return _merge(xs);
+    ].where((element) => element.isNotEmpty);
+    return _MergedRunIterator(xs, (p0, p1) => null, const (0, TextStyle()));
   }
 }
 
-final class TextPaintStyle {
-  TextPaintStyle(
+final class TextStyleAttributeSet {
+  const TextStyleAttributeSet({
+    this.fontWeight,
+    this.fontStyle,
+    this.fontFamilies,
+    this.locale,
+    this.fontSize,
+    this.fontFeatures,
+    this.fontVariations,
+    this.height,
+    this.textLeadingDistribution,
+    this.textBaseline,
+    this.wordSpacing,
+    this.letterSpacing,
+  });
+
+  final ui.FontWeight? fontWeight;
+  final ui.FontStyle? fontStyle;
+  final List<String>? fontFamilies;
+  final ui.Locale? locale;
+  final double? fontSize;
+
+  final Map<String, int>? fontFeatures;
+  final Map<String, double>? fontVariations;
+
+  final double? height;
+  final ui.TextLeadingDistribution? textLeadingDistribution;
+  final ui.TextBaseline? textBaseline;
+
+  final double? wordSpacing;
+  final double? letterSpacing;
+}
+
+final class TextPaintAnnotations {
+  TextPaintAnnotations._(
     this.underline,
     this.overline,
     this.lineThrough,
@@ -203,34 +266,33 @@ final class TextPaintStyle {
   final RBTree<ui.Shadow> shadow;
 }
 
-typedef TypographicAnnotation = ({
-  ui.FontWeight fontWeight,
-  ui.FontStyle fontStyle,
-  PersistentHashMap<String, int> fontFeatures,
-  PersistentHashMap<String, double> fontVariations,
+final class TextPaintAttributionSet {
+  const TextPaintAttributionSet({
+    this.foregroundColor,
+    this.backgroundColor,
+    this.foreground,
+    this.background,
+    this.shadows,
+    this.underline,
+    this.overline,
+    this.lineThrough,
+    this.decorationColor,
+    this.decorationStyle,
+    this.decorationThickness,
+  });
 
-  ui.TextBaseline textBaseline,
-  ui.TextLeadingDistribution textLeadingDistribution,
+  final ui.Color? foregroundColor;
+  final ui.Color? backgroundColor;
+  // How do we compare ui.Paint objects?
+  final ui.Paint? foreground;
+  final ui.Paint? background;
+  final List<ui.Shadow>? shadows;
 
-  String fontFamily,
-  List<String> fontFamilyFallback,
-  ui.Locale locale,
+  final bool? underline;
+  final bool? overline;
+  final bool? lineThrough;
 
-  double fontSize,
-  double height,
-  double letterSpacing,
-  double wordSpacing,
-});
-
-
-typedef TextPaintAnnotation = ({
-  ui.Paint foregroundPainter,
-  ui.Paint backgroundPainter,
-  ui.Shadow shadows,
-
-  ui.TextDecoration decorations,
-  ui.Color decorationColor,
-  ui.TextDecorationStyle decorationStyle,
-  double decorationThickness,
-});
-
+  final ui.Color? decorationColor;
+  final ui.TextDecorationStyle? decorationStyle;
+  final double? decorationThickness;
+}

@@ -9,10 +9,10 @@ typedef _TestTree = RBTree<void>;
 
 List<RBTree<Value>> toSortedList<Value>(RBTree<Value> tree, { int startingKey = 0 }) {
   final List<RBTree<Value>> list = <RBTree<Value>>[];
-  tree.visitAscending((RBTree<Value> node) {
-    list.add(node);
-    return true;
-  }, startingKey);
+  final Iterator<RBTree<Value>> iterator = tree.getRunsEndAfter(startingKey);
+  while (iterator.moveNext()) {
+    list.add(iterator.current);
+  }
   return list;
 }
 
