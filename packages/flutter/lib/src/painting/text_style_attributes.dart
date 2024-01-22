@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'dart:math' as math show max, min;
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -10,81 +9,209 @@ import 'package:flutter/src/foundation/persistent_rb_tree.dart';
 
 import 'text_style.dart';
 
-typedef _TextStyleAttribute<T extends Object> = ({
-  RBTree<T?> attribute,
-  TextStyle Function(T attribute) lift,
-});
+class TextAttributeIterable<T extends Object> {
+  TextAttributeIterable._(this._storage, this._defaultValue, this._lift);
 
-/// A wrapper iterator that allows safely querying the current value.
-class _Run<T> {
-  _Run(this.inner);
+  final RBTree<T?> _storage;
+  final T _defaultValue;
+  final TextStyle Function(T) _lift;
 
-  bool? _canMoveNext;
-  final Iterator<(int, T)> inner;
+  (int, T) _map(RBTree<T?> node) => (node.key, node.value ?? _defaultValue);
 
-  (int, T)? get current => (_canMoveNext ??= moveNext()) ? inner.current : null;
+  Iterator<(int, T)> getRunsEndAfter(int index) {
+    return _MapIterator<RBTree<T?>, (int, T)>(_storage.getRunsEndAfter(index), _map);
+  }
 
-  bool moveNext() => _canMoveNext = inner.moveNext();
+  (int, TextStyle) _liftToTextStyle(RBTree<T?> node) => (node.key, _lift(node.value ?? _defaultValue));
+
+  _RunIterator<TextStyle> _getTextStyleRunsEndAfter(int index) {
+    return _RunIterator<TextStyle>(_MapIterator<RBTree<T?>, (int, TextStyle)>(_storage.getRunsEndAfter(index), _liftToTextStyle));
+  }
 }
 
-class _MergedRunIterator<T> implements Iterator<(int, T)> {
-  _MergedRunIterator(List<_Run<T>> runsToMerge, T Function(T, T) combine, T filler)
-    : this._(runsToMerge.where((_Run<T> run) => run.current != null).toList(), combine, filler);
+/// For font features, font variations.
+///
+/// The TextStyle.merge method can't merge 2 TextStyles with different
+class _DynamicAttributeIterable<T extends Object> { //implements TextAttributeIterable<List<(String, T)>>
+  _DynamicAttributeIterable(this._storage, this._defaultValue, this._lift);
 
-  _MergedRunIterator._(this.runs, this.combine, this.filler) : runsLength = runs.length;
+  final PersistentHashMap<String, RBTree<T?>> _storage;
+  final Map<String, T> _defaultValue;
+  final TextStyle Function(Map<String, T>) _lift;
 
-  final List<_Run<T>> runs;
-  int runsLength;
+  //Iterator<(int, Iterable<String, T>)> getRunsEndAfter(int index) {
+  //  return _MapIterator<RBTree<T?>, (int, T)>(_storage.getRunsEndAfter(index), _map);
+  //}
 
-  final T Function(T, T) combine;
+  (int, TextStyle) _liftSnd((int, Map<String, T>) pair) => (pair.$1, _lift(pair.$2));
 
-  final T filler;
-  late final List<(T, _Run<T>?)> _buffer = List<(T, _Run<T>?)>.filled(runs.length, (filler, null));
+  _RunIterator<TextStyle> _getTextStyleRunsEndAfter(int index) {
+    final List<_RunIterator<(String, T?)>> attributes = _storage.entries.map((MapEntry<String, RBTree<T?>> e) {
+      (int, (String, T?)) transform(RBTree<T?> node) => (node.key, (e.key, node.value));
+      return _RunIterator<(String, T?)>(_MapIterator<RBTree<T?>, (int, (String, T?))>(e.value.getRunsEndAfter(index), transform));
+    }).toList(growable: false);
 
-  bool canMoveNext = true;
+    final _AccumulativeMergedRunIterator<T> merged = _AccumulativeMergedRunIterator<T>(attributes, _defaultValue);
+    return _RunIterator<TextStyle>(_MapIterator(merged, _liftSnd));
+  }
+}
+
+/// A wrapper iterator that allows safely querying the current value, without
+/// calling [moveNext].
+class _RunIterator<T> {
+  _RunIterator(this.inner);
+
+  bool? _canMoveNext;
+  bool get canMoveNext => _canMoveNext ??= moveNext();
+  final Iterator<(int, T)> inner;
+
+  (int, T)? get current => canMoveNext ? _current : null;
+  (int, T)? _current;
+
+  bool moveNext() {
+    _current = (_canMoveNext = inner.moveNext())
+      ? inner.current
+      : null;
+    return _current != null;
+  }
+}
+
+class _MapIterator<T, V> implements Iterator<V> {
+  _MapIterator(this.inner, this.map);
+
+  final Iterator<T> inner;
+  final V Function(T) map;
 
   @override
-  late (int, T) current;
+  V get current => map(inner.current);
+
+  @override
+  bool moveNext() => inner.moveNext();
+}
+
+abstract base class _MergedRunIterator<T, Attribute> implements Iterator<(int, T)> {
+  _MergedRunIterator(this.attributes) : remainingLength = cleanUpEmptyAttributes(attributes, attributes.length);
+
+  final List<_RunIterator<Attribute>> attributes;
+  // The number of attributes in [attributes] that has not reached end. This
+  // value being 0 indicates that this iterator has reached end.
+  int remainingLength;
+
+  // Throw exhausted attributes out of the list bounds. Returns the new list length.
+  static int cleanUpEmptyAttributes<T>(List<_RunIterator<T>> attributes, int length) {
+    int end = length - 1;
+    for (int i = 0; i <= end; i += 1) {
+      if (attributes[i].current != null) {
+        continue;
+      }
+      while (attributes[end].current == null) {
+        if (end <= i + 1) {
+          return i;
+        }
+        end -= 1;
+      }
+      assert(attributes[end].current != null);
+      // Throws the current i-th attribute away.
+      attributes[i] = attributes[end];
+    }
+    return end + 1;
+  }
+
+  // Move _RunIterators in the attributes list with the smallest starting index
+  // to the start of the attributes list.
+  int moveNextAttributesToHead() {
+    assert(remainingLength > 0);
+    int runStartIndex = -1;
+    // The number of attributes that currently start at runStartIndex.
+    int numberOfAttributes = 0;
+
+    for (int i = 0; i < remainingLength; i += 1) {
+      final _RunIterator<Attribute> attribute = attributes[i];
+      final int index = attribute.current!.$1;
+      if (numberOfAttributes > 0 && runStartIndex < index) {
+        // This attribute has a larger startIndex than the current runStartIndex.
+        continue;
+      }
+      if (index != runStartIndex) {
+        assert(numberOfAttributes == 0 || runStartIndex > index);
+        // This attribute has a smaller startIndex than the current runStartIndex.
+        runStartIndex = index;
+        numberOfAttributes = 1;
+      } else {
+        numberOfAttributes += 1;
+      }
+      // Move the attribute to the head of the list.
+      assert(numberOfAttributes - 1 <= i);
+      if (numberOfAttributes - 1 != i) {
+        // Swap locations to make sure the attributes with the smallest start
+        // index are relocated to the head of the list.
+        attributes[i] = attributes[numberOfAttributes - 1];
+        attributes[numberOfAttributes - 1] = attribute;
+      }
+    }
+    assert(numberOfAttributes > 0);
+    return numberOfAttributes;
+  }
+}
+
+final class _TextStyleMergingIterator extends _MergedRunIterator<TextStyle, TextStyle> {
+  _TextStyleMergingIterator(super.attributes);
+
+  @override
+  late (int, TextStyle) current;
 
   @override
   bool moveNext() {
-    if (runsLength <= 0) {
+    if (remainingLength <= 0) {
       return false;
     }
-    int bufferLength = 0;
-    int? index;
-
-    for (int i = 0; i < runsLength; i += 1) {
-      final _Run<T> run = runs[i];
-      final (int newIndex, T newValue) = run.current!;
-      if (index != null && index < newIndex) {
-        continue;
+    final int numberOfAttributes = moveNextAttributesToHead();
+    final int runStartIndex = attributes[0].current!.$1;
+    TextStyle? result;
+    for (int i = numberOfAttributes - 1; i >= 0; i -= 1) {
+      final _RunIterator<TextStyle> attribute = attributes[i];
+      final TextStyle value = attribute.current!.$2;
+      assert(attribute.current?.$1 == runStartIndex);
+      result = value.merge(result);
+      if (!attribute.moveNext()) {
+        // This attribute has no more starting indices, throw it out.
+        attributes[i] = attributes[remainingLength -= 1];
       }
-      if (newIndex != index) {
-        assert(index == null || index > newIndex);
-        bufferLength = 0;
-      }
-      index = newIndex;
-      _buffer[bufferLength] = (newValue, run);
-      bufferLength += 1;
     }
+    current = (runStartIndex, result!);
+    return remainingLength > 0;
+  }
+}
 
-    if (index != null) {
-      assert(bufferLength > 0);
-      late T result;
-      for (int j = 0; j < bufferLength; j += 1) {
-        final (T value, _Run<T>? run) = _buffer[j];
-        assert(run?.current != null);
-        result = j == 0 ? value : combine(result, value);
-        if (!run!.moveNext()) {
-          runs
-        }
-      }
-      current = (index, result);
-      assert(canMoveNext);
-      return true;
+final class _AccumulativeMergedRunIterator<T extends Object> extends _MergedRunIterator<Map<String, T>, (String, T?)> {
+  _AccumulativeMergedRunIterator(super.attributes, Map<String, T> defaultValue)
+    : current = (0, defaultValue);
+
+  @override
+  (int, Map<String, T>) current;
+
+  @override
+  bool moveNext() {
+    if (remainingLength <= 0) {
+      return false;
     }
-    return canMoveNext = false;
+    final int numberOfAttributes = moveNextAttributesToHead();
+    final int runStartIndex = attributes[0].current!.$1;
+    for (int i = numberOfAttributes - 1; i >= 0; i -= 1) {
+      final _RunIterator<(String, T?)> attribute = attributes[i];
+      final (String key, T? value) = attribute.current!.$2;
+      final Map<String, T> currentMap = current.$2;
+      if (value == null) {
+        currentMap.remove(key);
+      } else {
+        currentMap[key] = value;
+      }
+      assert(attribute.current?.$1 == runStartIndex);
+      if (!attribute.moveNext()) {
+        attributes[i] = attributes[remainingLength -= 1];
+      }
+    }
+    return remainingLength > 0;
   }
 }
 
@@ -116,7 +243,7 @@ class TextStyleAnnotations {
     this._fontFeatures,
     this._fontVariations,
     this._textBaseline,
-    this._textLeadingDistribution,
+    this._leadingDistribution,
     this._fontSize,
     this._height,
     this._letterSpacing,
@@ -124,100 +251,120 @@ class TextStyleAnnotations {
     this.defaults,
   );
 
+  static TextStyle _liftFontFamilies(List<String> input) => switch (input) {
+    [] => TextStyle(),
+    [final fontFamily, ...final fontFamilyFallback] => TextStyle(fontFamily: fontFamily, fontFamilyFallback: fontFamilyFallback),
+  };
+  static TextStyle _liftLocale(ui.Locale input) => TextStyle(locale: input);
+  static TextStyle _liftFontSize(double input) => TextStyle(fontSize: input);
+  static TextStyle _liftFontWeight(ui.FontWeight input) => TextStyle(fontWeight: input);
+  static TextStyle _liftFontStyle(ui.FontStyle input) => TextStyle(fontStyle: input);
+  static TextStyle _liftHeight(double input) => TextStyle(height: input);
+  static TextStyle _liftLeadingDistribution(ui.TextLeadingDistribution input) => TextStyle(leadingDistribution: input);
+  static TextStyle _liftTextBaseline(ui.TextBaseline input) => TextStyle(textBaseline: input);
+  static TextStyle _liftWordSpacing(double input) => TextStyle(wordSpacing: input);
+  static TextStyle _liftLetterSpacing(double input) => TextStyle(letterSpacing: input);
+
+  static Map<String, double> _fontVariationsToMap(List<ui.FontVariation>? input) {
+    return input == null
+      ? const <String, double>{}
+      : Map<String, double>.fromEntries(input.map((ui.FontVariation e) => MapEntry<String, double>(e.axis, e.value)));
+  }
+  static Map<String, int> _fontFeaturesToMap(List<ui.FontFeature>? input) {
+    return input == null
+      ? const <String, int>{}
+      : Map<String, int>.fromEntries(input.map((e) => MapEntry<String, int>(e.feature, e.value)));
+  }
+  static TextStyle _liftFontVariations(Map<String, double> input) => TextStyle(fontVariations: input.entries.map((MapEntry<String, double> entry) => ui.FontVariation(entry.key, entry.value)).toList(growable: false));
+  static TextStyle _liftFontFeatures(Map<String, int> input) => TextStyle(fontFeatures: input.entries.map((MapEntry<String, int> entry) => ui.FontFeature(entry.key, entry.value)).toList(growable: false));
+  static List<String> _getFontFamilies(TextStyle textStyle) {
+    final String? fontFamily = textStyle.fontFamily;
+    return <String>[
+      if (fontFamily != null) fontFamily,
+      ...?textStyle.fontFamilyFallback,
+    ];
+  }
+
   final TextStyle defaults;
 
-  final _TextStyleAttribute<List<String>> _fontFamilies;
-  final _TextStyleAttribute<ui.Locale> _locale;
+  final RBTree<List<String>?> _fontFamilies;
+  late final TextAttributeIterable<List<String>> fontFamilies = TextAttributeIterable<List<String>>._(_fontFamilies, _getFontFamilies(defaults), _liftFontFamilies);
 
-  final _TextStyleAttribute<ui.FontWeight> _fontWeight;
-  final _TextStyleAttribute<ui.FontStyle> _fontStyle;
-  final PersistentHashMap<String, RBTree<int>> _fontFeatures;
-  final PersistentHashMap<String, RBTree<double>> _fontVariations;
+  final RBTree<ui.Locale?> _locale;
+  late final TextAttributeIterable<ui.Locale> locale = TextAttributeIterable<ui.Locale>._(_locale, defaults.locale!, _liftLocale);
 
-  final _TextStyleAttribute<ui.TextBaseline> _textBaseline;
-  final _TextStyleAttribute<ui.TextLeadingDistribution> _textLeadingDistribution;
+  final RBTree<double?> _fontSize;
+  late final TextAttributeIterable<double> fontSize = TextAttributeIterable<double>._(_fontSize, defaults.fontSize!, _liftFontSize);
 
-  final _TextStyleAttribute<double> _fontSize;
-  final _TextStyleAttribute<double> _height;
-  final _TextStyleAttribute<double> _letterSpacing;
-  final _TextStyleAttribute<double> _wordSpacing;
+  final RBTree<ui.FontWeight?> _fontWeight;
+  late final TextAttributeIterable<ui.FontWeight> fontWeight = TextAttributeIterable<ui.FontWeight>._(_fontWeight, defaults.fontWeight!, _liftFontWeight);
 
-  (int, TextStyle?) getAnnotationAt(int index) {
-    (int, TextStyle?) lift<T extends Object>(_TextStyleAttribute<T> attribute) {
-      final RBTree<T?>? value = attribute.attribute.getNodeLessThanOrEqualTo(index);
-      final T? v = value?.value;
-      final TextStyle? style = v == null ? null : attribute.lift(v);
-      return (value?.key ?? 0, style);
-    }
-    final xs = [
-      lift(_fontFamilies),
-      lift(_locale),
-      lift(_fontWeight),
-      lift(_fontStyle),
-      lift(_textBaseline),
-      lift(_textLeadingDistribution),
-      lift(_fontSize),
-      lift(_height),
-      lift(_letterSpacing),
-      lift(_wordSpacing),
-      //..._f
-    ];
-    int styleIndex = 0;
-    TextStyle? textStyle;
-    for (final (int index, TextStyle? style) in xs) {
-      styleIndex = math.max(index, styleIndex);
-      textStyle = textStyle?.merge(style) ?? style;
-    }
-    return (styleIndex, textStyle);
+  final RBTree<ui.FontStyle?> _fontStyle;
+  late final TextAttributeIterable<ui.FontStyle> fontStyle = TextAttributeIterable<ui.FontStyle>._(_fontStyle, defaults.fontStyle!, _liftFontStyle);
+
+  final PersistentHashMap<String, RBTree<int?>> _fontFeatures;
+  late final _DynamicAttributeIterable<int> fontFeatures = _DynamicAttributeIterable(_fontFeatures, _fontFeaturesToMap(defaults.fontFeatures), _liftFontFeatures);
+
+  final PersistentHashMap<String, RBTree<double?>> _fontVariations;
+  late final _DynamicAttributeIterable<double> fontVariations = _DynamicAttributeIterable(_fontVariations, _fontVariationsToMap(defaults.fontVariations), _liftFontVariations);
+
+  final RBTree<ui.TextLeadingDistribution?> _leadingDistribution;
+  late final TextAttributeIterable<ui.TextLeadingDistribution> leadingDistribution = TextAttributeIterable<ui.TextLeadingDistribution>._(_leadingDistribution, defaults.leadingDistribution!, _liftLeadingDistribution);
+
+  final RBTree<double?> _height;
+  late final TextAttributeIterable<double> height = TextAttributeIterable<double>._(_height, defaults.height!, _liftHeight);
+
+  final RBTree<ui.TextBaseline?> _textBaseline;
+  late final TextAttributeIterable<ui.TextBaseline> textBaseline = TextAttributeIterable<ui.TextBaseline>._(_textBaseline, defaults.textBaseline!, _liftTextBaseline);
+
+  final RBTree<double?> _letterSpacing;
+  late final TextAttributeIterable<double> letterSpacing = TextAttributeIterable<double>._(_letterSpacing, defaults.letterSpacing!, _liftLetterSpacing);
+  final RBTree<double?> _wordSpacing;
+  late final TextAttributeIterable<double> wordSpacing = TextAttributeIterable<double>._(_wordSpacing, defaults.wordSpacing!, _liftWordSpacing);
+
+  TextStyle getAnnotationAt(int index) {
+    final TextStyle textStyle = TextStyle(
+      locale: _locale.getNodeLessThanOrEqualTo(index)?.value,
+
+      fontWeight: _fontWeight.getNodeLessThanOrEqualTo(index)?.value,
+      fontStyle: _fontStyle.getNodeLessThanOrEqualTo(index)?.value,
+
+      textBaseline: _textBaseline.getNodeLessThanOrEqualTo(index)?.value,
+      leadingDistribution: _leadingDistribution.getNodeLessThanOrEqualTo(index)?.value,
+
+      fontSize: _fontSize.getNodeLessThanOrEqualTo(index)?.value,
+      height: _height.getNodeLessThanOrEqualTo(index)?.value,
+      letterSpacing: _letterSpacing.getNodeLessThanOrEqualTo(index)?.value,
+      wordSpacing: _wordSpacing.getNodeLessThanOrEqualTo(index)?.value,
+    );
+    return defaults.merge(textStyle);
   }
 
-  static List<(int, Value)> _serializeToList<Value>(RBTree<Value>? tree, int startingKey, List<(int, Value)> list) {
-    if (tree == null) {
-      return list;
-    }
-    if (startingKey < tree.key) {
-      _serializeToList(tree.left, startingKey, list);
-    }
-    if (startingKey <= tree.key) {
-      list.add((tree.key, tree.value));
-    }
-    _serializeToList(tree.right, startingKey, list);
-    return list;
-  }
-
-  Iterator<(int, TextStyle)> getIterable( [int startIndex = 0]) {
-    Iterator<(int, TextStyle)> lift<T extends Object>(_TextStyleAttribute<T> attribute) {
-      (int, TextStyle) mapEntry((int, T?) entry) {
-        final T? value = entry.$2;
-        return (entry.$1, value == null ? null : attribute.lift(value));
-      }
-      return attribute.attribute.getRunsEndAfter(startIndex);
-    }
-
-    final xs = [
-      //lift(_fontFamilies),
-      lift(_locale),
-      lift(_fontWeight),
-      lift(_fontStyle),
-      lift(_textBaseline),
-      lift(_textLeadingDistribution),
-      lift(_fontSize),
-      lift(_height),
-      lift(_letterSpacing),
-      lift(_wordSpacing),
-      //..._f
-    ].where((element) => element.isNotEmpty);
-    return _MergedRunIterator(xs, (p0, p1) => null, const (0, TextStyle()));
+  Iterator<(int, TextStyle)> getRunsEndAfter(int index) {
+    final _RunIterator<TextStyle> fontFamiliesRuns = fontFamilies._getTextStyleRunsEndAfter(index);
+    final List<_RunIterator<TextStyle>> runsToMerge = List<_RunIterator<TextStyle>>.filled(12, fontFamiliesRuns)
+      ..[1] = locale._getTextStyleRunsEndAfter(index)
+      ..[2] = fontSize._getTextStyleRunsEndAfter(index)
+      ..[3] = fontWeight._getTextStyleRunsEndAfter(index)
+      ..[4] = fontStyle._getTextStyleRunsEndAfter(index)
+      ..[5] = height._getTextStyleRunsEndAfter(index)
+      ..[6] = leadingDistribution._getTextStyleRunsEndAfter(index)
+      ..[7] = textBaseline._getTextStyleRunsEndAfter(index)
+      ..[8] = wordSpacing._getTextStyleRunsEndAfter(index)
+      ..[9] = letterSpacing._getTextStyleRunsEndAfter(index)
+      ..[10] = fontVariations._getTextStyleRunsEndAfter(index)
+      ..[11] = fontFeatures._getTextStyleRunsEndAfter(index);
+    return _TextStyleMergingIterator(runsToMerge);
   }
 }
 
 final class TextStyleAttributeSet {
   const TextStyleAttributeSet({
-    this.fontWeight,
-    this.fontStyle,
     this.fontFamilies,
     this.locale,
     this.fontSize,
+    this.fontWeight,
+    this.fontStyle,
     this.fontFeatures,
     this.fontVariations,
     this.height,
@@ -227,11 +374,11 @@ final class TextStyleAttributeSet {
     this.letterSpacing,
   });
 
-  final ui.FontWeight? fontWeight;
-  final ui.FontStyle? fontStyle;
   final List<String>? fontFamilies;
   final ui.Locale? locale;
   final double? fontSize;
+  final ui.FontWeight? fontWeight;
+  final ui.FontStyle? fontStyle;
 
   final Map<String, int>? fontFeatures;
   final Map<String, double>? fontVariations;

@@ -56,8 +56,12 @@ class PersistentHashMap<K extends Object, V> {
     return _root.get(0, key, key.hashCode) as V?;
   }
 
-  //PersistentHashMap<K, U> mapValue<U>(U Function(V) transform) {
-  //}
+  /// The map entries of [this].
+  List<MapEntry<K, V>> get entries {
+    final List<MapEntry<K, V>> list = <MapEntry<K, V>>[];
+    _root?.getEntries(list);
+    return list;
+  }
 }
 
 /// Base class for nodes in a hash trie.
@@ -80,6 +84,9 @@ abstract class _TrieNode {
   /// Lookup a value associated with the given [key] using bits from [keyHash]
   /// starting at [bitIndex].
   Object? get(int bitIndex, Object key, int keyHash);
+
+  /// Put the key value pairs in the trie into the given list.
+  void getEntries(List<MapEntry<Object, Object?>> entries);
 }
 
 /// A full (uncompressed) node in the trie.
@@ -113,6 +120,14 @@ class _FullNode extends _TrieNode {
 
     final _TrieNode? node = _unsafeCast<_TrieNode?>(descendants[index]);
     return node?.get(bitIndex + _TrieNode.hashBitsPerLevel, key, keyHash);
+  }
+
+  @override
+  void getEntries(List<MapEntry<Object, Object?>> entries) {
+    for (int i = 0; i < descendants.length; i += 1) {
+      final _TrieNode? node = _unsafeCast<_TrieNode?>(descendants[i]);
+      node?.getEntries(entries);
+    }
   }
 }
 
@@ -286,6 +301,20 @@ class _CompressedNode extends _TrieNode {
             .put(bitIndex, existingKey, existingKeyHash, existingValue)
             .put(bitIndex, key, keyHash, value);
   }
+
+  @override
+  void getEntries(List<MapEntry<Object, Object?>> entries) {
+    for (int i = 0; i + 1 < keyValuePairs.length; i += 2) {
+      final Object? keyOrNull = keyValuePairs[i];
+      final Object? valueOrNode = keyValuePairs[i + 1];
+      if (identical(keyOrNull, null)) {
+        final _TrieNode node = _unsafeCast<_TrieNode>(valueOrNode);
+        node.getEntries(entries);
+      } else {
+        entries.add(MapEntry<Object, Object?>(keyOrNull, valueOrNode));
+      }
+    }
+  }
 }
 
 /// Trie node representing a full hash collision.
@@ -348,6 +377,20 @@ class _HashCollisionNode extends _TrieNode {
       }
     }
     return -1;
+  }
+
+  @override
+  void getEntries(List<MapEntry<Object, Object?>> entries) {
+    for (int i = 0; i + 1 < keyValuePairs.length; i += 2) {
+      final Object? keyOrNull = keyValuePairs[i];
+      final Object? valueOrNode = keyValuePairs[i + 1];
+      if (identical(keyOrNull, null)) {
+        final _TrieNode node = _unsafeCast<_TrieNode>(valueOrNode);
+        node.getEntries(entries);
+      } else {
+        entries.add(MapEntry<Object, Object?>(keyOrNull, valueOrNode));
+      }
+    }
   }
 }
 
