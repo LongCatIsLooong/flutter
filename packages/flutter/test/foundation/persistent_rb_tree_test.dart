@@ -7,9 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 typedef _TestTree = RBTree<void>;
 
-List<RBTree<Value>> toSortedList<Value>(RBTree<Value> tree, { int startingKey = 0 }) {
-  final List<RBTree<Value>> list = <RBTree<Value>>[];
-  final Iterator<RBTree<Value>> iterator = tree.getRunsEndAfter(startingKey);
+List<(int, Value)> toSortedList<Value>(RBTree<Value>? tree, { int startingKey = 0 }) {
+  final List<(int, Value)> list = <(int, Value)>[];
+  if (tree == null) {
+    return list;
+  }
+  assert(tree.debugCheckNoRedViolations);
+  final Iterator<(int, Value)> iterator = tree.getRunsEndAfter(startingKey);
   while (iterator.moveNext()) {
     list.add(iterator.current);
   }
@@ -80,7 +84,6 @@ void main() {
         final List<(int, int)> sortedList = List<(int, int)>.generate(i, (int index) => (index, index * index));
         final RBTree<int> tree = RBTree<int>.fromSortedList(sortedList);
         final List<(int, int)> toList = toSortedList(tree)
-          .map((RBTree<int> node) => (node.key, node.value))
           .toList();
         expect(toList, sortedList);
       }
@@ -88,7 +91,7 @@ void main() {
   });
 
   group('BST operations', () {
-    int getKey<Value>(RBTree<Value> tree) => tree.key;
+    int getKey<Value>((int, Value) pair) => pair.$1;
 
     test('visitAscending startingKey filtering', () {
       final List<int> sortedList = List<int>.generate(10, (int index) => index * index);
@@ -125,7 +128,7 @@ void main() {
   });
 
   group('RB operations', () {
-    int getKey<Value>(RBTree<Value> tree) => tree.key;
+    int getKey<Value>((int, Value) pair) => pair.$1;
 
     test('insert', () {
       _TestTree testTree = _TestTree.red(50, null);
@@ -185,6 +188,38 @@ void main() {
           for (int i = 80; i < 88; i++) i,
         ],
       );
+    });
+
+    test('join random test', () {
+      const int lower = 0;
+      const int upper = 50;
+
+      for (int pivot = lower + 1; pivot < upper - 1; pivot += 1) {
+        final RBTree<void> leftTree = _TestTree.fromSortedList(<(int, void)>[for (int i = lower; i < pivot; i += 1) (i, null)]);
+        final RBTree<void> rightTree = _TestTree.fromSortedList(<(int, void)>[for (int i = pivot + 1; i < upper; i += 1) (i, null)]);
+        final RBTree<void> joinedTree = leftTree.join(rightTree, pivot, null);
+        expect(toSortedList(joinedTree).map(getKey), <int>[for (int i = lower; i < upper; i++) i]);
+      }
+    });
+
+    test('skipUntil / takeLessThan', () {
+      const int lower = 1;
+      const int upper = 37;
+      final _TestTree tree = _TestTree.fromSortedList(<(int, void)>[for (int i = lower; i < upper; i++) (i, null)]);
+
+      for (int threshold = 0; threshold < 40; threshold += 1) {
+        final int mid = threshold.clamp(lower, upper);
+        expect(
+          toSortedList(tree.takeLessThan(threshold)).map(getKey),
+          <int>[for (int i = lower; i < mid; i += 1) i],
+          reason: 'less than $threshold',
+        );
+        expect(
+          toSortedList(tree.skipUntil(threshold)).map(getKey),
+          <int>[for (int i = mid; i < upper; i += 1) i],
+          reason: 'greater than or equal to $threshold',
+        );
+      }
     });
   });
 }

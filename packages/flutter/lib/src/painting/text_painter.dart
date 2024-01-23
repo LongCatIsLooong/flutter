@@ -18,7 +18,7 @@ import 'dart:ui' as ui show
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import 'attributed_text.dart';
+import 'annotated_string.dart';
 import 'basic_types.dart';
 import 'inline_span.dart';
 import 'placeholder_span.dart';
@@ -676,10 +676,9 @@ class TextPainter {
   /// The [InlineSpan] this provides is in the form of a tree that may contain
   /// multiple instances of [TextSpan]s and [WidgetSpan]s. To obtain a plain text
   /// representation of the contents of this [TextPainter], use [plainText].
-  InlineSpan? get text => _text;
-  InlineSpan? _text;
-  set text(InlineSpan? value) {
-    assert(value == null || value.debugAssertIsValid());
+  AnnotatedString? get text => _text;
+  AnnotatedString? _text;
+  set text(AnnotatedString? value) {
     if (_text == value) {
       return;
     }
@@ -722,11 +721,7 @@ class TextPainter {
   /// Returns a plain text version of the text to paint.
   ///
   /// This uses [InlineSpan.toPlainText] to get the full contents of all nodes in the tree.
-  String get plainText {
-    _cachedPlainText ??= _text?.toPlainText(includeSemanticsLabels: false);
-    return _cachedPlainText ?? '';
-  }
-  String? _cachedPlainText;
+  String get plainText => _text!.string;
 
   /// How the text should be aligned horizontally.
   ///

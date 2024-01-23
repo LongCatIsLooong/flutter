@@ -5,27 +5,63 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/src/foundation/persistent_rb_tree.dart';
 
 import 'text_style.dart';
+
+// TODO: dedup
+// When end is null, it is treated as +∞ and is special cased to enable faster
+// processing.
+RBTree<Value?>? _insertRange<Value extends Object>(RBTree<Value?>? tree, int start, int? end, Value? value) {
+  assert(start >= 0);
+  assert(end == null || end > start);
+  if (tree == null) {
+    return value == null
+      ? null
+      : RBTree<Value?>.fromSortedList(<(int, Value?)>[
+          (start, value),
+          if (end != null) (end, null),
+      ]);
+  }
+  // Split this tree into two rb trees: in the first tree keys are always less
+  // than `start`, and in the second tree keys are always greater than or equal
+  // to than `end`.
+  final RBTree<Value?>? leftTree = start == 0 ? null : tree.takeLessThan(start);
+  final RBTree<Value?>? rightTreeWithoutEnd = end == null ? null : tree.skipUntil(end);
+
+  final RBTree<Value?>? nodeAtEnd = end == null ? null : tree.getNodeLessThanOrEqualTo(end);
+  final RBTree<Value?>? rightTree = nodeAtEnd == null || nodeAtEnd.key == end
+    ? rightTreeWithoutEnd
+    : rightTreeWithoutEnd?.insert(end!, nodeAtEnd.value) ?? RBTree<Value?>.black(end!, nodeAtEnd.value);
+
+  return leftTree != null && rightTree != null
+    ? leftTree.join(rightTree, start, value)
+    : (leftTree ?? rightTree)?.insert(start, value) ?? RBTree<Value?>.black(start, value);
+}
 
 class TextAttributeIterable<T extends Object> {
   TextAttributeIterable._(this._storage, this._defaultValue, this._lift);
 
-  final RBTree<T?> _storage;
+  final RBTree<T?>? _storage;
   final T _defaultValue;
   final TextStyle Function(T) _lift;
 
-  (int, T) _map(RBTree<T?> node) => (node.key, node.value ?? _defaultValue);
+  (int, T) _map((int, T?) pair) => (pair.$1, pair.$2 ?? _defaultValue);
 
   Iterator<(int, T)> getRunsEndAfter(int index) {
-    return _MapIterator<RBTree<T?>, (int, T)>(_storage.getRunsEndAfter(index), _map);
+    final storage = _storage;
+    return storage == null
+      ? _EmptyIterator<(int, T)>()
+      : _MapIterator<(int, T?), (int, T)>(storage.getRunsEndAfter(index), _map);
   }
 
-  (int, TextStyle) _liftToTextStyle(RBTree<T?> node) => (node.key, _lift(node.value ?? _defaultValue));
+  (int, TextStyle) _liftToTextStyle((int, T?) pair) => (pair.$1, _lift(pair.$2 ?? _defaultValue));
 
   _RunIterator<TextStyle> _getTextStyleRunsEndAfter(int index) {
-    return _RunIterator<TextStyle>(_MapIterator<RBTree<T?>, (int, TextStyle)>(_storage.getRunsEndAfter(index), _liftToTextStyle));
+    final storage = _storage;
+    final innerIterator = storage == null
+      ? const _EmptyIterator<(int, TextStyle)>()
+      : _MapIterator<(int, T?), (int, TextStyle)>(storage.getRunsEndAfter(index), _liftToTextStyle);
+    return _RunIterator<TextStyle>(innerIterator);
   }
 }
 
@@ -35,7 +71,7 @@ class TextAttributeIterable<T extends Object> {
 class _DynamicAttributeIterable<T extends Object> { //implements TextAttributeIterable<List<(String, T)>>
   _DynamicAttributeIterable(this._storage, this._defaultValue, this._lift);
 
-  final PersistentHashMap<String, RBTree<T?>> _storage;
+  final PersistentHashMap<String, RBTree<T?>?> _storage;
   final Map<String, T> _defaultValue;
   final TextStyle Function(Map<String, T>) _lift;
 
@@ -46,14 +82,26 @@ class _DynamicAttributeIterable<T extends Object> { //implements TextAttributeIt
   (int, TextStyle) _liftSnd((int, Map<String, T>) pair) => (pair.$1, _lift(pair.$2));
 
   _RunIterator<TextStyle> _getTextStyleRunsEndAfter(int index) {
-    final List<_RunIterator<(String, T?)>> attributes = _storage.entries.map((MapEntry<String, RBTree<T?>> e) {
-      (int, (String, T?)) transform(RBTree<T?> node) => (node.key, (e.key, node.value));
-      return _RunIterator<(String, T?)>(_MapIterator<RBTree<T?>, (int, (String, T?))>(e.value.getRunsEndAfter(index), transform));
+    final List<_RunIterator<(String, T?)>> attributes = _storage.entries.map((MapEntry<String, RBTree<T?>?> e) {
+      (int, (String, T?)) transform((int, T?) pair) => (pair.$1, (e.key, pair.$2));
+      final storage = e.value;
+      final innerIterator = storage == null
+        ? _EmptyIterator<(int, (String, T?))>()
+        : _MapIterator<(int, T?), (int, (String, T?))>(storage.getRunsEndAfter(index), transform);
+      return _RunIterator<(String, T?)>(innerIterator);
     }).toList(growable: false);
 
     final _AccumulativeMergedRunIterator<T> merged = _AccumulativeMergedRunIterator<T>(attributes, _defaultValue);
     return _RunIterator<TextStyle>(_MapIterator(merged, _liftSnd));
   }
+}
+
+class _EmptyIterator<T> implements Iterator<T> {
+  const _EmptyIterator();
+  @override
+  bool moveNext() => false;
+  @override
+  T get current => throw FlutterError('unreachable');
 }
 
 /// A wrapper iterator that allows safely querying the current value, without
@@ -77,13 +125,13 @@ class _RunIterator<T> {
 }
 
 class _MapIterator<T, V> implements Iterator<V> {
-  _MapIterator(this.inner, this.map);
+  _MapIterator(this.inner, this.transform);
 
   final Iterator<T> inner;
-  final V Function(T) map;
+  final V Function(T) transform;
 
   @override
-  V get current => map(inner.current);
+  V get current => transform(inner.current);
 
   @override
   bool moveNext() => inner.moveNext();
@@ -248,6 +296,7 @@ class TextStyleAnnotations {
     this._height,
     this._letterSpacing,
     this._wordSpacing,
+    this._textLength,
     this.defaults,
   );
 
@@ -286,56 +335,76 @@ class TextStyleAnnotations {
   }
 
   final TextStyle defaults;
+  TextStyleAnnotations updateBaseTextStyle(TextStyle baseAnnotations) {
+    return TextStyleAnnotations._(
+      _fontFamilies,
+      _locale,
+      _fontWeight,
+      _fontStyle,
+      _fontFeatures,
+      _fontVariations,
+      _textBaseline,
+      _leadingDistribution,
+      _fontSize,
+      _height,
+      _letterSpacing,
+      _wordSpacing,
+      _textLength,
+      baseAnnotations,
+    );
+  }
 
-  final RBTree<List<String>?> _fontFamilies;
+  final int _textLength;
+
+  final RBTree<List<String>?>? _fontFamilies;
   late final TextAttributeIterable<List<String>> fontFamilies = TextAttributeIterable<List<String>>._(_fontFamilies, _getFontFamilies(defaults), _liftFontFamilies);
 
-  final RBTree<ui.Locale?> _locale;
+  final RBTree<ui.Locale?>? _locale;
   late final TextAttributeIterable<ui.Locale> locale = TextAttributeIterable<ui.Locale>._(_locale, defaults.locale!, _liftLocale);
 
-  final RBTree<double?> _fontSize;
+  final RBTree<double?>? _fontSize;
   late final TextAttributeIterable<double> fontSize = TextAttributeIterable<double>._(_fontSize, defaults.fontSize!, _liftFontSize);
 
-  final RBTree<ui.FontWeight?> _fontWeight;
+  final RBTree<ui.FontWeight?>? _fontWeight;
   late final TextAttributeIterable<ui.FontWeight> fontWeight = TextAttributeIterable<ui.FontWeight>._(_fontWeight, defaults.fontWeight!, _liftFontWeight);
 
-  final RBTree<ui.FontStyle?> _fontStyle;
+  final RBTree<ui.FontStyle?>? _fontStyle;
   late final TextAttributeIterable<ui.FontStyle> fontStyle = TextAttributeIterable<ui.FontStyle>._(_fontStyle, defaults.fontStyle!, _liftFontStyle);
 
-  final PersistentHashMap<String, RBTree<int?>> _fontFeatures;
+  final PersistentHashMap<String, RBTree<int?>?> _fontFeatures;
   late final _DynamicAttributeIterable<int> fontFeatures = _DynamicAttributeIterable(_fontFeatures, _fontFeaturesToMap(defaults.fontFeatures), _liftFontFeatures);
 
-  final PersistentHashMap<String, RBTree<double?>> _fontVariations;
+  final PersistentHashMap<String, RBTree<double?>?> _fontVariations;
   late final _DynamicAttributeIterable<double> fontVariations = _DynamicAttributeIterable(_fontVariations, _fontVariationsToMap(defaults.fontVariations), _liftFontVariations);
 
-  final RBTree<ui.TextLeadingDistribution?> _leadingDistribution;
+  final RBTree<ui.TextLeadingDistribution?>? _leadingDistribution;
   late final TextAttributeIterable<ui.TextLeadingDistribution> leadingDistribution = TextAttributeIterable<ui.TextLeadingDistribution>._(_leadingDistribution, defaults.leadingDistribution!, _liftLeadingDistribution);
 
-  final RBTree<double?> _height;
+  final RBTree<double?>? _height;
   late final TextAttributeIterable<double> height = TextAttributeIterable<double>._(_height, defaults.height!, _liftHeight);
 
-  final RBTree<ui.TextBaseline?> _textBaseline;
+  final RBTree<ui.TextBaseline?>? _textBaseline;
   late final TextAttributeIterable<ui.TextBaseline> textBaseline = TextAttributeIterable<ui.TextBaseline>._(_textBaseline, defaults.textBaseline!, _liftTextBaseline);
 
-  final RBTree<double?> _letterSpacing;
+  final RBTree<double?>? _letterSpacing;
   late final TextAttributeIterable<double> letterSpacing = TextAttributeIterable<double>._(_letterSpacing, defaults.letterSpacing!, _liftLetterSpacing);
-  final RBTree<double?> _wordSpacing;
+  final RBTree<double?>? _wordSpacing;
   late final TextAttributeIterable<double> wordSpacing = TextAttributeIterable<double>._(_wordSpacing, defaults.wordSpacing!, _liftWordSpacing);
 
   TextStyle getAnnotationAt(int index) {
     final TextStyle textStyle = TextStyle(
-      locale: _locale.getNodeLessThanOrEqualTo(index)?.value,
+      locale: _locale?.getNodeLessThanOrEqualTo(index)?.value,
 
-      fontWeight: _fontWeight.getNodeLessThanOrEqualTo(index)?.value,
-      fontStyle: _fontStyle.getNodeLessThanOrEqualTo(index)?.value,
+      fontWeight: _fontWeight?.getNodeLessThanOrEqualTo(index)?.value,
+      fontStyle: _fontStyle?.getNodeLessThanOrEqualTo(index)?.value,
 
-      textBaseline: _textBaseline.getNodeLessThanOrEqualTo(index)?.value,
-      leadingDistribution: _leadingDistribution.getNodeLessThanOrEqualTo(index)?.value,
+      textBaseline: _textBaseline?.getNodeLessThanOrEqualTo(index)?.value,
+      leadingDistribution: _leadingDistribution?.getNodeLessThanOrEqualTo(index)?.value,
 
-      fontSize: _fontSize.getNodeLessThanOrEqualTo(index)?.value,
-      height: _height.getNodeLessThanOrEqualTo(index)?.value,
-      letterSpacing: _letterSpacing.getNodeLessThanOrEqualTo(index)?.value,
-      wordSpacing: _wordSpacing.getNodeLessThanOrEqualTo(index)?.value,
+      fontSize: _fontSize?.getNodeLessThanOrEqualTo(index)?.value,
+      height: _height?.getNodeLessThanOrEqualTo(index)?.value,
+      letterSpacing: _letterSpacing?.getNodeLessThanOrEqualTo(index)?.value,
+      wordSpacing: _wordSpacing?.getNodeLessThanOrEqualTo(index)?.value,
     );
     return defaults.merge(textStyle);
   }
@@ -356,6 +425,77 @@ class TextStyleAnnotations {
       ..[11] = fontFeatures._getTextStyleRunsEndAfter(index);
     return _TextStyleMergingIterator(runsToMerge);
   }
+
+  TextStyleAnnotations overwrite(ui.TextRange range, TextStyleAttributeSet annotationsToOverwrite) {
+    final int? end = range.end >= _textLength ? null : range.end;
+
+    RBTree<Value?>? update<Value extends Object>(Value? newAttribute, RBTree<Value?>? tree) {
+      return newAttribute == null ? tree : _insertRange(tree, range.start, end, newAttribute);
+    }
+
+    PersistentHashMap<String, RBTree<Value?>?> updateMap<Value extends Object>(PersistentHashMap<String, RBTree<Value?>?> map, MapEntry<String, Value?> newAttribute) {
+      final key = newAttribute.key;
+      final newValue = newAttribute.value;
+      final tree = map[key];
+      final newTree = _insertRange(tree, range.start, end, newValue);
+      return identical(tree, newTree) ? map : map.put(key, newTree);
+    }
+
+    return TextStyleAnnotations._(
+      update(annotationsToOverwrite.fontFamilies, _fontFamilies),
+      update(annotationsToOverwrite.locale, _locale),
+      update(annotationsToOverwrite.fontWeight, _fontWeight),
+      update(annotationsToOverwrite.fontStyle, _fontStyle),
+      annotationsToOverwrite.fontFeatures.entries.fold(_fontFeatures, updateMap),
+      annotationsToOverwrite.fontVariations.entries.fold(_fontVariations, updateMap),
+      update(annotationsToOverwrite.textBaseline, _textBaseline),
+      update(annotationsToOverwrite.textLeadingDistribution, _leadingDistribution),
+      update(annotationsToOverwrite.fontSize, _fontSize),
+      update(annotationsToOverwrite.height, _height),
+      update(annotationsToOverwrite.letterSpacing, _letterSpacing),
+      update(annotationsToOverwrite.wordSpacing, _wordSpacing),
+      _textLength,
+      defaults,
+    );
+  }
+
+  // Resets TextStyle attributes with non-null values to baseTextStyle.
+  // I'm not sure this is really needed. Added for duality.
+  TextStyleAnnotations erase(ui.TextRange range, TextStyleAttributeSet annotationsToErase) {
+    final int? end = range.end >= _textLength ? null : range.end;
+
+    RBTree<Value?>? erase<Value extends Object>(Value? newAttribute, RBTree<Value?>? tree) {
+      return newAttribute == null ? tree : _insertRange(tree, range.start, end, null);
+    }
+
+    PersistentHashMap<String, RBTree<Value?>?> eraseFromMap<Value extends Object>(PersistentHashMap<String, RBTree<Value?>?> map, MapEntry<String, Value?> newAttribute) {
+      final key = newAttribute.key;
+      final newValue = newAttribute.value;
+      if (newValue == null) {
+        return map;
+      }
+      final tree = map[key];
+      final newTree = _insertRange<Value>(tree, range.start, end, null);
+      return identical(tree, newTree) ? map : map.put(key, newTree);
+    }
+
+    return TextStyleAnnotations._(
+      erase(annotationsToErase.fontFamilies, _fontFamilies),
+      erase(annotationsToErase.locale, _locale),
+      erase(annotationsToErase.fontWeight, _fontWeight),
+      erase(annotationsToErase.fontStyle, _fontStyle),
+      annotationsToErase.fontFeatures.entries.fold(_fontFeatures, eraseFromMap),
+      annotationsToErase.fontVariations.entries.fold(_fontVariations, eraseFromMap),
+      erase(annotationsToErase.textBaseline, _textBaseline),
+      erase(annotationsToErase.textLeadingDistribution, _leadingDistribution),
+      erase(annotationsToErase.fontSize, _fontSize),
+      erase(annotationsToErase.height, _height),
+      erase(annotationsToErase.letterSpacing, _letterSpacing),
+      erase(annotationsToErase.wordSpacing, _wordSpacing),
+      _textLength,
+      defaults,
+    );
+  }
 }
 
 final class TextStyleAttributeSet {
@@ -365,8 +505,8 @@ final class TextStyleAttributeSet {
     this.fontSize,
     this.fontWeight,
     this.fontStyle,
-    this.fontFeatures,
-    this.fontVariations,
+    this.fontFeatures = const <String, int?>{},
+    this.fontVariations = const <String, double?>{},
     this.height,
     this.textLeadingDistribution,
     this.textBaseline,
@@ -380,8 +520,8 @@ final class TextStyleAttributeSet {
   final ui.FontWeight? fontWeight;
   final ui.FontStyle? fontStyle;
 
-  final Map<String, int>? fontFeatures;
-  final Map<String, double>? fontVariations;
+  final Map<String, int?> fontFeatures;
+  final Map<String, double?> fontVariations;
 
   final double? height;
   final ui.TextLeadingDistribution? textLeadingDistribution;

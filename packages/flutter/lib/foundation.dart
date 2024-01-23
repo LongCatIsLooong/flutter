@@ -39,6 +39,7 @@ export 'src/foundation/node.dart';
 export 'src/foundation/object.dart';
 export 'src/foundation/observer_list.dart';
 export 'src/foundation/persistent_hash_map.dart';
+export 'src/foundation/persistent_rb_tree.dart';
 export 'src/foundation/platform.dart';
 export 'src/foundation/print.dart';
 export 'src/foundation/serialization.dart';

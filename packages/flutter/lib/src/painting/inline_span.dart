@@ -6,9 +6,8 @@ import 'dart:ui' as ui show ParagraphBuilder, StringAttribute;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/src/painting/text_style_attributes.dart';
 
-import 'attributed_text.dart';
+import 'annotated_string.dart';
 import 'basic_types.dart';
 import 'text_painter.dart';
 import 'text_scaler.dart';
