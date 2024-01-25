@@ -5,6 +5,7 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/src/painting/basic_types.dart';
 
 import 'inline_span.dart';
 import 'placeholder_span.dart';
@@ -72,37 +73,6 @@ class TextAttributeIterable<T extends Object> implements TextStyleAttributeGette
       ? const _EmptyIterator<(int, TextStyle)>()
       : _MapIterator<(int, T?), (int, TextStyle)>(storage.getRunsEndAfter(index), _liftToTextStyle);
     return _RunIterator<TextStyle>(innerIterator);
-  }
-}
-
-/// For font features, font variations.
-///
-/// The TextStyle.merge method can't merge 2 TextStyles with different
-class _DynamicAttributeIterable<T extends Object> { //implements TextAttributeIterable<List<(String, T)>>
-  _DynamicAttributeIterable(this._storage, this._defaultValue, this._lift);
-
-  final PersistentHashMap<String, RBTree<T?>?> _storage;
-  final Map<String, T> _defaultValue;
-  final TextStyle Function(Map<String, T>) _lift;
-
-  //Iterator<(int, Iterable<String, T>)> getRunsEndAfter(int index) {
-  //  return _MapIterator<RBTree<T?>, (int, T)>(_storage.getRunsEndAfter(index), _map);
-  //}
-
-  (int, TextStyle) _liftSnd((int, Map<String, T>) pair) => (pair.$1, _lift(pair.$2));
-
-  _RunIterator<TextStyle> _getTextStyleRunsEndAfter(int index) {
-    final List<_RunIterator<(String, T?)>> attributes = _storage.entries.map((MapEntry<String, RBTree<T?>?> e) {
-      (int, (String, T?)) transform((int, T?) pair) => (pair.$1, (e.key, pair.$2));
-      final storage = e.value;
-      final innerIterator = storage == null
-        ? _EmptyIterator<(int, (String, T?))>()
-        : _MapIterator<(int, T?), (int, (String, T?))>(storage.getRunsEndAfter(index), transform);
-      return _RunIterator<(String, T?)>(innerIterator);
-    }).toList(growable: false);
-
-    final _AccumulativeMergedRunIterator<T> merged = _AccumulativeMergedRunIterator<T>(attributes, _defaultValue);
-    return _RunIterator<TextStyle>(_MapIterator(merged, _liftSnd));
   }
 }
 
@@ -314,6 +284,10 @@ TextStyle _liftFontWeight(ui.FontWeight input) => TextStyle(fontWeight: input);
 ui.FontWeight?_getFontWeight(TextStyle textStyle) => textStyle.fontWeight;
 TextStyle _liftFontStyle(ui.FontStyle input) => TextStyle(fontStyle: input);
 ui.FontStyle?_getFontStyle(TextStyle textStyle) => textStyle.fontStyle;
+TextStyle _liftFontFeatures(List<ui.FontFeature> input) => TextStyle(fontFeatures: input);
+List<ui.FontFeature>?_getFontFeatures(TextStyle textStyle) => textStyle.fontFeatures;
+TextStyle _liftFontVariations(List<ui.FontVariation> input) => TextStyle(fontVariations: input);
+List<ui.FontVariation>?_getFontVariations(TextStyle textStyle) => textStyle.fontVariations;
 TextStyle _liftHeight(double input) => TextStyle(height: input);
 double? _getHeight(TextStyle textStyle) => textStyle.height;
 TextStyle _liftLeadingDistribution(ui.TextLeadingDistribution input) => TextStyle(leadingDistribution: input);
@@ -325,19 +299,14 @@ double? _getWordSpacing(TextStyle textStyle) => textStyle.wordSpacing;
 TextStyle _liftLetterSpacing(double input) => TextStyle(letterSpacing: input);
 double? _getLetterSpacing(TextStyle textStyle) => textStyle.letterSpacing;
 
-MapEntry<String, double> _mapFontVariation(ui.FontVariation fontVariation) => MapEntry<String, double>(fontVariation.axis, fontVariation.value);
-Map<String, double> _fontVariationsToMap(List<ui.FontVariation>? input) {
-  return input == null ? const <String, double>{} : Map<String, double>.fromEntries(input.map(_mapFontVariation));
-}
+bool? _getUnderline(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.underline);
+bool? _getOverline(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.overline);
+bool? _getLineThrough(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.lineThrough);
+ui.Color? _getDecorationColor(TextStyle textStyle) => textStyle.decorationColor;
+ui.TextDecorationStyle? _getDecorationStyle(TextStyle textStyle) => textStyle.decorationStyle;
+double? _getDecorationThickness(TextStyle textStyle) => textStyle.decorationThickness;
+List<ui.Shadow>? _getShadows(TextStyle textStyle) => textStyle.shadows;
 
-MapEntry<String, int> _mapFontFeature(ui.FontFeature fontFeature) => MapEntry<String, int>(fontFeature.feature, fontFeature.value);
-Map<String, int> _fontFeaturesToMap(List<ui.FontFeature>? input) {
-  return input == null ? const <String, int>{} : Map<String, int>.fromEntries(input.map(_mapFontFeature));
-}
-//TextStyle _liftFontVariations(Map<String, double> input) => TextStyle(fontVariations: input.entries.map((MapEntry<String, double> entry) => ui.FontVariation(entry.key, entry.value)).toList(growable: false));
-TextStyle _liftFontVariations(List<ui.FontVariation> input) => TextStyle(fontVariations: input);
-//TextStyle _liftFontFeatures(Map<String, int> input) => TextStyle(fontFeatures: input.entries.map((MapEntry<String, int> entry) => ui.FontFeature(entry.key, entry.value)).toList(growable: false));
-TextStyle _liftFontFeatures(List<ui.FontFeature> input) => TextStyle(fontFeatures: input);
 
 abstract final class _TextStyleAnnotationKey { }
 
@@ -406,11 +375,6 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
 
   final RBTree<List<ui.FontVariation>?>? _fontVariations;
   late final TextAttributeIterable<List<ui.FontVariation>> fontVariations = _createAttribute(_fontVariations, defaults.fontVariations!, _liftFontVariations);
-  //final PersistentHashMap<String, RBTree<int?>?> _fontFeatures;
-  //late final _DynamicAttributeIterable<int> fontFeatures = _DynamicAttributeIterable(_fontFeatures, _fontFeaturesToMap(defaults.fontFeatures), _liftFontFeatures);
-
-  //final PersistentHashMap<String, RBTree<double?>?> _fontVariations;
-  //late final _DynamicAttributeIterable<double> fontVariations = _DynamicAttributeIterable(_fontVariations, _fontVariationsToMap(defaults.fontVariations), _liftFontVariations);
 
   final RBTree<ui.TextLeadingDistribution?>? _leadingDistribution;
   late final TextAttributeIterable<ui.TextLeadingDistribution> leadingDistribution = _createAttribute(_leadingDistribution, defaults.leadingDistribution!, _liftLeadingDistribution);
@@ -451,13 +415,13 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
       ..[2] = fontSize._getTextStyleRunsEndAfter(index)
       ..[3] = fontWeight._getTextStyleRunsEndAfter(index)
       ..[4] = fontStyle._getTextStyleRunsEndAfter(index)
-      ..[5] = height._getTextStyleRunsEndAfter(index)
-      ..[6] = leadingDistribution._getTextStyleRunsEndAfter(index)
-      ..[7] = textBaseline._getTextStyleRunsEndAfter(index)
-      ..[8] = wordSpacing._getTextStyleRunsEndAfter(index)
-      ..[9] = letterSpacing._getTextStyleRunsEndAfter(index)
-      ..[10] = fontVariations._getTextStyleRunsEndAfter(index)
-      ..[11] = fontFeatures._getTextStyleRunsEndAfter(index);
+      ..[5] = fontVariations._getTextStyleRunsEndAfter(index)
+      ..[6] = fontFeatures._getTextStyleRunsEndAfter(index)
+      ..[7] = height._getTextStyleRunsEndAfter(index)
+      ..[8] = leadingDistribution._getTextStyleRunsEndAfter(index)
+      ..[9] = textBaseline._getTextStyleRunsEndAfter(index)
+      ..[10] = wordSpacing._getTextStyleRunsEndAfter(index)
+      ..[11] = letterSpacing._getTextStyleRunsEndAfter(index);
     return _TextStyleMergingIterator(runsToMerge);
   }
 
@@ -481,8 +445,8 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
       update(annotationsToOverwrite.locale, _locale),
       update(annotationsToOverwrite.fontWeight, _fontWeight),
       update(annotationsToOverwrite.fontStyle, _fontStyle),
-      annotationsToOverwrite.fontFeatures.entries.fold(_fontFeatures, updateMap),
-      annotationsToOverwrite.fontVariations.entries.fold(_fontVariations, updateMap),
+      update(annotationsToOverwrite.fontFeatures, _fontFeatures),
+      update(annotationsToOverwrite.fontVariations, _fontVariations),
       update(annotationsToOverwrite.textBaseline, _textBaseline),
       update(annotationsToOverwrite.textLeadingDistribution, _leadingDistribution),
       update(annotationsToOverwrite.fontSize, _fontSize),
@@ -503,24 +467,13 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
       return newAttribute == null ? tree : _insertRange(tree, range.start, end, null);
     }
 
-    PersistentHashMap<String, RBTree<Value?>?> eraseFromMap<Value extends Object>(PersistentHashMap<String, RBTree<Value?>?> map, MapEntry<String, Value?> newAttribute) {
-      final key = newAttribute.key;
-      final newValue = newAttribute.value;
-      if (newValue == null) {
-        return map;
-      }
-      final tree = map[key];
-      final newTree = _insertRange<Value>(tree, range.start, end, null);
-      return identical(tree, newTree) ? map : map.put(key, newTree);
-    }
-
     return TextStyleAnnotations._(
       erase(annotationsToErase.fontFamilies, _fontFamilies),
       erase(annotationsToErase.locale, _locale),
       erase(annotationsToErase.fontWeight, _fontWeight),
       erase(annotationsToErase.fontStyle, _fontStyle),
-      annotationsToErase.fontFeatures.entries.fold(_fontFeatures, eraseFromMap),
-      annotationsToErase.fontVariations.entries.fold(_fontVariations, eraseFromMap),
+      erase(annotationsToErase.fontFeatures, _fontFeatures),
+      erase(annotationsToErase.fontVariations, _fontVariations),
       erase(annotationsToErase.textBaseline, _textBaseline),
       erase(annotationsToErase.textLeadingDistribution, _leadingDistribution),
       erase(annotationsToErase.fontSize, _fontSize),
@@ -540,8 +493,8 @@ final class TextStyleAttributeSet {
     this.fontSize,
     this.fontWeight,
     this.fontStyle,
-    this.fontFeatures = const <String, int?>{},
-    this.fontVariations = const <String, double?>{},
+    this.fontFeatures,
+    this.fontVariations,
     this.height,
     this.textLeadingDistribution,
     this.textBaseline,
@@ -555,8 +508,8 @@ final class TextStyleAttributeSet {
   final ui.FontWeight? fontWeight;
   final ui.FontStyle? fontStyle;
 
-  final Map<String, int?> fontFeatures;
-  final Map<String, double?> fontVariations;
+  final List<ui.FontFeature>? fontFeatures;
+  final List<ui.FontVariation>? fontVariations;
 
   final double? height;
   final ui.TextLeadingDistribution? textLeadingDistribution;
@@ -571,24 +524,29 @@ abstract final class _TextPaintAnnotationKey { }
 @immutable
 final class TextPaintAnnotations implements StringAnnotation<_TextPaintAnnotationKey> {
   TextPaintAnnotations._(
-    this.underline,
-    this.overline,
-    this.lineThrough,
-    this.decorationColor,
-    this.decorationStyle,
-    this.decorationThickness,
-    this.shadow,
+    this._underline,
+    this._overline,
+    this._lineThrough,
+    this._decorationColor,
+    this._decorationStyle,
+    this._decorationThickness,
+    this._shadows,
+    this._textLength,
+    this.baseAnnotations,
   );
 
-  final RBTree<bool> underline;
-  final RBTree<bool> overline;
-  final RBTree<bool> lineThrough;
+  final RBTree<bool?>? _underline;
+  final RBTree<bool?>? _overline;
+  final RBTree<bool?>? _lineThrough;
 
-  final RBTree<ui.Color> decorationColor;
-  final RBTree<ui.TextDecorationStyle> decorationStyle;
-  final RBTree<double> decorationThickness;
+  final RBTree<ui.Color?>? _decorationColor;
+  final RBTree<ui.TextDecorationStyle?>? _decorationStyle;
+  final RBTree<double?>? _decorationThickness;
 
-  final RBTree<ui.Shadow> shadow;
+  final RBTree<List<ui.Shadow>?>? _shadows;
+
+  final TextStyle baseAnnotations;
+  final int _textLength;
 }
 
 final class TextPaintAttributionSet {
@@ -638,10 +596,8 @@ class _TextStyleAttributeStackEntry<Value extends Object> {
 // [(0, 10), (5, 20)], it means the text starts with a font size of 10 and
 // starting from the 5th code unit the font size changes to 20.
 
-//class _TextStyleAttributeRunBuilder<Value extends Object> {
-//}
-class _PlainTextStyleAttributeRunBuilder<Value extends Object> {
-  _PlainTextStyleAttributeRunBuilder(this.getAttribute);
+class _TextStyleAttributeRunBuilder<Value extends Object> {
+  _TextStyleAttributeRunBuilder(this.getAttribute);
   final List<_TextStyleAttributeStackEntry<Value>> attributeStack = <_TextStyleAttributeStackEntry<Value>>[];
   final List<(int, Value)> runs = <(int, Value)>[];
   int runStartIndex = 0;
@@ -684,46 +640,48 @@ class _PlainTextStyleAttributeRunBuilder<Value extends Object> {
   RBTree<Value?> build() => RBTree<Value?>.fromSortedList(runs);
 }
 
-class _TextStyleFontFeatureRunBuilder<Value extends Object> {
-  _TextStyleAttributeCollectionRunBuilder(this.getAttribute);
-
-  final Map<String, _PlainTextStyleAttributeRunBuilder<Value>> plainBuilders = <String, _PlainTextStyleAttributeRunBuilder<Value>>{};
-
-  void push(TextStyle? textStyle) {
-    final List<ui.FontFeature>? newAttribute = textStyle?.fontFeatures;
-    if (newAttribute == null) {
-      return;
-    }
-
-    for (int i = 0; i < newAttribute.length; i += 1) {
-      plainBuilders[newAttribute[i].feature] =
-    }
-  }
-}
-
 (TextStyleAnnotations, TextPaintAnnotations) _inlineSpanToTextStyleAnnotations(InlineSpan span, String string) {
-  final fontFamilies = _PlainTextStyleAttributeRunBuilder<List<String>>(_getFontFamilies);
-  final locale = _PlainTextStyleAttributeRunBuilder<ui.Locale>(_getLocale);
-  final fontWeight = _PlainTextStyleAttributeRunBuilder<ui.FontWeight>(_getFontWeight);
-  final fontStyle = _PlainTextStyleAttributeRunBuilder<ui.FontStyle>(_getFontStyle);
+  final fontFamilies = _TextStyleAttributeRunBuilder<List<String>>(_getFontFamilies);
+  final locale = _TextStyleAttributeRunBuilder<ui.Locale>(_getLocale);
+  final fontWeight = _TextStyleAttributeRunBuilder<ui.FontWeight>(_getFontWeight);
+  final fontStyle = _TextStyleAttributeRunBuilder<ui.FontStyle>(_getFontStyle);
+  final fontFeatures = _TextStyleAttributeRunBuilder<List<ui.FontFeature>>(_getFontFeatures);
+  final fontVariations = _TextStyleAttributeRunBuilder<List<ui.FontVariation>>(_getFontVariations);
+  final textBaseline = _TextStyleAttributeRunBuilder<ui.TextBaseline>(_getTextBaseline);
+  final leadingDistribution = _TextStyleAttributeRunBuilder<ui.TextLeadingDistribution>(_getLeadingDistribution);
+  final fontSize = _TextStyleAttributeRunBuilder<double>(_getFontSize);
+  final height = _TextStyleAttributeRunBuilder<double>(_getHeight);
+  final letterSpacing = _TextStyleAttributeRunBuilder<double>(_getLetterSpacing);
+  final wordSpacing = _TextStyleAttributeRunBuilder<double>(_getWordSpacing);
 
-  final textBaseline = _PlainTextStyleAttributeRunBuilder<ui.TextBaseline>(_getTextBaseline);
-  final leadingDistribution = _PlainTextStyleAttributeRunBuilder<ui.TextLeadingDistribution>(_getLeadingDistribution);
-  final fontSize = _PlainTextStyleAttributeRunBuilder<double>(_getFontSize);
-  final height = _PlainTextStyleAttributeRunBuilder<double>(_getHeight);
-  final letterSpacing = _PlainTextStyleAttributeRunBuilder<double>(_getLetterSpacing);
-  final wordSpacing = _PlainTextStyleAttributeRunBuilder<double>(_getWordSpacing);
-  final List<_PlainTextStyleAttributeRunBuilder<Object>> attributes = <_PlainTextStyleAttributeRunBuilder<Object>>[
+  final underline = _TextStyleAttributeRunBuilder<bool>(_getUnderline);
+  final overline = _TextStyleAttributeRunBuilder<bool>(_getOverline);
+  final lineThrough = _TextStyleAttributeRunBuilder<bool>(_getLineThrough);
+  final decorationColor = _TextStyleAttributeRunBuilder<ui.Color>(_getDecorationColor);
+  final decorationStyle = _TextStyleAttributeRunBuilder<ui.TextDecorationStyle>(_getDecorationStyle);
+  final decorationThickness = _TextStyleAttributeRunBuilder<double>(_getDecorationThickness);
+  final shadows = _TextStyleAttributeRunBuilder<List<ui.Shadow>>(_getShadows);
+  final List<_TextStyleAttributeRunBuilder<Object>> attributes = <_TextStyleAttributeRunBuilder<Object>>[
     fontFamilies,
     locale,
     fontWeight,
     fontStyle,
+    fontFeatures,
+    fontVariations,
     textBaseline,
     leadingDistribution,
     fontSize,
     height,
     letterSpacing,
     wordSpacing,
+
+    underline,
+    overline,
+    lineThrough,
+    decorationColor,
+    decorationStyle,
+    decorationThickness,
+    shadows,
   ];
 
   bool visitSpan(InlineSpan span) {
@@ -761,8 +719,8 @@ class _TextStyleFontFeatureRunBuilder<Value extends Object> {
     locale.build(),
     fontWeight.build(),
     fontStyle.build(),
-    ,
-    ,
+    fontFeatures.build(),
+    fontVariations.build(),
     textBaseline.build(),
     leadingDistribution.build(),
     fontSize.build(),
@@ -772,7 +730,18 @@ class _TextStyleFontFeatureRunBuilder<Value extends Object> {
     string.length,
     const TextStyle(),
   );
-  return (textStyleAnnotations, );
+  final TextPaintAnnotations textPaintAnnotations = TextPaintAnnotations._(
+    underline.build(),
+    overline.build(),
+    lineThrough.build(),
+    decorationColor.build(),
+    decorationStyle.build(),
+    decorationThickness.build(),
+    shadows.build(),
+    string.length,
+    const TextStyle(),
+  );
+  return (textStyleAnnotations, textPaintAnnotations);
 }
 
 (String, PersistentHashMap<Type, StringAnnotation<Object>?>) _extractFromInlineSpan(InlineSpan span) {
@@ -786,50 +755,6 @@ class _TextStyleFontFeatureRunBuilder<Value extends Object> {
       .put(_TextStyleAnnotationKey, styleAnnotations),
   );
 }
-
-//class _AnnotatedStringBuilder implements ui.ParagraphBuilder {
-//  final StringBuffer buffer = StringBuffer();
-//  final List<int> placeholderAnnotations = <int>[];
-//
-//  final List<ui.TextStyle> _styleStack = <ui.TextStyle>[];
-//  final List<(int, ui.TextStyle?)> styles = <(int, ui.TextStyle?)>[];
-//
-//  @override
-//  void addPlaceholder(double width, double height, ui.PlaceholderAlignment alignment, {double scale = 1.0, double? baselineOffset, ui.TextBaseline? baseline}) {
-//    placeholderAnnotations.add(buffer.length);
-//    commitText(String.fromCharCode(PlaceholderSpan.placeholderCodeUnit));
-//  }
-//
-//  @override
-//  void addText(String text) => commitText(text);
-//
-//  @override
-//  void pop() {
-//    _styleStack.removeLast();
-//  }
-//
-//  @override
-//  void pushStyle(ui.TextStyle style) {
-//    _styleStack.add(style);
-//  }
-//
-//  void commitText(String text) {
-//    if (text.isEmpty) {
-//      return;
-//    }
-//    final ui.TextStyle? style = _styleStack.isEmpty ? null : _styleStack.last;
-//    styles.add((buffer.length, style));
-//    buffer.write(text);
-//  }
-//
-//  @override
-//  ui.Paragraph build() => throw UnimplementedError();
-//  @override
-//  int get placeholderCount => throw UnimplementedError();
-//  @override
-//  List<double> get placeholderScales => throw UnimplementedError();
-//}
-
 
 /// An immutable represetation of
 @immutable
