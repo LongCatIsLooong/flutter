@@ -7,12 +7,12 @@ import 'dart:ui' as ui show ParagraphBuilder, StringAttribute;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 
-import 'annotated_string.dart';
 import 'basic_types.dart';
 import 'text_painter.dart';
 import 'text_scaler.dart';
 import 'text_span.dart';
 import 'text_style.dart';
+import 'text_style_attributes.dart';
 
 // Examples can assume:
 // late InlineSpan myInlineSpan;
@@ -270,12 +270,12 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
 
   @override
   @protected
-  T? getAnnotationOfType<T extends Object>() {
-    return toAnnotatedString.getAnnotationOfType<T>();
+  T? getAnnotationOfType<T extends StringAnnotation<Key>, Key extends Object>() {
+    return toAnnotatedString.getAnnotationOfType<T, Key>();
   }
 
   @override
-  AnnotatedString setAnnotationOfType<T extends Object>(T? newAnnotations) {
+  AnnotatedString setAnnotationOfType<T extends StringAnnotation<Key>, Key extends Object>(T? newAnnotations) {
     return toAnnotatedString.setAnnotationOfType(newAnnotations);
   }
 
