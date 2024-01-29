@@ -5,12 +5,18 @@
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/src/painting/basic_types.dart';
 
 import 'inline_span.dart';
 import 'placeholder_span.dart';
 import 'text_span.dart';
 import 'text_style.dart';
+
+@pragma('vm:prefer-inline')
+V? _applyNullable<T extends Object, V extends Object>(V? Function(T) transform, T? nullable) {
+  return nullable == null ? null : transform(nullable);
+}
 
 // TODO: dedup
 // TODO: rename lift
@@ -23,18 +29,15 @@ RBTree<Value?>? _insertRange<Value extends Object>(RBTree<Value?>? tree, int sta
   if (tree == null) {
     return value == null
       ? null
-      : RBTree<Value?>.fromSortedList(<(int, Value?)>[
-          (start, value),
-          if (end != null) (end, null),
-      ]);
+      : RBTree<Value?>.black(start, value, right: end == null ? null : RBTree<Value?>.red(end, null));
   }
   // Split this tree into two rb trees: in the first tree keys are always less
   // than `start`, and in the second tree keys are always greater than or equal
   // to than `end`.
   final RBTree<Value?>? leftTree = start == 0 ? null : tree.takeLessThan(start);
-  final RBTree<Value?>? rightTreeWithoutEnd = end == null ? null : tree.skipUntil(end);
+  final RBTree<Value?>? rightTreeWithoutEnd = _applyNullable(tree.skipUntil, end);
 
-  final RBTree<Value?>? nodeAtEnd = end == null ? null : tree.getNodeLessThanOrEqualTo(end);
+  final RBTree<Value?>? nodeAtEnd = _applyNullable(tree.getNodeLessThanOrEqualTo, end);
   final RBTree<Value?>? rightTree = nodeAtEnd == null || nodeAtEnd.key == end
     ? rightTreeWithoutEnd
     : rightTreeWithoutEnd?.insert(end!, nodeAtEnd.value) ?? RBTree<Value?>.black(end!, nodeAtEnd.value);
@@ -299,6 +302,8 @@ double? _getWordSpacing(TextStyle textStyle) => textStyle.wordSpacing;
 TextStyle _liftLetterSpacing(double input) => TextStyle(letterSpacing: input);
 double? _getLetterSpacing(TextStyle textStyle) => textStyle.letterSpacing;
 
+Either<ui.Color, ui.Paint>? _getForeground(TextStyle textStyle) => _applyNullable(Left.new, textStyle.color) ?? _applyNullable(Right.new, textStyle.foreground);
+Either<ui.Color, ui.Paint>? _getBackground(TextStyle textStyle) => _applyNullable(Left.new, textStyle.backgroundColor) ?? _applyNullable(Right.new, textStyle.background);
 bool? _getUnderline(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.underline);
 bool? _getOverline(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.overline);
 bool? _getLineThrough(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.lineThrough);
@@ -524,6 +529,8 @@ abstract final class _TextPaintAnnotationKey { }
 @immutable
 final class TextPaintAnnotations implements StringAnnotation<_TextPaintAnnotationKey> {
   TextPaintAnnotations._(
+    this._foreground,
+    this._background,
     this._underline,
     this._overline,
     this._lineThrough,
@@ -534,6 +541,9 @@ final class TextPaintAnnotations implements StringAnnotation<_TextPaintAnnotatio
     this._textLength,
     this.baseAnnotations,
   );
+
+  final RBTree<Either<ui.Color, ui.Paint>?>? _foreground;
+  final RBTree<Either<ui.Color, ui.Paint>?>? _background;
 
   final RBTree<bool?>? _underline;
   final RBTree<bool?>? _overline;
@@ -551,8 +561,6 @@ final class TextPaintAnnotations implements StringAnnotation<_TextPaintAnnotatio
 
 final class TextPaintAttributionSet {
   const TextPaintAttributionSet({
-    this.foregroundColor,
-    this.backgroundColor,
     this.foreground,
     this.background,
     this.shadows,
@@ -564,11 +572,9 @@ final class TextPaintAttributionSet {
     this.decorationThickness,
   });
 
-  final ui.Color? foregroundColor;
-  final ui.Color? backgroundColor;
   // How do we compare ui.Paint objects?
-  final ui.Paint? foreground;
-  final ui.Paint? background;
+  final Either<ui.Color, ui.Paint>? foreground;
+  final Either<ui.Color, ui.Paint>? background;
   final List<ui.Shadow>? shadows;
 
   final bool? underline;
@@ -580,46 +586,55 @@ final class TextPaintAttributionSet {
   final double? decorationThickness;
 }
 
-class _TextStyleAttributeStackEntry<Value extends Object> {
-  _TextStyleAttributeStackEntry(this.value);
-  final Value value;
-  int repeatCount = 1;
+abstract final class _HitTestAnnotationKey {}
+class TextHitTestAnnotations implements StringAnnotation<_HitTestAnnotationKey> {
+  const TextHitTestAnnotations._(this._hitTestTargets);
+
+  final RBTree<List<HitTestTarget>> _hitTestTargets;
+
+  Iterable<HitTestTarget> getHitTestTargets(int codeUnitOffset) {
+    final iterator = _hitTestTargets.getRunsEndAfter(codeUnitOffset);
+    return iterator.moveNext() ? iterator.current.$2 : const <HitTestTarget>[];
+  }
+}
+
+abstract final class _SemanticsAnnotationKey {}
+/// An annotation type that represents the extra semantics information of the text.
+class SemanticsAnnotations implements StringAnnotation<_SemanticsAnnotationKey> {
+  const SemanticsAnnotations._(this._semanticsLabels, this._spellout, this._gestureCallbacks);
+
+  final RBTree<String?>? _semanticsLabels;
+  final RBTree<bool?>? _spellout;
+  // Either onTap callbacks or onLongPress callbacks.
+  final RBTree<Either<VoidCallback, VoidCallback>?>? _gestureCallbacks;
 }
 
 /// InlineSpan to AnnotatedString Conversion
 
-// A class for extracting TextStyle attribute (such as the font size) runs from
-// an InlineSpans.
+class _AttributeStackEntry<Value extends Object> {
+  _AttributeStackEntry(this.value);
+  final Value value;
+  int repeatCount = 1;
+}
+
+// A class for extracting attribute (such as the font size) runs from an InlineSpan.
 //
 // Each attribute run is a pair of the starting index of the attribute in the
 // string, and value of the attribute. For instance if the font size runs are
 // [(0, 10), (5, 20)], it means the text starts with a font size of 10 and
 // starting from the 5th code unit the font size changes to 20.
 
-class _TextStyleAttributeRunBuilder<Value extends Object> {
-  _TextStyleAttributeRunBuilder(this.getAttribute);
-  final List<_TextStyleAttributeStackEntry<Value>> attributeStack = <_TextStyleAttributeStackEntry<Value>>[];
-  final List<(int, Value)> runs = <(int, Value)>[];
+abstract class _AttributeRunBuilder<Source extends Object, Attribute extends Object> {
+  final List<_AttributeStackEntry<Attribute>> attributeStack = <_AttributeStackEntry<Attribute>>[];
+  final List<(int, Attribute)> runs = <(int, Attribute)>[];
   int runStartIndex = 0;
-  final Value? Function(TextStyle) getAttribute;
 
-  void push(TextStyle? textStyle) {
-    if (textStyle == null) {
-      return;
-    }
-    final Value? newAttribute = getAttribute(textStyle);
-    final _TextStyleAttributeStackEntry<Value>? topOfStack = attributeStack.isEmpty ? null : attributeStack.last;
-    if (newAttribute == null || newAttribute == topOfStack?.value) {
-      topOfStack?.repeatCount += 1;
-    } else {
-      attributeStack.add(_TextStyleAttributeStackEntry<Value>(newAttribute));
-    }
-  }
+  void push(Source? attribute);
   void pop() {
     if (attributeStack.isEmpty) {
       return;
     }
-    final _TextStyleAttributeStackEntry<Value> topOfStack = attributeStack.last;
+    final _AttributeStackEntry<Attribute> topOfStack = attributeStack.last;
     if (topOfStack.repeatCount > 1) {
       topOfStack.repeatCount -= 1;
     } else {
@@ -630,17 +645,52 @@ class _TextStyleAttributeRunBuilder<Value extends Object> {
     if (length == 0) {
       return;
     }
-    final Value? currentRunAttribute = runs.isEmpty ? null : runs.last.$2;
+    final Attribute? currentRunAttribute = runs.isEmpty ? null : runs.last.$2;
     // Start a new run only if the attributes are different.
     if (attributeStack.isNotEmpty && currentRunAttribute != attributeStack.last.value) {
       runs.add((runStartIndex, attributeStack.last.value));
     }
     runStartIndex += length;
   }
-  RBTree<Value?> build() => RBTree<Value?>.fromSortedList(runs);
+  RBTree<Attribute?> build() => RBTree<Attribute?>.fromSortedList(runs);
 }
 
-(TextStyleAnnotations, TextPaintAnnotations) _inlineSpanToTextStyleAnnotations(InlineSpan span, String string) {
+class _TextStyleAttributeRunBuilder<Attribute extends Object> extends _AttributeRunBuilder<TextStyle, Attribute> {
+  _TextStyleAttributeRunBuilder(this.getAttribute);
+  final Attribute? Function(TextStyle) getAttribute;
+  @override
+  void push(TextStyle? textStyle) {
+    if (textStyle == null) {
+      return;
+    }
+    final Attribute? newAttribute = getAttribute(textStyle);
+    final _AttributeStackEntry<Attribute>? topOfStack = attributeStack.isEmpty ? null : attributeStack.last;
+    if (newAttribute == null || newAttribute == topOfStack?.value) {
+      topOfStack?.repeatCount += 1;
+    } else {
+      attributeStack.add(_AttributeStackEntry<Attribute>(newAttribute));
+    }
+  }
+}
+
+class _PlainAttributeRunBuilder<Attribute extends Object> extends _AttributeRunBuilder<Attribute, Attribute> {
+  _PlainAttributeRunBuilder();
+
+  @override
+  void push(Attribute? attribute) {
+    if (attribute == null) {
+      return;
+    }
+    final _AttributeStackEntry<Attribute>? topOfStack = attributeStack.isEmpty ? null : attributeStack.last;
+    if (attribute == topOfStack?.value) {
+      topOfStack?.repeatCount += 1;
+    } else {
+      attributeStack.add(_AttributeStackEntry<Attribute>(attribute));
+    }
+  }
+}
+
+AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string) {
   final fontFamilies = _TextStyleAttributeRunBuilder<List<String>>(_getFontFamilies);
   final locale = _TextStyleAttributeRunBuilder<ui.Locale>(_getLocale);
   final fontWeight = _TextStyleAttributeRunBuilder<ui.FontWeight>(_getFontWeight);
@@ -654,6 +704,8 @@ class _TextStyleAttributeRunBuilder<Value extends Object> {
   final letterSpacing = _TextStyleAttributeRunBuilder<double>(_getLetterSpacing);
   final wordSpacing = _TextStyleAttributeRunBuilder<double>(_getWordSpacing);
 
+  final foreground = _TextStyleAttributeRunBuilder<Either<ui.Color, ui.Paint>>(_getForeground);
+  final background = _TextStyleAttributeRunBuilder<Either<ui.Color, ui.Paint>>(_getBackground);
   final underline = _TextStyleAttributeRunBuilder<bool>(_getUnderline);
   final overline = _TextStyleAttributeRunBuilder<bool>(_getOverline);
   final lineThrough = _TextStyleAttributeRunBuilder<bool>(_getLineThrough);
@@ -661,6 +713,12 @@ class _TextStyleAttributeRunBuilder<Value extends Object> {
   final decorationStyle = _TextStyleAttributeRunBuilder<ui.TextDecorationStyle>(_getDecorationStyle);
   final decorationThickness = _TextStyleAttributeRunBuilder<double>(_getDecorationThickness);
   final shadows = _TextStyleAttributeRunBuilder<List<ui.Shadow>>(_getShadows);
+
+  // Semantics
+  final semanticsLabels = _PlainAttributeRunBuilder<String>();
+  final spellOuts = _PlainAttributeRunBuilder<bool>();
+  final semanticGestureCallbacks = _PlainAttributeRunBuilder<Either<VoidCallback, VoidCallback>>();
+
   final List<_TextStyleAttributeRunBuilder<Object>> attributes = <_TextStyleAttributeRunBuilder<Object>>[
     fontFamilies,
     locale,
@@ -675,6 +733,8 @@ class _TextStyleAttributeRunBuilder<Value extends Object> {
     letterSpacing,
     wordSpacing,
 
+    foreground,
+    background,
     underline,
     overline,
     lineThrough,
@@ -686,20 +746,48 @@ class _TextStyleAttributeRunBuilder<Value extends Object> {
 
   bool visitSpan(InlineSpan span) {
     final int textLength;
+    final bool hasSemanticsLabel;
+    final bool hasSpellOut;
+    final bool hasSemanticsGestureCallback;
     switch (span) {
-      case TextSpan(: final String? text):
+      case TextSpan(: final String? text, :final semanticsLabel, :final spellOut, :final recognizer):
         textLength = text?.length ?? 0;
+        hasSemanticsLabel = semanticsLabel != null;
+        hasSpellOut = spellOut != null;
+        spellOuts.push(spellOut);
+        semanticsLabels.push(semanticsLabel);
+        switch (recognizer) {
+          case TapGestureRecognizer(:final VoidCallback onTap) || DoubleTapGestureRecognizer(onDoubleTap: final VoidCallback onTap):
+            hasSemanticsGestureCallback = true;
+            semanticGestureCallbacks.push(Left(onTap));
+          case LongPressGestureRecognizer(:final VoidCallback onLongPress):
+            hasSemanticsGestureCallback = true;
+            semanticGestureCallbacks.push(Right(onLongPress));
+          case _:
+            hasSemanticsGestureCallback = false;
+        }
+
       case PlaceholderSpan():
         textLength = 1;
+        hasSemanticsLabel = false;
+        hasSpellOut = false;
+        hasSemanticsGestureCallback = false;
       default:
         assert(false, 'unknown span type: $span');
         textLength = 0;
+        hasSemanticsLabel = false;
+        hasSpellOut = false;
+        hasSemanticsGestureCallback = false;
     }
+
     final styleToPush = span.style;
     if (styleToPush != null || textLength > 0) {
       for (final attribute in attributes) {
         attribute.push(styleToPush);
+        semanticsLabels.commitText(textLength);
+        spellOuts.commitText(textLength);
         attribute.commitText(textLength);
+        semanticGestureCallbacks.commitText(textLength);
       }
     }
 
@@ -708,6 +796,15 @@ class _TextStyleAttributeRunBuilder<Value extends Object> {
       for (final attribute in attributes) {
         attribute.pop();
       }
+    }
+    if (hasSpellOut) {
+      spellOuts.pop();
+    }
+    if (hasSemanticsLabel) {
+      semanticsLabels.pop();
+    }
+    if (hasSemanticsGestureCallback) {
+      semanticGestureCallbacks.pop();
     }
 
     return true;
@@ -731,6 +828,8 @@ class _TextStyleAttributeRunBuilder<Value extends Object> {
     const TextStyle(),
   );
   final TextPaintAnnotations textPaintAnnotations = TextPaintAnnotations._(
+    foreground.build(),
+    background.build(),
     underline.build(),
     overline.build(),
     lineThrough.build(),
@@ -741,19 +840,28 @@ class _TextStyleAttributeRunBuilder<Value extends Object> {
     string.length,
     const TextStyle(),
   );
-  return (textStyleAnnotations, textPaintAnnotations);
+
+  final TextHitTestAnnotations textHitTestAnnotations = TextHitTestAnnotations._(
+  );
+
+  final semanticsAnnotations = SemanticsAnnotations._(
+    semanticsLabels.build(),
+    spellOuts.build(),
+    semanticGestureCallbacks.build(),
+  );
+
+  final storage = const PersistentHashMap<Type, StringAnnotation<Object>?>.empty()
+    .put(_TextPaintAnnotationKey, textPaintAnnotations)
+    .put(_TextStyleAnnotationKey, textStyleAnnotations)
+    .put(_HitTestAnnotationKey, textHitTestAnnotations)
+    .put(_SemanticsAnnotationKey, semanticsAnnotations);
+
+  return AnnotatedString._(string, storage);
 }
 
-(String, PersistentHashMap<Type, StringAnnotation<Object>?>) _extractFromInlineSpan(InlineSpan span) {
+AnnotatedString _extractFromInlineSpan(InlineSpan span) {
   final String string = span.toPlainText(includeSemanticsLabels: false);
-  final (TextStyleAnnotations styleAnnotations, TextPaintAnnotations paintAnnotations) = _inlineSpanToTextStyleAnnotations(span, string);
-
-  return (
-    string,
-    const PersistentHashMap<Type, StringAnnotation<Object>?>.empty()
-      .put(_TextPaintAnnotationKey, paintAnnotations)
-      .put(_TextStyleAnnotationKey, styleAnnotations),
-  );
+  return _inlineSpanToTextStyleAnnotations(span, string);
 }
 
 /// An immutable represetation of
@@ -761,13 +869,11 @@ class _TextStyleAttributeRunBuilder<Value extends Object> {
 class AnnotatedString {
   const AnnotatedString._(this.string, this._attributeStorage);
 
-  AnnotatedString._fromPair((String, PersistentHashMap<Type, StringAnnotation<Object>?>) pair): this._(pair.$1, pair.$2);
-
   AnnotatedString._fromAnnotatedString(AnnotatedString string) :
     string = string.string,
     _attributeStorage = string._attributeStorage;
 
-  AnnotatedString.fromInlineSpan(InlineSpan span) : this._fromPair(_extractFromInlineSpan(span));
+  AnnotatedString.fromInlineSpan(InlineSpan span) : this._fromAnnotatedString(_extractFromInlineSpan(span));
 
   final String string;
 
@@ -784,8 +890,6 @@ class AnnotatedString {
   AnnotatedString setAnnotationOfType<T extends StringAnnotation<Key>, Key extends Object>(T? newAnnotations) {
     return AnnotatedString._(string, _attributeStorage.put(Key, newAnnotations));
   }
-
-  AnnotatedString get toAnnotatedString => this;
 }
 
 interface class StringAnnotation<Key extends Object> { }

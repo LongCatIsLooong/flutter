@@ -4,6 +4,9 @@
 
 import 'dart:collection';
 
+import 'package:meta/meta.dart' show immutable;
+
+
 // COMMON SIGNATURES
 
 /// Signature for callbacks that report that an underlying value has changed.
@@ -247,4 +250,40 @@ Duration lerpDuration(Duration a, Duration b, double t) {
   return Duration(
     microseconds: (a.inMicroseconds + (b.inMicroseconds - a.inMicroseconds) * t).round(),
   );
+}
+
+sealed class Either<Left, Right> { }
+
+@immutable
+final class Left<T> implements Either<T, Never> {
+  const Left(this.value);
+  final T value;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is Left<T> && other.value == value;
+  }
+
+  @override
+  int get hashCode => value.hashCode;
+}
+
+@immutable
+final class Right<T> implements Either<Never, T> {
+  const Right(this.value);
+  final T value;
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is Right<T> && other.value == value;
+  }
+
+  @override
+  int get hashCode => value.hashCode;
 }
