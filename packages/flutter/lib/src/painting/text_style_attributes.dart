@@ -53,20 +53,20 @@ abstract class TextStyleAttributeGetter<T extends Object> {
   _RunIterator<TextStyle> _getTextStyleRunsEndAfter(int index);
 }
 
-class TextAttributeIterable<T extends Object> implements TextStyleAttributeGetter<T> {
-  TextAttributeIterable._(this._storage, this._defaultValue, this._lift);
+class _AttributeIterable<T extends Object, Output extends Object> implements TextStyleAttributeGetter<T> {
+  _AttributeIterable._(this._storage, this._defaultValue, this._lift);
 
   final RBTree<T?>? _storage;
   final T _defaultValue;
   final TextStyle Function(T) _lift;
 
-  (int, T) _map((int, T?) pair) => (pair.$1, pair.$2 ?? _defaultValue);
+  (int, T) _transform((int, T?) pair) => (pair.$1, pair.$2 ?? _defaultValue);
 
   Iterator<(int, T)> getRunsEndAfter(int index) {
     final storage = _storage;
     return storage == null
       ? _EmptyIterator<(int, T)>()
-      : _MapIterator<(int, T?), (int, T)>(storage.getRunsEndAfter(index), _map);
+      : _map(storage.getRunsEndAfter(index), _transform);
   }
 
   (int, TextStyle) _liftToTextStyle((int, T?) pair) => (pair.$1, _lift(pair.$2 ?? _defaultValue));
@@ -75,7 +75,7 @@ class TextAttributeIterable<T extends Object> implements TextStyleAttributeGette
     final storage = _storage;
     final innerIterator = storage == null
       ? const _EmptyIterator<(int, TextStyle)>()
-      : _MapIterator<(int, T?), (int, TextStyle)>(storage.getRunsEndAfter(index), _liftToTextStyle);
+      : _map(storage.getRunsEndAfter(index), _liftToTextStyle);
     return _RunIterator<TextStyle>(innerIterator);
   }
 }
@@ -108,15 +108,15 @@ class _RunIterator<T> {
   }
 }
 
+@pragma('vm:prefer-inline')
+Iterator<V> _map<T, V>(Iterator<T> inner, V Function(T) transform) => _MapIterator<T, V>(inner, transform);
 class _MapIterator<T, V> implements Iterator<V> {
   _MapIterator(this.inner, this.transform);
 
   final Iterator<T> inner;
   final V Function(T) transform;
-
   @override
   V get current => transform(inner.current);
-
   @override
   bool moveNext() => inner.moveNext();
 }
@@ -215,6 +215,42 @@ final class _TextStyleMergingIterator extends _MergedRunIterator<TextStyle, Text
   }
 }
 
+final class _DecorationFlagsMergingIterator extends _MergedRunIterator<int, (int, bool)> {
+  _DecorationFlagsMergingIterator(super.attributes, int baseDecorationMask)
+    : assert(baseDecorationMask >= 0),
+      assert(baseDecorationMask < 1 << 4),
+      current = (0, baseDecorationMask);
+
+  @override
+  (int, int) current;
+
+  @override
+  bool moveNext() {
+    if (remainingLength <= 0) {
+      return false;
+    }
+    final int numberOfAttributes = moveNextAttributesToHead();
+    final int runStartIndex = attributes[0].current!.$1;
+    int currentFlags = current.$2;
+    for (int i = numberOfAttributes - 1; i >= 0; i -= 1) {
+      final _RunIterator<(int, bool)> attribute = attributes[i];
+      final (int mask, bool isSet) = attribute.current!.$2;
+      assert(attribute.current?.$1 == runStartIndex);
+      // Set the bit specified current value
+      final bool needsFlipping = (currentFlags & mask != 0) != isSet;
+      if (needsFlipping) {
+        currentFlags ^= mask;
+      }
+      if (!attribute.moveNext()) {
+        // This attribute has no more starting indices, throw it out.
+        attributes[i] = attributes[remainingLength -= 1];
+      }
+    }
+    current = (runStartIndex, currentFlags);
+    return remainingLength > 0;
+  }
+}
+
 final class _AccumulativeMergedRunIterator<T extends Object> extends _MergedRunIterator<Map<String, T>, (String, T?)> {
   _AccumulativeMergedRunIterator(super.attributes, Map<String, T> defaultValue)
     : current = (0, defaultValue);
@@ -265,20 +301,20 @@ final class _AccumulativeMergedRunIterator<T extends Object> extends _MergedRunI
 //  wordSpacing: 0.0,
 //);
 
-  TextStyle _liftFontFamilies(List<String> input) => switch (input) {
-    [] => const TextStyle(),
-    [final fontFamily, ...final fontFamilyFallback] => TextStyle(fontFamily: fontFamily, fontFamilyFallback: fontFamilyFallback),
-  };
-  List<String>? _getFontFamilies(TextStyle textStyle) {
-    final String? fontFamily = textStyle.fontFamily;
-    final List<String>? fontFamilyFallback = textStyle.fontFamilyFallback;
-    return fontFamily == null && fontFamilyFallback == null
-      ? null
-      : <String>[
-        if (fontFamily != null) fontFamily,
-        ...?textStyle.fontFamilyFallback,
-      ];
-  }
+TextStyle _liftFontFamilies(List<String> input) => switch (input) {
+  [] => const TextStyle(),
+  [final fontFamily, ...final fontFamilyFallback] => TextStyle(fontFamily: fontFamily, fontFamilyFallback: fontFamilyFallback),
+};
+List<String>? _getFontFamilies(TextStyle textStyle) {
+  final String? fontFamily = textStyle.fontFamily;
+  final List<String>? fontFamilyFallback = textStyle.fontFamilyFallback;
+  return fontFamily == null && fontFamilyFallback == null
+    ? null
+    : <String>[
+      if (fontFamily != null) fontFamily,
+      ...?textStyle.fontFamilyFallback,
+    ];
+}
 
 TextStyle _liftLocale(ui.Locale input) => TextStyle(locale: input);
 ui.Locale?_getLocale(TextStyle textStyle) => textStyle.locale;
@@ -303,16 +339,25 @@ double? _getWordSpacing(TextStyle textStyle) => textStyle.wordSpacing;
 TextStyle _liftLetterSpacing(double input) => TextStyle(letterSpacing: input);
 double? _getLetterSpacing(TextStyle textStyle) => textStyle.letterSpacing;
 
-Either<ui.Color, ui.Paint>? _getForeground(TextStyle textStyle) => _applyNullable(Left.new, textStyle.color) ?? _applyNullable(Right.new, textStyle.foreground);
-Either<ui.Color, ui.Paint>? _getBackground(TextStyle textStyle) => _applyNullable(Left.new, textStyle.backgroundColor) ?? _applyNullable(Right.new, textStyle.background);
-bool? _getUnderline(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.underline);
-bool? _getOverline(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.overline);
-bool? _getLineThrough(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.lineThrough);
+Either<ui.Color, ui.Paint>? _getForeground(TextStyle textStyle) => _applyNullable(Either.left, textStyle.color) ?? _applyNullable(Either.right, textStyle.foreground);
+Either<ui.Color, ui.Paint>? _getBackground(TextStyle textStyle) => _applyNullable(Either.left, textStyle.backgroundColor) ?? _applyNullable(Either.right, textStyle.background);
 ui.Color? _getDecorationColor(TextStyle textStyle) => textStyle.decorationColor;
 ui.TextDecorationStyle? _getDecorationStyle(TextStyle textStyle) => textStyle.decorationStyle;
 double? _getDecorationThickness(TextStyle textStyle) => textStyle.decorationThickness;
 List<ui.Shadow>? _getShadows(TextStyle textStyle) => textStyle.shadows;
 
+final ui.TextDecoration _underlineOverline = ui.TextDecoration.combine(const [ui.TextDecoration.underline, ui.TextDecoration.overline]);
+final ui.TextDecoration _underlineLineThrough = ui.TextDecoration.combine(const [ui.TextDecoration.underline, ui.TextDecoration.lineThrough]);
+final ui.TextDecoration _overlineLineThrough = ui.TextDecoration.combine(const [ui.TextDecoration.overline, ui.TextDecoration.lineThrough]);
+final ui.TextDecoration _allDecorations = ui.TextDecoration.combine(const [ui.TextDecoration.underline, ui.TextDecoration.overline, ui.TextDecoration.lineThrough]);
+
+const int _underlineMask = 1 << 0;
+const int _overlineMask = 1 << 1;
+const int _lineThroughMask = 1 << 2;
+
+bool? _getUnderline(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.underline);
+bool? _getOverline(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.overline);
+bool? _getLineThrough(TextStyle textStyle) => textStyle.decoration?.contains(TextDecoration.lineThrough);
 
 abstract final class _TextStyleAnnotationKey { }
 
@@ -331,12 +376,22 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
     this._height,
     this._letterSpacing,
     this._wordSpacing,
+    this._foreground,
+    this._background,
+    this._underline,
+    this._overline,
+    this._lineThrough,
+    this._decorationColor,
+    this._decorationStyle,
+    this._decorationThickness,
+    this._shadows,
+
     this._textLength,
     this.baseStyle,
   );
 
-  static TextAttributeIterable<Value> _createAttribute<Value extends Object>(RBTree<Value?>? storage, Value defaultValue, TextStyle Function(Value) lift) {
-    return TextAttributeIterable<Value>._(storage, defaultValue, lift);
+  static _AttributeIterable<Value, TextStyle> _createAttribute<Value extends Object>(RBTree<Value?>? storage, Value defaultValue, TextStyle Function(Value) lift) {
+    return _AttributeIterable<Value, TextStyle>._(storage, defaultValue, lift);
   }
 
   final TextStyle baseStyle;
@@ -362,61 +417,119 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
   final int _textLength;
 
   final RBTree<List<String>?>? _fontFamilies;
-  late final TextAttributeIterable<List<String>> fontFamilies = _createAttribute(_fontFamilies, _getFontFamilies(baseStyle)!, _liftFontFamilies);
+  late final TextStyleAttributeGetter<List<String>> fontFamilies = _createAttribute(_fontFamilies, _getFontFamilies(baseStyle)!, _liftFontFamilies);
 
   final RBTree<ui.Locale?>? _locale;
-  late final TextAttributeIterable<ui.Locale> locale = _createAttribute(_locale, baseStyle.locale!, _liftLocale);
+  late final TextStyleAttributeGetter<ui.Locale> locale = _createAttribute(_locale, baseStyle.locale!, _liftLocale);
 
   final RBTree<double?>? _fontSize;
-  late final TextAttributeIterable<double> fontSize = _createAttribute(_fontSize, baseStyle.fontSize!, _liftFontSize);
+  late final TextStyleAttributeGetter<double> fontSize = _createAttribute(_fontSize, baseStyle.fontSize!, _liftFontSize);
 
   final RBTree<ui.FontWeight?>? _fontWeight;
-  late final TextAttributeIterable<ui.FontWeight> fontWeight = _createAttribute(_fontWeight, baseStyle.fontWeight!, _liftFontWeight);
+  late final TextStyleAttributeGetter<ui.FontWeight> fontWeight = _createAttribute(_fontWeight, baseStyle.fontWeight!, _liftFontWeight);
 
   final RBTree<ui.FontStyle?>? _fontStyle;
-  late final TextAttributeIterable<ui.FontStyle> fontStyle = _createAttribute(_fontStyle, baseStyle.fontStyle!, _liftFontStyle);
+  late final TextStyleAttributeGetter<ui.FontStyle> fontStyle = _createAttribute(_fontStyle, baseStyle.fontStyle!, _liftFontStyle);
 
   final RBTree<List<ui.FontFeature>?>? _fontFeatures;
-  late final TextAttributeIterable<List<ui.FontFeature>> fontFeatures = _createAttribute(_fontFeatures, baseStyle.fontFeatures!, _liftFontFeatures);
+  late final TextStyleAttributeGetter<List<ui.FontFeature>> fontFeatures = _createAttribute(_fontFeatures, baseStyle.fontFeatures!, _liftFontFeatures);
 
   final RBTree<List<ui.FontVariation>?>? _fontVariations;
-  late final TextAttributeIterable<List<ui.FontVariation>> fontVariations = _createAttribute(_fontVariations, baseStyle.fontVariations!, _liftFontVariations);
+  late final TextStyleAttributeGetter<List<ui.FontVariation>> fontVariations = _createAttribute(_fontVariations, baseStyle.fontVariations!, _liftFontVariations);
 
   final RBTree<ui.TextLeadingDistribution?>? _leadingDistribution;
-  late final TextAttributeIterable<ui.TextLeadingDistribution> leadingDistribution = _createAttribute(_leadingDistribution, baseStyle.leadingDistribution!, _liftLeadingDistribution);
+  late final TextStyleAttributeGetter<ui.TextLeadingDistribution> leadingDistribution = _createAttribute(_leadingDistribution, baseStyle.leadingDistribution!, _liftLeadingDistribution);
 
   final RBTree<double?>? _height;
-  late final TextAttributeIterable<double> height = _createAttribute(_height, baseStyle.height!, _liftHeight);
+  late final TextStyleAttributeGetter<double> height = _createAttribute(_height, baseStyle.height!, _liftHeight);
 
   final RBTree<ui.TextBaseline?>? _textBaseline;
-  late final TextAttributeIterable<ui.TextBaseline> textBaseline = _createAttribute(_textBaseline, baseStyle.textBaseline!, _liftTextBaseline);
+  late final TextStyleAttributeGetter<ui.TextBaseline> textBaseline = _createAttribute(_textBaseline, baseStyle.textBaseline!, _liftTextBaseline);
 
   final RBTree<double?>? _letterSpacing;
-  late final TextAttributeIterable<double> letterSpacing = _createAttribute(_letterSpacing, baseStyle.letterSpacing!, _liftLetterSpacing);
+  late final TextStyleAttributeGetter<double> letterSpacing = _createAttribute(_letterSpacing, baseStyle.letterSpacing!, _liftLetterSpacing);
   final RBTree<double?>? _wordSpacing;
-  late final TextAttributeIterable<double> wordSpacing = _createAttribute(_wordSpacing, baseStyle.wordSpacing!, _liftWordSpacing);
+  late final TextStyleAttributeGetter<double> wordSpacing = _createAttribute(_wordSpacing, baseStyle.wordSpacing!, _liftWordSpacing);
+
+  final RBTree<Either<ui.Color, ui.Paint>?>? _foreground;
+  final RBTree<Either<ui.Color, ui.Paint>?>? _background;
+
+  final RBTree<bool?>? _underline;
+  late final TextStyleAttributeGetter<bool> hasUnderline = _createAttribute(_underline, baseStyle.decoration?.contains(ui.TextDecoration.underline), _liftWordSpacing);
+  final RBTree<bool?>? _overline;
+  final RBTree<bool?>? _lineThrough;
+
+  final RBTree<ui.Color?>? _decorationColor;
+  final RBTree<ui.TextDecorationStyle?>? _decorationStyle;
+  final RBTree<double?>? _decorationThickness;
+
+  final RBTree<List<ui.Shadow>?>? _shadows;
 
   TextStyle getAnnotationAt(int index) {
+    final underline = _underline?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
+    final overline = _overline?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
+    final lineThrough = _lineThrough?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
+    final ui.TextDecoration? decoration = underline || overline || lineThrough
+      ? null
+      : ui.TextDecoration.combine([
+          if (underline) ui.TextDecoration.underline,
+          if (overline) ui.TextDecoration.overline,
+          if (lineThrough) ui.TextDecoration.lineThrough,
+        ]);
+    final foreground = _foreground?.getNodeGreaterThan(index)?.value;
+    final background = _background?.getNodeGreaterThan(index)?.value;
+
+    final (String? fontFamily, List<String>? fallback) = switch (_fontFamilies?.getNodeLessThanOrEqualTo(index)?.value) {
+      null => (null, null),
+      [] => ('', const []),
+      [final fontFamily, ...final fallback] => (fontFamily, fallback)
+    };
+
     final TextStyle textStyle = TextStyle(
+      fontFamily: fontFamily,
+      fontFamilyFallback: fallback,
       locale: _locale?.getNodeLessThanOrEqualTo(index)?.value,
 
       fontWeight: _fontWeight?.getNodeLessThanOrEqualTo(index)?.value,
       fontStyle: _fontStyle?.getNodeLessThanOrEqualTo(index)?.value,
 
-      textBaseline: _textBaseline?.getNodeLessThanOrEqualTo(index)?.value,
+      fontFeatures: _fontFeatures?.getNodeGreaterThan(index)?.value,
+      fontVariations: _fontVariations?.getNodeGreaterThan(index)?.value,
+
       leadingDistribution: _leadingDistribution?.getNodeLessThanOrEqualTo(index)?.value,
+      height: _height?.getNodeLessThanOrEqualTo(index)?.value,
+      textBaseline: _textBaseline?.getNodeLessThanOrEqualTo(index)?.value,
 
       fontSize: _fontSize?.getNodeLessThanOrEqualTo(index)?.value,
-      height: _height?.getNodeLessThanOrEqualTo(index)?.value,
       letterSpacing: _letterSpacing?.getNodeLessThanOrEqualTo(index)?.value,
       wordSpacing: _wordSpacing?.getNodeLessThanOrEqualTo(index)?.value,
+
+      color: foreground?.maybeLeft,
+      foreground: foreground?.maybeRight,
+      backgroundColor: background?.maybeLeft,
+      background: background?.maybeRight,
+      decoration: decoration,
+      decorationColor: _decorationColor?.getNodeLessThanOrEqualTo(index)?.value,
+      decorationStyle: _decorationStyle?.getNodeLessThanOrEqualTo(index)?.value,
+      decorationThickness: _decorationThickness?.getNodeLessThanOrEqualTo(index)?.value,
+      shadows: _shadows?.getNodeLessThanOrEqualTo(index)?.value,
     );
     return baseStyle.merge(textStyle);
   }
 
   Iterator<(int, TextStyle)> getRunsEndAfter(int index) {
-    final _RunIterator<TextStyle> fontFamiliesRuns = fontFamilies._getTextStyleRunsEndAfter(index);
-    final List<_RunIterator<TextStyle>> runsToMerge = List<_RunIterator<TextStyle>>.filled(12, fontFamiliesRuns)
+    final List<_RunIterator<ui.TextDecoration>?>? decorationsToMerge;
+    switch ((_underline, _overline, _lineThrough)) {
+      case (null, null, null):
+        decorationsToMerge = null;
+      case (final underline?, null, null):
+        decorationsToMerge = _map(underline.getRunsEndAfter(index), (bool?));
+
+    }
+    final bool noDecoration = _underline == null && _overline == null && _lineThrough == null;
+
+    final List<_RunIterator<TextStyle>?> runsToMerge = List<_RunIterator<TextStyle>?>.filled(12, null)
+      ..[0] = fontFamilies._getTextStyleRunsEndAfter(index)
       ..[1] = locale._getTextStyleRunsEndAfter(index)
       ..[2] = fontSize._getTextStyleRunsEndAfter(index)
       ..[3] = fontWeight._getTextStyleRunsEndAfter(index)
@@ -428,7 +541,10 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
       ..[9] = textBaseline._getTextStyleRunsEndAfter(index)
       ..[10] = wordSpacing._getTextStyleRunsEndAfter(index)
       ..[11] = letterSpacing._getTextStyleRunsEndAfter(index);
-    return _TextStyleMergingIterator(runsToMerge);
+      ..[11] = letterSpacing._getTextStyleRunsEndAfter(index)
+      ..[11] = letterSpacing._getTextStyleRunsEndAfter(index)
+      ..[11] = letterSpacing._getTextStyleRunsEndAfter(index);
+    return _TextStyleMergingIterator(runsToMerge as List<_RunIterator<TextStyle>>);
   }
 
   TextStyleAnnotations overwrite(ui.TextRange range, TextStyleAttributeSet annotationsToOverwrite) {
@@ -459,6 +575,7 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
       update(annotationsToOverwrite.height, _height),
       update(annotationsToOverwrite.letterSpacing, _letterSpacing),
       update(annotationsToOverwrite.wordSpacing, _wordSpacing),
+
       _textLength,
       baseStyle,
     );
@@ -506,6 +623,16 @@ final class TextStyleAttributeSet {
     this.textBaseline,
     this.wordSpacing,
     this.letterSpacing,
+
+    this.foreground,
+    this.background,
+    this.shadows,
+    this.underline,
+    this.overline,
+    this.lineThrough,
+    this.decorationColor,
+    this.decorationStyle,
+    this.decorationThickness,
   });
 
   final List<String>? fontFamilies;
@@ -523,55 +650,6 @@ final class TextStyleAttributeSet {
 
   final double? wordSpacing;
   final double? letterSpacing;
-}
-
-abstract final class _TextPaintAnnotationKey { }
-
-@immutable
-final class TextPaintAnnotations implements StringAnnotation<_TextPaintAnnotationKey> {
-  TextPaintAnnotations._(
-    this._foreground,
-    this._background,
-    this._underline,
-    this._overline,
-    this._lineThrough,
-    this._decorationColor,
-    this._decorationStyle,
-    this._decorationThickness,
-    this._shadows,
-    this._textLength,
-    this.baseAnnotations,
-  );
-
-  final RBTree<Either<ui.Color, ui.Paint>?>? _foreground;
-  final RBTree<Either<ui.Color, ui.Paint>?>? _background;
-
-  final RBTree<bool?>? _underline;
-  final RBTree<bool?>? _overline;
-  final RBTree<bool?>? _lineThrough;
-
-  final RBTree<ui.Color?>? _decorationColor;
-  final RBTree<ui.TextDecorationStyle?>? _decorationStyle;
-  final RBTree<double?>? _decorationThickness;
-
-  final RBTree<List<ui.Shadow>?>? _shadows;
-
-  final TextStyle baseAnnotations;
-  final int _textLength;
-}
-
-final class TextPaintAttributionSet {
-  const TextPaintAttributionSet({
-    this.foreground,
-    this.background,
-    this.shadows,
-    this.underline,
-    this.overline,
-    this.lineThrough,
-    this.decorationColor,
-    this.decorationStyle,
-    this.decorationThickness,
-  });
 
   // How do we compare ui.Paint objects?
   final Either<ui.Color, ui.Paint>? foreground;
@@ -686,7 +764,7 @@ class _HitTestTargetRunBuilder extends _AttributeRunBuilder<TextSpan, Iterable<T
 
   @override
   bool tryPush(TextSpan span) {
-    final topOfStack = attributeStack.isEmpty ? null : attributeStack.last;
+    final TextSpan? topOfStack = attributeStack.isEmpty ? null : attributeStack.last;
     final bool pushToStack = (span.recognizer != null && span.recognizer != topOfStack?.recognizer)
                           || (span.onEnter != null && span.onEnter != topOfStack?.onEnter)
                           || (span.onExit != null && span.onExit != topOfStack?.onExit)
@@ -705,9 +783,9 @@ class _HitTestTargetRunBuilder extends _AttributeRunBuilder<TextSpan, Iterable<T
   @override
   void commitText(int length) {
     assert(length > 0);
-    final currentRunAttribute = runs.isEmpty ? null : runs.last.$2.last;
+    final TextSpan? currentSpan = runs.isEmpty ? null : runs.last.$2.last;
     // Start a new run only if the attributes are different.
-    if (attributeStack.isNotEmpty && currentRunAttribute != attributeStack.last) {
+    if (attributeStack.isNotEmpty && currentSpan != attributeStack.last) {
       runs.add((runStartIndex, attributeStack));
     }
     runStartIndex += length;
@@ -765,51 +843,35 @@ AnnotatedString _convertTextStyleAttributes(InlineSpan span, AnnotatedString str
 
   bool visitSpan(InlineSpan span) {
     List<_AttributeRunBuilder<Object?, Object?>>? buildersToPop;
-    void tryPush<Source>(_AttributeRunBuilder<Source, Object?> builder, Source newValue) {
-      if (builder.tryPush(newValue)) {
-        if (buildersToPop == null) {
-          buildersToPop = [builder];
-        } else {
-          buildersToPop!.add(builder);
+    final TextStyle? style = span.style;
+    if (style != null) {
+      for (final attribute in attributes) {
+        if (attribute.tryPush(style)) {
+          (buildersToPop ??= <_AttributeRunBuilder<Object?, Object?>>[]).add(attribute);
         }
       }
     }
-
-    switch (span) {
-      case TextSpan(:final String? text, :final style, :final semanticsLabel, :final spellOut, :final recognizer):
-        if (style != null) {
-          for (final attribute in attributes) {
-            tryPush(attribute, style);
-          }
-        }
-        final textLength = text?.length ?? 0;
-        if (textLength > 0) {
-          for (final attribute in attributes) {
-            attribute.commitText(textLength);
-          }
-        }
-
-      case PlaceholderSpan():
-        // Ignore styles?
-        for (final attribute in attributes) {
-          attribute.commitText(1);
-        }
-
-      default:
-        assert(false, 'unknown span type: $span');
+    final int textLength = switch (span) {
+      TextSpan(:final String? text) => text?.length ?? 0,
+      PlaceholderSpan() => 1,
+      _ => 0,
+    };
+    if (textLength > 0) {
+      for (final _TextStyleAttributeRunBuilder<Object> attribute in attributes) {
+        attribute.commitText(textLength);
+      }
     }
-
     span.visitDirectChildren(visitSpan);
-    final toPop = buildersToPop;
-    if (toPop != null) {
-      for (int i = 0; i < toPop.length; i += 1) {
-        toPop[i].pop();
+    if (buildersToPop != null) {
+      for (int i = 0; i < buildersToPop.length; i += 1) {
+        buildersToPop[i].pop();
       }
     }
     return true;
   }
 
-  visitSpan(span);
+  // Only extract
+  span.visitChildren(visitSpan);
   final TextStyleAnnotations textStyleAnnotations = TextStyleAnnotations._(
     fontFamilies.build(),
     locale.build(),
@@ -823,10 +885,6 @@ AnnotatedString _convertTextStyleAttributes(InlineSpan span, AnnotatedString str
     height.build(),
     letterSpacing.build(),
     wordSpacing.build(),
-    string.string.length,
-    const TextStyle(),
-  );
-  final TextPaintAnnotations textPaintAnnotations = TextPaintAnnotations._(
     foreground.build(),
     background.build(),
     underline.build(),
@@ -836,13 +894,12 @@ AnnotatedString _convertTextStyleAttributes(InlineSpan span, AnnotatedString str
     decorationStyle.build(),
     decorationThickness.build(),
     shadows.build(),
+
     string.string.length,
-    const TextStyle(),
+    span.style ?? const TextStyle(),
   );
 
-  return string
-    .setAnnotationOfType(textStyleAnnotations)
-    .setAnnotationOfType(textPaintAnnotations);
+  return string.setAnnotationOfType(textStyleAnnotations);
 }
 
 AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string) {
@@ -874,9 +931,9 @@ AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string
         tryPush(hitTests, span);
         switch (recognizer) {
           case TapGestureRecognizer(:final VoidCallback onTap) || DoubleTapGestureRecognizer(onDoubleTap: final VoidCallback onTap):
-            tryPush(semanticGestureCallbacks, Left(onTap));
+            tryPush(semanticGestureCallbacks, Either.left(onTap));
           case LongPressGestureRecognizer(:final VoidCallback onLongPress):
-            tryPush(semanticGestureCallbacks, Right(onLongPress));
+            tryPush(semanticGestureCallbacks, Either.right(onLongPress));
           case _:
             break;
         }

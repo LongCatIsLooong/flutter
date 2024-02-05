@@ -252,19 +252,22 @@ Duration lerpDuration(Duration a, Duration b, double t) {
   );
 }
 
-sealed class Either<Left, Right> { }
+sealed class Either<L, R> {
+  const factory Either.left(L value) = Left<L, Never>._;
+  const factory Either.right(R value) = Right<Never, R>._;
+}
 
 @immutable
-final class Left<T> implements Either<T, Never> {
-  const Left(this.value);
-  final T value;
+final class Left<L, R> implements Either<L, R> {
+  const Left._(this.value);
+  final L value;
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {
       return true;
     }
-    return other is Left<T> && other.value == value;
+    return other is Left<L, Never> && other.value == value;
   }
 
   @override
@@ -272,18 +275,32 @@ final class Left<T> implements Either<T, Never> {
 }
 
 @immutable
-final class Right<T> implements Either<Never, T> {
-  const Right(this.value);
-  final T value;
+final class Right<L, R> implements Either<L, R> {
+  const Right._(this.value);
+  final R value;
 
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) {
       return true;
     }
-    return other is Right<T> && other.value == value;
+    return other is Right<Never, R> && other.value == value;
   }
 
   @override
   int get hashCode => value.hashCode;
+}
+
+extension NullableLeft<L extends Object, R> on Either<L, R> {
+  L? get maybeLeft => switch (this) {
+    Left(:final L value) => value,
+    Right() => null,
+  };
+}
+
+extension NullableRight<R extends Object> on Either<Object?, R> {
+  R? get maybeRight => switch (this) {
+    Left() => null,
+    Right(:final R value) => value,
+  };
 }

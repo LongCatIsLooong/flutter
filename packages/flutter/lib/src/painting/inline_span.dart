@@ -279,9 +279,6 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
     return toAnnotatedString.setAnnotationOfType(newAnnotations);
   }
 
-  @override
-  AnnotatedString get toAnnotatedString => AnnotatedString.fromInlineSpan(this);
-
   /// Performs the check at each [InlineSpan] for if the `position` falls within the range
   /// of the span and returns the span if it does.
   ///
