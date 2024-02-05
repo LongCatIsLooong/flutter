@@ -18,13 +18,13 @@ import 'dart:ui' as ui show
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import 'annotated_string.dart';
 import 'basic_types.dart';
 import 'inline_span.dart';
 import 'placeholder_span.dart';
 import 'strut_style.dart';
 import 'text_scaler.dart';
 import 'text_span.dart';
+import 'text_style_attributes.dart';
 
 export 'dart:ui' show LineMetrics;
 export 'package:flutter/services.dart' show TextRange, TextSelection;
@@ -682,7 +682,9 @@ class TextPainter {
     if (_text == value) {
       return;
     }
-    if (_text?.style != value?.style) {
+    final TextStyleAnnotations? newStyle = value?.getAnnotationOfType();
+    final TextStyleAnnotations? oldStyle = _text?.getAnnotationOfType();
+    if (newStyle?.baseStyle != oldStyle?.baseStyle) {
       _layoutTemplate?.dispose();
       _layoutTemplate = null;
     }
@@ -692,7 +694,6 @@ class TextPainter {
       : _text?.compareTo(value) ?? RenderComparison.layout;
 
     _text = value;
-    _cachedPlainText = null;
 
     if (comparison.index >= RenderComparison.layout.index) {
       markNeedsLayout();
@@ -702,20 +703,6 @@ class TextPainter {
       _rebuildParagraphForPaint = true;
     }
     // Neither relayout or repaint is needed.
-  }
-
-  AnnotatedString get annotatedText {
-    final AnnotatedString? returnValue = _annotatedString;
-    if (returnValue == null) {
-      throw FlutterError('annotatedText must be set to non-null');
-    }
-    return returnValue;
-  }
-  AnnotatedString? _annotatedString;
-  set annotatedString(AnnotatedString value) {
-    if (value ==  _annotatedString) {
-      return;
-    }
   }
 
   /// Returns a plain text version of the text to paint.

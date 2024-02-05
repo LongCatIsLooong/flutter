@@ -6,8 +6,9 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
-import 'package:flutter/src/painting/basic_types.dart';
+import 'package:flutter/services.dart' show MouseCursor;
 
+import 'basic_types.dart';
 import 'inline_span.dart';
 import 'placeholder_span.dart';
 import 'text_span.dart';
@@ -331,14 +332,14 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
     this._letterSpacing,
     this._wordSpacing,
     this._textLength,
-    this.defaults,
+    this.baseStyle,
   );
 
   static TextAttributeIterable<Value> _createAttribute<Value extends Object>(RBTree<Value?>? storage, Value defaultValue, TextStyle Function(Value) lift) {
     return TextAttributeIterable<Value>._(storage, defaultValue, lift);
   }
 
-  final TextStyle defaults;
+  final TextStyle baseStyle;
   TextStyleAnnotations updateBaseTextStyle(TextStyle baseAnnotations) {
     return TextStyleAnnotations._(
       _fontFamilies,
@@ -361,39 +362,39 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
   final int _textLength;
 
   final RBTree<List<String>?>? _fontFamilies;
-  late final TextAttributeIterable<List<String>> fontFamilies = _createAttribute(_fontFamilies, _getFontFamilies(defaults)!, _liftFontFamilies);
+  late final TextAttributeIterable<List<String>> fontFamilies = _createAttribute(_fontFamilies, _getFontFamilies(baseStyle)!, _liftFontFamilies);
 
   final RBTree<ui.Locale?>? _locale;
-  late final TextAttributeIterable<ui.Locale> locale = _createAttribute(_locale, defaults.locale!, _liftLocale);
+  late final TextAttributeIterable<ui.Locale> locale = _createAttribute(_locale, baseStyle.locale!, _liftLocale);
 
   final RBTree<double?>? _fontSize;
-  late final TextAttributeIterable<double> fontSize = _createAttribute(_fontSize, defaults.fontSize!, _liftFontSize);
+  late final TextAttributeIterable<double> fontSize = _createAttribute(_fontSize, baseStyle.fontSize!, _liftFontSize);
 
   final RBTree<ui.FontWeight?>? _fontWeight;
-  late final TextAttributeIterable<ui.FontWeight> fontWeight = _createAttribute(_fontWeight, defaults.fontWeight!, _liftFontWeight);
+  late final TextAttributeIterable<ui.FontWeight> fontWeight = _createAttribute(_fontWeight, baseStyle.fontWeight!, _liftFontWeight);
 
   final RBTree<ui.FontStyle?>? _fontStyle;
-  late final TextAttributeIterable<ui.FontStyle> fontStyle = _createAttribute(_fontStyle, defaults.fontStyle!, _liftFontStyle);
+  late final TextAttributeIterable<ui.FontStyle> fontStyle = _createAttribute(_fontStyle, baseStyle.fontStyle!, _liftFontStyle);
 
   final RBTree<List<ui.FontFeature>?>? _fontFeatures;
-  late final TextAttributeIterable<List<ui.FontFeature>> fontFeatures = _createAttribute(_fontFeatures, defaults.fontFeatures!, _liftFontFeatures);
+  late final TextAttributeIterable<List<ui.FontFeature>> fontFeatures = _createAttribute(_fontFeatures, baseStyle.fontFeatures!, _liftFontFeatures);
 
   final RBTree<List<ui.FontVariation>?>? _fontVariations;
-  late final TextAttributeIterable<List<ui.FontVariation>> fontVariations = _createAttribute(_fontVariations, defaults.fontVariations!, _liftFontVariations);
+  late final TextAttributeIterable<List<ui.FontVariation>> fontVariations = _createAttribute(_fontVariations, baseStyle.fontVariations!, _liftFontVariations);
 
   final RBTree<ui.TextLeadingDistribution?>? _leadingDistribution;
-  late final TextAttributeIterable<ui.TextLeadingDistribution> leadingDistribution = _createAttribute(_leadingDistribution, defaults.leadingDistribution!, _liftLeadingDistribution);
+  late final TextAttributeIterable<ui.TextLeadingDistribution> leadingDistribution = _createAttribute(_leadingDistribution, baseStyle.leadingDistribution!, _liftLeadingDistribution);
 
   final RBTree<double?>? _height;
-  late final TextAttributeIterable<double> height = _createAttribute(_height, defaults.height!, _liftHeight);
+  late final TextAttributeIterable<double> height = _createAttribute(_height, baseStyle.height!, _liftHeight);
 
   final RBTree<ui.TextBaseline?>? _textBaseline;
-  late final TextAttributeIterable<ui.TextBaseline> textBaseline = _createAttribute(_textBaseline, defaults.textBaseline!, _liftTextBaseline);
+  late final TextAttributeIterable<ui.TextBaseline> textBaseline = _createAttribute(_textBaseline, baseStyle.textBaseline!, _liftTextBaseline);
 
   final RBTree<double?>? _letterSpacing;
-  late final TextAttributeIterable<double> letterSpacing = _createAttribute(_letterSpacing, defaults.letterSpacing!, _liftLetterSpacing);
+  late final TextAttributeIterable<double> letterSpacing = _createAttribute(_letterSpacing, baseStyle.letterSpacing!, _liftLetterSpacing);
   final RBTree<double?>? _wordSpacing;
-  late final TextAttributeIterable<double> wordSpacing = _createAttribute(_wordSpacing, defaults.wordSpacing!, _liftWordSpacing);
+  late final TextAttributeIterable<double> wordSpacing = _createAttribute(_wordSpacing, baseStyle.wordSpacing!, _liftWordSpacing);
 
   TextStyle getAnnotationAt(int index) {
     final TextStyle textStyle = TextStyle(
@@ -410,7 +411,7 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
       letterSpacing: _letterSpacing?.getNodeLessThanOrEqualTo(index)?.value,
       wordSpacing: _wordSpacing?.getNodeLessThanOrEqualTo(index)?.value,
     );
-    return defaults.merge(textStyle);
+    return baseStyle.merge(textStyle);
   }
 
   Iterator<(int, TextStyle)> getRunsEndAfter(int index) {
@@ -459,7 +460,7 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
       update(annotationsToOverwrite.letterSpacing, _letterSpacing),
       update(annotationsToOverwrite.wordSpacing, _wordSpacing),
       _textLength,
-      defaults,
+      baseStyle,
     );
   }
 
@@ -486,7 +487,7 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
       erase(annotationsToErase.letterSpacing, _letterSpacing),
       erase(annotationsToErase.wordSpacing, _wordSpacing),
       _textLength,
-      defaults,
+      baseStyle,
     );
   }
 }
@@ -590,11 +591,11 @@ abstract final class _HitTestAnnotationKey {}
 class TextHitTestAnnotations implements StringAnnotation<_HitTestAnnotationKey> {
   const TextHitTestAnnotations._(this._hitTestTargets);
 
-  final RBTree<List<HitTestTarget>> _hitTestTargets;
+  final RBTree<Iterable<HitTestTarget>>? _hitTestTargets;
 
   Iterable<HitTestTarget> getHitTestTargets(int codeUnitOffset) {
-    final iterator = _hitTestTargets.getRunsEndAfter(codeUnitOffset);
-    return iterator.moveNext() ? iterator.current.$2 : const <HitTestTarget>[];
+    final iterator = _hitTestTargets?.getRunsEndAfter(codeUnitOffset);
+    return iterator != null && iterator.moveNext() ? iterator.current.$2 : const <HitTestTarget>[];
   }
 }
 
@@ -611,86 +612,109 @@ class SemanticsAnnotations implements StringAnnotation<_SemanticsAnnotationKey> 
 
 /// InlineSpan to AnnotatedString Conversion
 
-class _AttributeStackEntry<Value extends Object> {
-  _AttributeStackEntry(this.value);
-  final Value value;
-  int repeatCount = 1;
-}
+//class _AttributeStackEntry<Value extends Object> {
+//  _AttributeStackEntry(this.value);
+//  final Value value;
+//  int repeatCount = 1;
+//}
 
-// A class for extracting attribute (such as the font size) runs from an InlineSpan.
+// A class for extracting attribute (such as the font size) runs from an
+// InlineSpan tree.
 //
 // Each attribute run is a pair of the starting index of the attribute in the
 // string, and value of the attribute. For instance if the font size runs are
 // [(0, 10), (5, 20)], it means the text starts with a font size of 10 and
 // starting from the 5th code unit the font size changes to 20.
-
-abstract class _AttributeRunBuilder<Source extends Object, Attribute extends Object> {
-  final List<_AttributeStackEntry<Attribute>> attributeStack = <_AttributeStackEntry<Attribute>>[];
+abstract class _AttributeRunBuilder<Source, Attribute> {
   final List<(int, Attribute)> runs = <(int, Attribute)>[];
   int runStartIndex = 0;
 
-  void push(Source? attribute);
+  bool tryPush(Source attribute);
+  void pop();
+  void commitText(int length);
+  RBTree<Attribute>? build() => runs.isEmpty ? null : RBTree<Attribute>.fromSortedList(runs);
+}
+
+mixin _NonOverlappingAttributeRunMixin<Source, Attribute> on _AttributeRunBuilder<Source, Attribute> {
+  final List<Attribute> attributeStack = <Attribute>[];
+
+  @override
   void pop() {
-    if (attributeStack.isEmpty) {
-      return;
-    }
-    final _AttributeStackEntry<Attribute> topOfStack = attributeStack.last;
-    if (topOfStack.repeatCount > 1) {
-      topOfStack.repeatCount -= 1;
-    } else {
-      attributeStack.removeLast();
-    }
+    assert(attributeStack.isNotEmpty);
+    attributeStack.removeLast();
   }
+
+  @override
   void commitText(int length) {
-    if (length == 0) {
-      return;
-    }
+    assert(length > 0);
     final Attribute? currentRunAttribute = runs.isEmpty ? null : runs.last.$2;
     // Start a new run only if the attributes are different.
-    if (attributeStack.isNotEmpty && currentRunAttribute != attributeStack.last.value) {
-      runs.add((runStartIndex, attributeStack.last.value));
+    if (attributeStack.isNotEmpty && currentRunAttribute != attributeStack.last) {
+      runs.add((runStartIndex, attributeStack.last));
     }
     runStartIndex += length;
   }
-  RBTree<Attribute?> build() => RBTree<Attribute?>.fromSortedList(runs);
 }
 
-class _TextStyleAttributeRunBuilder<Attribute extends Object> extends _AttributeRunBuilder<TextStyle, Attribute> {
+class _TextStyleAttributeRunBuilder<Attribute extends Object> extends _AttributeRunBuilder<TextStyle?, Attribute> with _NonOverlappingAttributeRunMixin<TextStyle?, Attribute> {
   _TextStyleAttributeRunBuilder(this.getAttribute);
   final Attribute? Function(TextStyle) getAttribute;
   @override
-  void push(TextStyle? textStyle) {
-    if (textStyle == null) {
-      return;
+  bool tryPush(TextStyle? textStyle) {
+    final Attribute? newAttribute = _applyNullable(getAttribute, textStyle);
+    final bool pushToStack = newAttribute != null && (attributeStack.isEmpty || newAttribute != attributeStack.last);
+    if (pushToStack) {
+      attributeStack.add(newAttribute);
     }
-    final Attribute? newAttribute = getAttribute(textStyle);
-    final _AttributeStackEntry<Attribute>? topOfStack = attributeStack.isEmpty ? null : attributeStack.last;
-    if (newAttribute == null || newAttribute == topOfStack?.value) {
-      topOfStack?.repeatCount += 1;
-    } else {
-      attributeStack.add(_AttributeStackEntry<Attribute>(newAttribute));
-    }
+    return pushToStack;
   }
 }
 
-class _PlainAttributeRunBuilder<Attribute extends Object> extends _AttributeRunBuilder<Attribute, Attribute> {
-  _PlainAttributeRunBuilder();
+class _PlainAttributeRunBuilder<Attribute extends Object> extends _AttributeRunBuilder<Attribute?, Attribute> with _NonOverlappingAttributeRunMixin<Attribute?, Attribute> {
+  @override
+  bool tryPush(Attribute? attribute) {
+    final bool pushToStack = attribute != null && (attributeStack.isEmpty || attribute != attributeStack.last);
+    if (pushToStack) {
+      attributeStack.add(attribute);
+    }
+    return pushToStack;
+  }
+}
+
+class _HitTestTargetRunBuilder extends _AttributeRunBuilder<TextSpan, Iterable<TextSpan>> {
+  final List<TextSpan> attributeStack = <TextSpan>[];
 
   @override
-  void push(Attribute? attribute) {
-    if (attribute == null) {
-      return;
+  bool tryPush(TextSpan span) {
+    final topOfStack = attributeStack.isEmpty ? null : attributeStack.last;
+    final bool pushToStack = (span.recognizer != null && span.recognizer != topOfStack?.recognizer)
+                          || (span.onEnter != null && span.onEnter != topOfStack?.onEnter)
+                          || (span.onExit != null && span.onExit != topOfStack?.onExit)
+                          || (!identical(span.mouseCursor, MouseCursor.defer) && !identical(span.mouseCursor, topOfStack?.mouseCursor));
+    if (pushToStack) {
+      attributeStack.add(span);
     }
-    final _AttributeStackEntry<Attribute>? topOfStack = attributeStack.isEmpty ? null : attributeStack.last;
-    if (attribute == topOfStack?.value) {
-      topOfStack?.repeatCount += 1;
-    } else {
-      attributeStack.add(_AttributeStackEntry<Attribute>(attribute));
+    return pushToStack;
+  }
+
+  @override
+  void pop() {
+    assert(attributeStack.isNotEmpty);
+    attributeStack.removeLast();
+  }
+  @override
+  void commitText(int length) {
+    assert(length > 0);
+    final currentRunAttribute = runs.isEmpty ? null : runs.last.$2.last;
+    // Start a new run only if the attributes are different.
+    if (attributeStack.isNotEmpty && currentRunAttribute != attributeStack.last) {
+      runs.add((runStartIndex, attributeStack));
     }
+    runStartIndex += length;
   }
 }
 
-AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string) {
+AnnotatedString _convertTextStyleAttributes(InlineSpan span, AnnotatedString string) {
   final fontFamilies = _TextStyleAttributeRunBuilder<List<String>>(_getFontFamilies);
   final locale = _TextStyleAttributeRunBuilder<ui.Locale>(_getLocale);
   final fontWeight = _TextStyleAttributeRunBuilder<ui.FontWeight>(_getFontWeight);
@@ -713,11 +737,6 @@ AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string
   final decorationStyle = _TextStyleAttributeRunBuilder<ui.TextDecorationStyle>(_getDecorationStyle);
   final decorationThickness = _TextStyleAttributeRunBuilder<double>(_getDecorationThickness);
   final shadows = _TextStyleAttributeRunBuilder<List<ui.Shadow>>(_getShadows);
-
-  // Semantics
-  final semanticsLabels = _PlainAttributeRunBuilder<String>();
-  final spellOuts = _PlainAttributeRunBuilder<bool>();
-  final semanticGestureCallbacks = _PlainAttributeRunBuilder<Either<VoidCallback, VoidCallback>>();
 
   final List<_TextStyleAttributeRunBuilder<Object>> attributes = <_TextStyleAttributeRunBuilder<Object>>[
     fontFamilies,
@@ -745,68 +764,48 @@ AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string
   ];
 
   bool visitSpan(InlineSpan span) {
-    final int textLength;
-    final bool hasSemanticsLabel;
-    final bool hasSpellOut;
-    final bool hasSemanticsGestureCallback;
+    List<_AttributeRunBuilder<Object?, Object?>>? buildersToPop;
+    void tryPush<Source>(_AttributeRunBuilder<Source, Object?> builder, Source newValue) {
+      if (builder.tryPush(newValue)) {
+        if (buildersToPop == null) {
+          buildersToPop = [builder];
+        } else {
+          buildersToPop!.add(builder);
+        }
+      }
+    }
+
     switch (span) {
-      case TextSpan(: final String? text, :final semanticsLabel, :final spellOut, :final recognizer):
-        textLength = text?.length ?? 0;
-        hasSemanticsLabel = semanticsLabel != null;
-        hasSpellOut = spellOut != null;
-        spellOuts.push(spellOut);
-        semanticsLabels.push(semanticsLabel);
-        switch (recognizer) {
-          case TapGestureRecognizer(:final VoidCallback onTap) || DoubleTapGestureRecognizer(onDoubleTap: final VoidCallback onTap):
-            hasSemanticsGestureCallback = true;
-            semanticGestureCallbacks.push(Left(onTap));
-          case LongPressGestureRecognizer(:final VoidCallback onLongPress):
-            hasSemanticsGestureCallback = true;
-            semanticGestureCallbacks.push(Right(onLongPress));
-          case _:
-            hasSemanticsGestureCallback = false;
+      case TextSpan(:final String? text, :final style, :final semanticsLabel, :final spellOut, :final recognizer):
+        if (style != null) {
+          for (final attribute in attributes) {
+            tryPush(attribute, style);
+          }
+        }
+        final textLength = text?.length ?? 0;
+        if (textLength > 0) {
+          for (final attribute in attributes) {
+            attribute.commitText(textLength);
+          }
         }
 
       case PlaceholderSpan():
-        textLength = 1;
-        hasSemanticsLabel = false;
-        hasSpellOut = false;
-        hasSemanticsGestureCallback = false;
+        // Ignore styles?
+        for (final attribute in attributes) {
+          attribute.commitText(1);
+        }
+
       default:
         assert(false, 'unknown span type: $span');
-        textLength = 0;
-        hasSemanticsLabel = false;
-        hasSpellOut = false;
-        hasSemanticsGestureCallback = false;
-    }
-
-    final styleToPush = span.style;
-    if (styleToPush != null || textLength > 0) {
-      for (final attribute in attributes) {
-        attribute.push(styleToPush);
-        semanticsLabels.commitText(textLength);
-        spellOuts.commitText(textLength);
-        attribute.commitText(textLength);
-        semanticGestureCallbacks.commitText(textLength);
-      }
     }
 
     span.visitDirectChildren(visitSpan);
-    if (styleToPush != null) {
-      for (final attribute in attributes) {
-        attribute.pop();
+    final toPop = buildersToPop;
+    if (toPop != null) {
+      for (int i = 0; i < toPop.length; i += 1) {
+        toPop[i].pop();
       }
     }
-    if (hasSpellOut) {
-      spellOuts.pop();
-    }
-    if (hasSemanticsLabel) {
-      semanticsLabels.pop();
-    }
-    if (hasSemanticsGestureCallback) {
-      semanticGestureCallbacks.pop();
-    }
-
     return true;
   }
 
@@ -824,7 +823,7 @@ AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string
     height.build(),
     letterSpacing.build(),
     wordSpacing.build(),
-    string.length,
+    string.string.length,
     const TextStyle(),
   );
   final TextPaintAnnotations textPaintAnnotations = TextPaintAnnotations._(
@@ -837,12 +836,80 @@ AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string
     decorationStyle.build(),
     decorationThickness.build(),
     shadows.build(),
-    string.length,
+    string.string.length,
     const TextStyle(),
   );
 
-  final TextHitTestAnnotations textHitTestAnnotations = TextHitTestAnnotations._(
-  );
+  return string
+    .setAnnotationOfType(textStyleAnnotations)
+    .setAnnotationOfType(textPaintAnnotations);
+}
+
+AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string) {
+
+  // Hit test
+  final hitTests = _HitTestTargetRunBuilder();
+
+  // Semantics
+  final semanticsLabels = _PlainAttributeRunBuilder<String>();
+  final spellOuts = _PlainAttributeRunBuilder<bool>();
+  final semanticGestureCallbacks = _PlainAttributeRunBuilder<Either<VoidCallback, VoidCallback>>();
+
+  bool visitSpan(InlineSpan span) {
+    List<_AttributeRunBuilder<Object?, Object?>>? buildersToPop;
+    void tryPush<Source>(_AttributeRunBuilder<Source, Object?> builder, Source newValue) {
+      if (builder.tryPush(newValue)) {
+        if (buildersToPop == null) {
+          buildersToPop = [builder];
+        } else {
+          buildersToPop!.add(builder);
+        }
+      }
+    }
+
+    switch (span) {
+      case TextSpan(:final String? text, :final style, :final semanticsLabel, :final spellOut, :final recognizer):
+        tryPush(semanticsLabels, semanticsLabel);
+        tryPush(spellOuts, spellOut);
+        tryPush(hitTests, span);
+        switch (recognizer) {
+          case TapGestureRecognizer(:final VoidCallback onTap) || DoubleTapGestureRecognizer(onDoubleTap: final VoidCallback onTap):
+            tryPush(semanticGestureCallbacks, Left(onTap));
+          case LongPressGestureRecognizer(:final VoidCallback onLongPress):
+            tryPush(semanticGestureCallbacks, Right(onLongPress));
+          case _:
+            break;
+        }
+
+        final textLength = text?.length ?? 0;
+        if (textLength > 0) {
+          semanticsLabels.commitText(textLength);
+          spellOuts.commitText(textLength);
+          semanticGestureCallbacks.commitText(textLength);
+        }
+
+      case PlaceholderSpan():
+        // Ignore styles?
+        semanticsLabels.commitText(1);
+        spellOuts.commitText(1);
+        semanticGestureCallbacks.commitText(1);
+        hitTests.commitText(1);
+      default:
+        assert(false, 'unknown span type: $span');
+    }
+
+    span.visitDirectChildren(visitSpan);
+    final toPop = buildersToPop;
+    if (toPop != null) {
+      for (int i = 0; i < toPop.length; i += 1) {
+        toPop[i].pop();
+      }
+    }
+    return true;
+  }
+
+  visitSpan(span);
+  final TextHitTestAnnotations textHitTestAnnotations = TextHitTestAnnotations._(hitTests.build());
 
   final semanticsAnnotations = SemanticsAnnotations._(
     semanticsLabels.build(),
@@ -851,8 +918,6 @@ AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string
   );
 
   final storage = const PersistentHashMap<Type, StringAnnotation<Object>?>.empty()
-    .put(_TextPaintAnnotationKey, textPaintAnnotations)
-    .put(_TextStyleAnnotationKey, textStyleAnnotations)
     .put(_HitTestAnnotationKey, textHitTestAnnotations)
     .put(_SemanticsAnnotationKey, semanticsAnnotations);
 

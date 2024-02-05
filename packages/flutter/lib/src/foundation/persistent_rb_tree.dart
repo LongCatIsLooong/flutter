@@ -170,7 +170,7 @@ class RBTree<Value> {
      isBlack = true,
      blackHeight = (left?.blackHeight ?? 0) + 1;
 
-  /// Creates a [RBTree] from a sorted association [List].
+  /// Creates a [RBTree] from a sorted, non-empty association [List].
   factory RBTree.fromSortedList(List<(int, Value)> sortedList) {
     assert(sortedList.isNotEmpty);
     assert(() {
