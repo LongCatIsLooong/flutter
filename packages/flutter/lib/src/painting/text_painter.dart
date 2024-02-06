@@ -13,6 +13,7 @@ import 'dart:ui' as ui show
   ParagraphConstraints,
   ParagraphStyle,
   PlaceholderAlignment,
+  StrutStyle,
   TextStyle;
 
 import 'package:flutter/foundation.dart';
@@ -958,6 +959,7 @@ class TextPainter {
     // The defaultTextDirection argument is used for preferredLineHeight in case
     // textDirection hasn't yet been set.
     assert(textDirection != null || defaultTextDirection != null, 'TextPainter.textDirection must be set to a non-null value before using the TextPainter.');
+    final StrutStyle? strutStyle = _strutStyle;
     return _text!.style?.getParagraphStyle(
       textAlign: textAlign,
       textDirection: textDirection ?? defaultTextDirection,
@@ -966,7 +968,7 @@ class TextPainter {
       textHeightBehavior: _textHeightBehavior,
       ellipsis: _ellipsis,
       locale: _locale,
-      strutStyle: _strutStyle,
+      strutStyle: strutStyle,
     ) ?? ui.ParagraphStyle(
       textAlign: textAlign,
       textDirection: textDirection ?? defaultTextDirection,
@@ -978,6 +980,20 @@ class TextPainter {
       textHeightBehavior: _textHeightBehavior,
       ellipsis: ellipsis,
       locale: locale,
+      strutStyle: strutStyle == null ? null : ui.StrutStyle(
+        fontFamily: strutStyle.fontFamily,
+        fontFamilyFallback: strutStyle.fontFamilyFallback,
+        fontSize: switch (strutStyle.fontSize) {
+          null => null,
+          final double unscaled => textScaler.scale(unscaled),
+        },
+        height: strutStyle.height,
+        leading: strutStyle.leading,
+        leadingDistribution: strutStyle.leadingDistribution,
+        fontWeight: strutStyle.fontWeight,
+        fontStyle: strutStyle.fontStyle,
+        forceStrutHeight: strutStyle.forceStrutHeight,
+      ),
     );
   }
 
