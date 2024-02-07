@@ -271,12 +271,16 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
   @override
   @protected
   T? getAnnotationOfType<T extends StringAnnotation<Key>, Key extends Object>() {
+    return switch (Key) {
+      _SemanticsAnnotationKey => _InlineSpanSemanticsAnnotations(this),
+      default:
+    }
     return toAnnotatedString.getAnnotationOfType<T, Key>();
   }
 
   @override
   AnnotatedString setAnnotationOfType<T extends StringAnnotation<Key>, Key extends Object>(T? newAnnotations) {
-    return toAnnotatedString.setAnnotationOfType(newAnnotations);
+    return AnnotatedString.fromInlineSpan(this).setAnnotationOfType(newAnnotations);
   }
 
   /// Performs the check at each [InlineSpan] for if the `position` falls within the range
@@ -414,4 +418,24 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
     properties.defaultDiagnosticsTreeStyle = DiagnosticsTreeStyle.whitespace;
     style?.debugFillProperties(properties);
   }
+}
+
+abstract final class _HitTestAnnotationKey {}
+abstract class TextHitTestAnnotations implements StringAnnotation<_HitTestAnnotationKey> {
+  Iterable<HitTestTarget> getHitTestTargets(int codeUnitOffset);
+}
+
+abstract final class _SemanticsAnnotationKey {}
+/// An annotation type that represents the extra semantics information of the text.
+abstract class SemanticsAnnotations implements StringAnnotation<_SemanticsAnnotationKey> {
+  RBTree<String?>? get semanticsLabels;
+  RBTree<bool?>? get spellout;
+  // Either onTap callbacks or onLongPress callbacks.
+  RBTree<Either<VoidCallback, VoidCallback>?>? get gestureCallbacks;
+}
+
+class _InlineSpanSemanticsAnnotations implements SemanticsAnnotations {
+  _InlineSpanSemanticsAnnotations(this.span);
+
+  final InlineSpan span;
 }

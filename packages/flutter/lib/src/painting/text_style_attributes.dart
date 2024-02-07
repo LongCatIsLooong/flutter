@@ -7,9 +7,10 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart' show MouseCursor;
-import 'package:flutter/src/painting/strut_style.dart';
-import 'package:flutter/src/painting/text_painter.dart';
-import 'package:flutter/src/painting/text_scaler.dart';
+
+import 'strut_style.dart';
+import 'text_painter.dart';
+import 'text_scaler.dart';
 
 import 'basic_types.dart';
 import 'inline_span.dart';
@@ -930,22 +931,21 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
   }
 }
 
-abstract final class _HitTestAnnotationKey {}
-class TextHitTestAnnotations implements StringAnnotation<_HitTestAnnotationKey> {
-  const TextHitTestAnnotations._(this._hitTestTargets);
+class _TextHitTestAnnotations implements TextHitTestAnnotations {
+  const _TextHitTestAnnotations(this._hitTestTargets);
 
   final RBTree<Iterable<HitTestTarget>>? _hitTestTargets;
 
+  @override
   Iterable<HitTestTarget> getHitTestTargets(int codeUnitOffset) {
-    final iterator = _hitTestTargets?.getRunsEndAfter(codeUnitOffset);
+    final Iterator<(int, Iterable<HitTestTarget>)>? iterator = _hitTestTargets?.getRunsEndAfter(codeUnitOffset);
     return iterator != null && iterator.moveNext() ? iterator.current.$2 : const <HitTestTarget>[];
   }
 }
 
-abstract final class _SemanticsAnnotationKey {}
 /// An annotation type that represents the extra semantics information of the text.
-class SemanticsAnnotations implements StringAnnotation<_SemanticsAnnotationKey> {
-  const SemanticsAnnotations._(this._semanticsLabels, this._spellout, this._gestureCallbacks);
+class _SemanticsAnnotations implements SemanticsAnnotations {
+  const _SemanticsAnnotations(this._semanticsLabels, this._spellout, this._gestureCallbacks);
 
   final RBTree<String?>? _semanticsLabels;
   final RBTree<bool?>? _spellout;
@@ -1231,19 +1231,17 @@ AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string
   }
 
   visitSpan(span);
-  final TextHitTestAnnotations textHitTestAnnotations = TextHitTestAnnotations._(hitTests.build());
+  final TextHitTestAnnotations textHitTestAnnotations = _TextHitTestAnnotations(hitTests.build());
 
-  final semanticsAnnotations = SemanticsAnnotations._(
+  final semanticsAnnotations = _SemanticsAnnotations(
     semanticsLabels.build(),
     spellOuts.build(),
     semanticGestureCallbacks.build(),
   );
 
-  final storage = const PersistentHashMap<Type, StringAnnotation<Object>?>.empty()
-    .put(_HitTestAnnotationKey, textHitTestAnnotations)
-    .put(_SemanticsAnnotationKey, semanticsAnnotations);
-
-  return AnnotatedString._(string, storage);
+  return AnnotatedString._(string, const PersistentHashMap<Type, StringAnnotation<Object>?>.empty())
+    .setAnnotationOfType(textHitTestAnnotations)
+    .setAnnotationOfType(semanticsAnnotations);
 }
 
 AnnotatedString _extractFromInlineSpan(InlineSpan span) {
