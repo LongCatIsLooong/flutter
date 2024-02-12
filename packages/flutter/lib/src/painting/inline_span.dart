@@ -55,16 +55,22 @@ class InlineSpanSemanticsInformation {
   /// Use [InlineSpanSemanticsInformation.placeholder] instead of directly setting
   /// [isPlaceholder].
   const InlineSpanSemanticsInformation(
+    String text, {
+    String? semanticsLabel,
+    List<ui.StringAttribute> stringAttributes = const <ui.StringAttribute>[],
+    GestureRecognizer? recognizer,
+  }) : this._(text, isPlaceholder: true, semanticsLabel: semanticsLabel, stringAttributes: stringAttributes, recognizer: recognizer);
+
+  const InlineSpanSemanticsInformation._(
     this.text, {
     this.isPlaceholder = false,
     this.semanticsLabel,
     this.stringAttributes = const <ui.StringAttribute>[],
     this.recognizer,
-  }) : assert(!isPlaceholder || (text == '\uFFFC' && semanticsLabel == null && recognizer == null)),
-       requiresOwnNode = isPlaceholder || recognizer != null;
+  }) : assert(!isPlaceholder || (text == '\uFFFC' && semanticsLabel == null && recognizer == null));
 
   /// The text info for a [PlaceholderSpan].
-  static const InlineSpanSemanticsInformation placeholder = InlineSpanSemanticsInformation('\uFFFC', isPlaceholder: true);
+  static const InlineSpanSemanticsInformation placeholder = InlineSpanSemanticsInformation._('\uFFFC', isPlaceholder: true);
 
   /// The text value, if any. For [PlaceholderSpan]s, this will be the unicode
   /// placeholder value.
@@ -83,7 +89,7 @@ class InlineSpanSemanticsInformation {
   ///
   /// This will be the case of the [recognizer] is not null, of if
   /// [isPlaceholder] is true.
-  final bool requiresOwnNode;
+  bool get requiresOwnNode => isPlaceholder || recognizer != null;
 
   /// The string attributes attached to this semantics information
   final List<ui.StringAttribute> stringAttributes;
@@ -265,24 +271,6 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
     return result;
   }
 
-  @override
-  String get string => toPlainText(includeSemanticsLabels: false);
-
-  @override
-  @protected
-  T? getAnnotationOfType<T extends StringAnnotation<Key>, Key extends Object>() {
-    return switch (Key) {
-      _SemanticsAnnotationKey => _InlineSpanSemanticsAnnotations(this),
-      default:
-    }
-    return toAnnotatedString.getAnnotationOfType<T, Key>();
-  }
-
-  @override
-  AnnotatedString setAnnotationOfType<T extends StringAnnotation<Key>, Key extends Object>(T? newAnnotations) {
-    return AnnotatedString.fromInlineSpan(this).setAnnotationOfType(newAnnotations);
-  }
-
   /// Performs the check at each [InlineSpan] for if the `position` falls within the range
   /// of the span and returns the span if it does.
   ///
@@ -398,6 +386,24 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
   RenderComparison compareTo(InlineSpan other);
 
   @override
+  String get string => toPlainText(includeSemanticsLabels: false);
+
+  @override
+  T? getAnnotationOfType<T extends StringAnnotation<Key>, Key extends Object>() {
+    return switch (Key) {
+      _SemanticsAnnotationKey => _InlineSpanSemanticsAnnotations(this),
+      _HitTestAnnotationKey => _InlineSpanSemanticsAnnotations(this),
+      default:
+    }
+    return toAnnotatedString.getAnnotationOfType<T, Key>();
+  }
+
+  @override
+  AnnotatedString setAnnotationOfType<T extends StringAnnotation<Key>, Key extends Object>(T? newAnnotations) {
+    return AnnotatedString.fromInlineSpan(this).setAnnotationOfType(newAnnotations);
+  }
+
+  @override
   bool operator ==(Object other) {
     if (identical(this, other)) {
       return true;
@@ -421,21 +427,50 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
 }
 
 abstract final class _HitTestAnnotationKey {}
-abstract class TextHitTestAnnotations implements StringAnnotation<_HitTestAnnotationKey> {
+abstract class TextHitTestAnnotations implements StringAnnotation<_HitTestAnnotationKey>, OverwritableStringAttribute<TextHitTestAnnotations, > {
   Iterable<HitTestTarget> getHitTestTargets(int codeUnitOffset);
+}
+
+@immutable
+final class SemanticsAttributeSet {
+  const SemanticsAttributeSet({
+    this.semanticsLabel,
+    this.spellOut,
+    this.gestureCallback,
+  });
+
+  final String? semanticsLabel;
+  final bool? spellOut;
+  final Either<VoidCallback, VoidCallback>? gestureCallback;
 }
 
 abstract final class _SemanticsAnnotationKey {}
 /// An annotation type that represents the extra semantics information of the text.
-abstract class SemanticsAnnotations implements StringAnnotation<_SemanticsAnnotationKey> {
-  RBTree<String?>? get semanticsLabels;
-  RBTree<bool?>? get spellout;
-  // Either onTap callbacks or onLongPress callbacks.
-  RBTree<Either<VoidCallback, VoidCallback>?>? get gestureCallbacks;
+abstract class SemanticsAnnotations implements StringAnnotation<_SemanticsAnnotationKey>, OverwritableStringAttribute<TextHitTestAnnotations, SemanticsAttributeSet> {
+  Iterable<SemanticsAttributeSet> getSemanticsInformation(int codeUnitOffset);
 }
 
 class _InlineSpanSemanticsAnnotations implements SemanticsAnnotations {
   _InlineSpanSemanticsAnnotations(this.span);
 
   final InlineSpan span;
+
+  Iterable<SemanticsAttributeSet> getSemanticsInformation(int codeUnitOffset) {
+
+  }
+}
+
+abstract final class _TextStyleAnnotationKey { }
+
+@immutable
+abstract class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey>, OverwritableStringAttribute<TextStyleAnnotations, TextStyleAttributeSet> {
+  Iterator<(int, TextStyle)> getRunsEndAfter(int index) {
+  }
+}
+
+@immutable
+class _TextStyleAnnotations implements TextStyleAnnotations {
+  @override
+  TextStyleAnnotations overwrite(TextRange range, TextStyleAttributeSet annotationsToOverwrite) {
+  }
 }

@@ -252,6 +252,29 @@ Duration lerpDuration(Duration a, Duration b, double t) {
   );
 }
 
+class FlatMapIterator<T> implements Iterator<T> {
+  FlatMapIterator(this.iterators);
+
+  final Iterator<Iterator<T>> iterators;
+  Iterator<T>? _currentIterator;
+
+  @override
+  T get current => _currentIterator!.current;
+
+  @override
+  bool moveNext() {
+    if (_currentIterator?.moveNext() ?? false) {
+      return true;
+    }
+    while (iterators.moveNext()) {
+      if ((_currentIterator = iterators.current).moveNext()) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
 sealed class Either<L, R> {
   const factory Either.left(L value) = Left<L, Never>._;
   const factory Either.right(R value) = Right<Never, R>._;

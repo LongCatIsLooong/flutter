@@ -8,10 +8,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart' show MouseCursor;
 
-import 'strut_style.dart';
-import 'text_painter.dart';
-import 'text_scaler.dart';
-
 import 'basic_types.dart';
 import 'inline_span.dart';
 import 'placeholder_span.dart';
@@ -1278,3 +1274,7 @@ class AnnotatedString {
 }
 
 interface class StringAnnotation<Key extends Object> { }
+
+abstract class OverwritableStringAttribute<Self extends OverwritableStringAttribute<Self, Attribute>, Attribute> {
+  Self overwrite(ui.TextRange range, Attribute newAttribute);
+}
