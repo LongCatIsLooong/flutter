@@ -390,12 +390,8 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
 
   @override
   T? getAnnotationOfType<T extends StringAnnotation<Key>, Key extends Object>() {
-    return switch (Key) {
-      _SemanticsAnnotationKey => _InlineSpanSemanticsAnnotations(this),
-      _HitTestAnnotationKey => _InlineSpanSemanticsAnnotations(this),
-      default:
-    }
-    return toAnnotatedString.getAnnotationOfType<T, Key>();
+    final _InlineSpanTextStyleAnnotations textStyleAnnotations = _InlineSpanTextStyleAnnotations._(this);
+    return textStyleAnnotations is T ? textStyleAnnotations as T : null;
   }
 
   @override
@@ -426,51 +422,37 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
   }
 }
 
-abstract final class _HitTestAnnotationKey {}
-abstract class TextHitTestAnnotations implements StringAnnotation<_HitTestAnnotationKey>, OverwritableStringAttribute<TextHitTestAnnotations, > {
-  Iterable<HitTestTarget> getHitTestTargets(int codeUnitOffset);
-}
+class _InlineSpanTextStyleAnnotations implements TextStyleAnnotations {
+  _InlineSpanTextStyleAnnotations._(this._span);
 
-@immutable
-final class SemanticsAttributeSet {
-  const SemanticsAttributeSet({
-    this.semanticsLabel,
-    this.spellOut,
-    this.gestureCallback,
-  });
+  final InlineSpan _span;
 
-  final String? semanticsLabel;
-  final bool? spellOut;
-  final Either<VoidCallback, VoidCallback>? gestureCallback;
-}
+  @override
+  void build(ui.ParagraphBuilder builder, {
+    TextScaler textScaler = TextScaler.noScaling,
+    List<PlaceholderDimensions>? dimensions,
+  }) => _span.build(builder, textScaler: textScaler, dimensions: dimensions);
 
-abstract final class _SemanticsAnnotationKey {}
-/// An annotation type that represents the extra semantics information of the text.
-abstract class SemanticsAnnotations implements StringAnnotation<_SemanticsAnnotationKey>, OverwritableStringAttribute<TextHitTestAnnotations, SemanticsAttributeSet> {
-  Iterable<SemanticsAttributeSet> getSemanticsInformation(int codeUnitOffset);
-}
-
-class _InlineSpanSemanticsAnnotations implements SemanticsAnnotations {
-  _InlineSpanSemanticsAnnotations(this.span);
-
-  final InlineSpan span;
-
-  Iterable<SemanticsAttributeSet> getSemanticsInformation(int codeUnitOffset) {
-
-  }
-}
-
-abstract final class _TextStyleAnnotationKey { }
-
-@immutable
-abstract class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey>, OverwritableStringAttribute<TextStyleAnnotations, TextStyleAttributeSet> {
-  Iterator<(int, TextStyle)> getRunsEndAfter(int index) {
-  }
-}
-
-@immutable
-class _TextStyleAnnotations implements TextStyleAnnotations {
   @override
   TextStyleAnnotations overwrite(TextRange range, TextStyleAttributeSet annotationsToOverwrite) {
+    return TextStyleAnnotations.fromInlineSpan(_span).overwrite(range, annotationsToOverwrite);
+  }
+
+  @override
+  TextStyle get baseStyle => _span.style;
+
+  @override
+  TextStyleAnnotations erase(TextRange range, TextStyleAttributeSet annotationsToErase) {
+    return TextStyleAnnotations.fromInlineSpan(_span).erase(range, annotationsToErase);
+  }
+
+  @override
+  Iterator<(int, TextStyle)> getRunsEndAfter(int index) {
+    throw UnimplementedError();
+  }
+
+  @override
+  TextStyleAnnotations updateBaseTextStyle(TextStyle baseAnnotations) {
+    return TextStyleAnnotations.fromInlineSpan(_span).updateBaseTextStyle(baseAnnotations);
   }
 }

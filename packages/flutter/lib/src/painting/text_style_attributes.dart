@@ -11,8 +11,10 @@ import 'package:flutter/services.dart' show MouseCursor;
 import 'basic_types.dart';
 import 'inline_span.dart';
 import 'placeholder_span.dart';
+import 'text_scaler.dart';
 import 'text_span.dart';
 import 'text_style.dart';
+import 'text_painter.dart';
 
 @pragma('vm:prefer-inline')
 V? _applyNullable<T extends Object, V extends Object>(V? Function(T) transform, T? nullable) {
@@ -631,7 +633,7 @@ final class _MutableTextStyleAttributeSet extends TextStyleAttributeSet {
 abstract final class _TextStyleAnnotationKey { }
 
 @immutable
-class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> {
+class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey>, OverwritableStringAttribute<TextStyleAnnotations, TextStyleAttributeSet> {
   TextStyleAnnotations._(
     this._fontFamilies,
     this._locale,
@@ -655,9 +657,18 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
     this._decorationThickness,
     this._shadows,
 
-    this._textLength,
+    this._debugTextLength,
     this.baseStyle,
   );
+
+  factory TextStyleAnnotations.fromInlineSpan(InlineSpan span) {
+    int debugStringLength = -1;
+    assert(() {
+      debugStringLength = span.string.length;
+      return true;
+    }());
+    return _convertTextStyleAttributes(span, debugStringLength);
+  }
 
   static _AttributeIterable<Value, TextStyle> _createAttribute<Value extends Object>(RBTree<Value?>? storage, Value defaultValue, TextStyle Function(Value) lift) {
     return _AttributeIterable<Value, TextStyle>._(storage, defaultValue, lift);
@@ -689,12 +700,12 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
       _decorationThickness,
       _shadows,
 
-      _textLength,
+      _debugTextLength,
       baseAnnotations,
     );
   }
 
-  final int _textLength;
+  final int _debugTextLength;
 
   final RBTree<List<String>?>? _fontFamilies;
   late final TextStyleAttributeGetter<List<String>> fontFamilies = _createAttribute(_fontFamilies, _getFontFamilies(baseStyle)!, _liftFontFamilies);
@@ -750,57 +761,57 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
   final RBTree<List<ui.Shadow>?>? _shadows;
   late final TextStyleAttributeGetter<List<ui.Shadow>> shadows = _createAttribute(_shadows, baseStyle.shadows!, _liftShadows);
 
-  TextStyle getAnnotationAt(int index) {
-    final underline = _underline?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
-    final overline = _overline?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
-    final lineThrough = _lineThrough?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
-    final ui.TextDecoration? decoration = underline || overline || lineThrough
-      ? null
-      : ui.TextDecoration.combine([
-          if (underline) ui.TextDecoration.underline,
-          if (overline) ui.TextDecoration.overline,
-          if (lineThrough) ui.TextDecoration.lineThrough,
-        ]);
-    final foreground = _foreground?.getNodeGreaterThan(index)?.value;
-    final background = _background?.getNodeGreaterThan(index)?.value;
+  //TextStyle getAnnotationAt(int index) {
+  //  final underline = _underline?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
+  //  final overline = _overline?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
+  //  final lineThrough = _lineThrough?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
+  //  final ui.TextDecoration? decoration = underline || overline || lineThrough
+  //    ? null
+  //    : ui.TextDecoration.combine([
+  //        if (underline) ui.TextDecoration.underline,
+  //        if (overline) ui.TextDecoration.overline,
+  //        if (lineThrough) ui.TextDecoration.lineThrough,
+  //      ]);
+  //  final foreground = _foreground?.getNodeGreaterThan(index)?.value;
+  //  final background = _background?.getNodeGreaterThan(index)?.value;
 
-    final (String? fontFamily, List<String>? fallback) = switch (_fontFamilies?.getNodeLessThanOrEqualTo(index)?.value) {
-      null => (null, null),
-      [] => ('', const []),
-      [final fontFamily, ...final fallback] => (fontFamily, fallback)
-    };
+  //  final (String? fontFamily, List<String>? fallback) = switch (_fontFamilies?.getNodeLessThanOrEqualTo(index)?.value) {
+  //    null => (null, null),
+  //    [] => ('', const []),
+  //    [final fontFamily, ...final fallback] => (fontFamily, fallback)
+  //  };
 
-    final TextStyle textStyle = TextStyle(
-      fontFamily: fontFamily,
-      fontFamilyFallback: fallback,
-      locale: _locale?.getNodeLessThanOrEqualTo(index)?.value,
+  //  final TextStyle textStyle = TextStyle(
+  //    fontFamily: fontFamily,
+  //    fontFamilyFallback: fallback,
+  //    locale: _locale?.getNodeLessThanOrEqualTo(index)?.value,
 
-      fontWeight: _fontWeight?.getNodeLessThanOrEqualTo(index)?.value,
-      fontStyle: _fontStyle?.getNodeLessThanOrEqualTo(index)?.value,
+  //    fontWeight: _fontWeight?.getNodeLessThanOrEqualTo(index)?.value,
+  //    fontStyle: _fontStyle?.getNodeLessThanOrEqualTo(index)?.value,
 
-      fontFeatures: _fontFeatures?.getNodeGreaterThan(index)?.value,
-      fontVariations: _fontVariations?.getNodeGreaterThan(index)?.value,
+  //    fontFeatures: _fontFeatures?.getNodeGreaterThan(index)?.value,
+  //    fontVariations: _fontVariations?.getNodeGreaterThan(index)?.value,
 
-      leadingDistribution: _leadingDistribution?.getNodeLessThanOrEqualTo(index)?.value,
-      height: _height?.getNodeLessThanOrEqualTo(index)?.value,
-      textBaseline: _textBaseline?.getNodeLessThanOrEqualTo(index)?.value,
+  //    leadingDistribution: _leadingDistribution?.getNodeLessThanOrEqualTo(index)?.value,
+  //    height: _height?.getNodeLessThanOrEqualTo(index)?.value,
+  //    textBaseline: _textBaseline?.getNodeLessThanOrEqualTo(index)?.value,
 
-      fontSize: _fontSize?.getNodeLessThanOrEqualTo(index)?.value,
-      letterSpacing: _letterSpacing?.getNodeLessThanOrEqualTo(index)?.value,
-      wordSpacing: _wordSpacing?.getNodeLessThanOrEqualTo(index)?.value,
+  //    fontSize: _fontSize?.getNodeLessThanOrEqualTo(index)?.value,
+  //    letterSpacing: _letterSpacing?.getNodeLessThanOrEqualTo(index)?.value,
+  //    wordSpacing: _wordSpacing?.getNodeLessThanOrEqualTo(index)?.value,
 
-      color: foreground?.maybeLeft,
-      foreground: foreground?.maybeRight,
-      backgroundColor: background?.maybeLeft,
-      background: background?.maybeRight,
-      decoration: decoration,
-      decorationColor: _decorationColor?.getNodeLessThanOrEqualTo(index)?.value,
-      decorationStyle: _decorationStyle?.getNodeLessThanOrEqualTo(index)?.value,
-      decorationThickness: _decorationThickness?.getNodeLessThanOrEqualTo(index)?.value,
-      shadows: _shadows?.getNodeLessThanOrEqualTo(index)?.value,
-    );
-    return baseStyle.merge(textStyle);
-  }
+  //    color: foreground?.maybeLeft,
+  //    foreground: foreground?.maybeRight,
+  //    backgroundColor: background?.maybeLeft,
+  //    background: background?.maybeRight,
+  //    decoration: decoration,
+  //    decorationColor: _decorationColor?.getNodeLessThanOrEqualTo(index)?.value,
+  //    decorationStyle: _decorationStyle?.getNodeLessThanOrEqualTo(index)?.value,
+  //    decorationThickness: _decorationThickness?.getNodeLessThanOrEqualTo(index)?.value,
+  //    shadows: _shadows?.getNodeLessThanOrEqualTo(index)?.value,
+  //  );
+  //  return baseStyle.merge(textStyle);
+  //}
 
   Iterator<(int, TextStyle)> getRunsEndAfter(int index) {
     final bool baseStyleHasUnderline = _getUnderline(baseStyle) ?? false;
@@ -818,7 +829,9 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
 
     final decorationRuns = _DecorationFlagsMergingIterator(
       decorationRunList,
-      (baseStyleHasUnderline ? _underlineMask : 0) | (baseStyleHasOverline ? _overlineMask : 0) | (baseStyleHasLineThrough ? _lineThroughMask : 0)
+      (baseStyleHasUnderline ? _underlineMask : 0) |
+      (baseStyleHasOverline ? _overlineMask : 0) |
+      (baseStyleHasLineThrough ? _lineThroughMask : 0)
     );
 
     final List<_RunIterator<TextStyle>?> runsToMerge = List<_RunIterator<TextStyle>?>.filled(19, null)
@@ -846,7 +859,7 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
   }
 
   TextStyleAnnotations overwrite(ui.TextRange range, TextStyleAttributeSet annotationsToOverwrite) {
-    final int? end = range.end >= _textLength ? null : range.end;
+    final int? end = range.end >= _debugTextLength ? null : range.end;
 
     RBTree<Value?>? update<Value extends Object>(Value? newAttribute, RBTree<Value?>? tree) {
       return newAttribute == null ? tree : _insertRange(tree, range.start, end, newAttribute);
@@ -883,7 +896,7 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
       update(annotationsToOverwrite.decorationStyle, _decorationStyle),
       update(annotationsToOverwrite.decorationThickness, _decorationThickness),
       update(annotationsToOverwrite.shadows, _shadows),
-      _textLength,
+      _debugTextLength,
       baseStyle,
     );
   }
@@ -891,7 +904,7 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
   // Resets TextStyle attributes with non-null values to baseTextStyle.
   // I'm not sure this is really needed. Added for duality.
   TextStyleAnnotations erase(ui.TextRange range, TextStyleAttributeSet annotationsToErase) {
-    final int? end = range.end >= _textLength ? null : range.end;
+    final int? end = range.end >= _debugTextLength ? null : range.end;
 
     RBTree<Value?>? erase<Value extends Object>(Value? newAttribute, RBTree<Value?>? tree) {
       return newAttribute == null ? tree : _insertRange(tree, range.start, end, null);
@@ -921,9 +934,16 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey> 
       erase(annotationsToErase.decorationThickness, _decorationThickness),
       erase(annotationsToErase.shadows, _shadows),
 
-      _textLength,
+      _debugTextLength,
       baseStyle,
     );
+  }
+
+  void build(ui.ParagraphBuilder builder, {
+    TextScaler textScaler = TextScaler.noScaling,
+    List<PlaceholderDimensions>? dimensions,
+  }) {
+
   }
 }
 
@@ -1053,7 +1073,7 @@ class _HitTestTargetRunBuilder extends _AttributeRunBuilder<TextSpan, Iterable<T
   }
 }
 
-AnnotatedString _convertTextStyleAttributes(InlineSpan span, AnnotatedString string) {
+TextStyleAnnotations _convertTextStyleAttributes(InlineSpan span, int stringLength) {
   final fontFamilies = _TextStyleAttributeRunBuilder<List<String>>(_getFontFamilies);
   final locale = _TextStyleAttributeRunBuilder<ui.Locale>(_getLocale);
   final fontWeight = _TextStyleAttributeRunBuilder<ui.FontWeight>(_getFontWeight);
@@ -1131,9 +1151,9 @@ AnnotatedString _convertTextStyleAttributes(InlineSpan span, AnnotatedString str
     return true;
   }
 
-  // Only extract
+  // Only extract styles.
   span.visitChildren(visitSpan);
-  final TextStyleAnnotations textStyleAnnotations = TextStyleAnnotations._(
+  return TextStyleAnnotations._(
     fontFamilies.build(),
     locale.build(),
     fontWeight.build(),
@@ -1156,11 +1176,9 @@ AnnotatedString _convertTextStyleAttributes(InlineSpan span, AnnotatedString str
     decorationThickness.build(),
     shadows.build(),
 
-    string.string.length,
+    stringLength,
     span.style ?? const TextStyle(),
   );
-
-  return string.setAnnotationOfType(textStyleAnnotations);
 }
 
 AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string) {
@@ -1277,4 +1295,28 @@ interface class StringAnnotation<Key extends Object> { }
 
 abstract class OverwritableStringAttribute<Self extends OverwritableStringAttribute<Self, Attribute>, Attribute> {
   Self overwrite(ui.TextRange range, Attribute newAttribute);
+}
+
+abstract final class _HitTestAnnotationKey {}
+abstract class TextHitTestAnnotations implements StringAnnotation<_HitTestAnnotationKey>, OverwritableStringAttribute<TextHitTestAnnotations, > {
+  Iterable<HitTestTarget> getHitTestTargets(int codeUnitOffset);
+}
+
+@immutable
+final class SemanticsAttributeSet {
+  const SemanticsAttributeSet({
+    this.semanticsLabel,
+    this.spellOut,
+    this.gestureCallback,
+  });
+
+  final String? semanticsLabel;
+  final bool? spellOut;
+  final Either<VoidCallback, VoidCallback>? gestureCallback;
+}
+
+abstract final class _SemanticsAnnotationKey {}
+/// An annotation type that represents the extra semantics information of the text.
+abstract class SemanticsAnnotations implements StringAnnotation<_SemanticsAnnotationKey>, OverwritableStringAttribute<TextHitTestAnnotations, SemanticsAttributeSet> {
+  Iterable<SemanticsAttributeSet> getSemanticsInformation(int codeUnitOffset);
 }
