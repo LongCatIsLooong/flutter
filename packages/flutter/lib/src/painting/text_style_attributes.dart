@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart' show MouseCursor;
 
+import 'annotated_string.dart';
 import 'basic_types.dart';
 import 'inline_span.dart';
 import 'placeholder_span.dart';
@@ -52,7 +53,7 @@ RBTree<Value?>? _insertRange<Value extends Object>(RBTree<Value?>? tree, int sta
 
 abstract class TextStyleAttributeGetter<T extends Object> {
   Iterator<(int, T)> getRunsEndAfter(int index);
-  _RunIterator<TextStyle>? _getTextStyleRunsEndAfter(int index);
+  Iterator<(int, TextStyle)>? _getTextStyleRunsEndAfter(int index);
 }
 
 class _AttributeIterable<T extends Object, Output extends Object> implements TextStyleAttributeGetter<T> {
@@ -72,8 +73,8 @@ class _AttributeIterable<T extends Object, Output extends Object> implements Tex
   TextStyle _liftToTextStyle(T? value) => _lift(value ?? _defaultValue);
 
   @override
-  _RunIterator<TextStyle>? _getTextStyleRunsEndAfter(int index) {
-    return _applyNullable(_RunIterator.new, _map(_liftToTextStyle, _storage?.getRunsEndAfter(index)));
+  Iterator<(int, TextStyle)>? _getTextStyleRunsEndAfter(int index) {
+    return _map(_liftToTextStyle, _storage?.getRunsEndAfter(index));
   }
 }
 
@@ -83,26 +84,6 @@ class _EmptyIterator<T> implements Iterator<T> {
   bool moveNext() => false;
   @override
   T get current => throw FlutterError('unreachable');
-}
-
-/// A wrapper iterator that allows safely querying the current value, without
-/// calling [moveNext].
-class _RunIterator<T> {
-  _RunIterator(this.inner);
-
-  bool? _canMoveNext;
-  bool get canMoveNext => _canMoveNext ??= moveNext();
-  final Iterator<(int, T)> inner;
-
-  (int, T)? get current => canMoveNext ? _current : null;
-  (int, T)? _current;
-
-  bool moveNext() {
-    _current = (_canMoveNext = inner.moveNext())
-      ? inner.current
-      : null;
-    return _current != null;
-  }
 }
 
 /// Transforms the values emitted by an nullable indexed iterator using the given
@@ -125,137 +106,48 @@ class _TransformedIndexedIterator<T, V> implements Iterator<(int, V)> {
   bool moveNext() => inner.moveNext();
 }
 
-abstract base class _MergedRunIterator<T, Attribute> implements Iterator<(int, T)> {
-  _MergedRunIterator(List<_RunIterator<Attribute>?> attributes)
-    : remainingLength = cleanUpEmptyAttributes(attributes),
-      attributes = attributes as List<_RunIterator<Attribute>>;
+/// A wrapper iterator that allows safely querying the current value, without
+/// calling [moveNext].
+class _RunIterator<T> {
+  _RunIterator(this.inner);
 
-  final List<_RunIterator<Attribute>> attributes;
-  // The number of attributes in [attributes] that has not reached end. This
-  // value being 0 indicates that this iterator has reached end.
-  int remainingLength;
+  bool? _canMoveNext;
+  bool get canMoveNext => _canMoveNext ??= moveNext();
+  final Iterator<(int, T)> inner;
 
-  // Throw exhausted attributes out of the list bounds. Returns the new list length.
-  static int cleanUpEmptyAttributes<Attribute>(List<_RunIterator<Attribute>?> attributes) {
-    int end = attributes.length - 1;
-    for (int i = 0; i <= end; i += 1) {
-      if (attributes[i]?.current != null) {
-        continue;
-      }
-      while (attributes[end]?.current == null) {
-        if (end <= i + 1) {
-          return i;
-        }
-        end -= 1;
-      }
-      assert(attributes[end]?.current != null);
-      // Throws the current i-th attribute away.
-      attributes[i] = attributes[end];
-    }
-    return end + 1;
-  }
+  (int, T)? get current => canMoveNext ? _current : null;
+  (int, T)? _current;
 
-  // Move _RunIterators in the attributes list with the smallest starting index
-  // to the start of the attributes list.
-  int moveNextAttributesToHead() {
-    assert(remainingLength > 0);
-    int runStartIndex = -1;
-    // The number of attributes that currently start at runStartIndex.
-    int numberOfAttributes = 0;
-
-    for (int i = 0; i < remainingLength; i += 1) {
-      final _RunIterator<Attribute> attribute = attributes[i];
-      final int index = attribute.current!.$1;
-      if (numberOfAttributes > 0 && runStartIndex < index) {
-        // This attribute has a larger startIndex than the current runStartIndex.
-        continue;
-      }
-      if (index != runStartIndex) {
-        assert(numberOfAttributes == 0 || runStartIndex > index);
-        // This attribute has a smaller startIndex than the current runStartIndex.
-        runStartIndex = index;
-        numberOfAttributes = 1;
-      } else {
-        numberOfAttributes += 1;
-      }
-      // Move the attribute to the head of the list.
-      assert(numberOfAttributes - 1 <= i);
-      if (numberOfAttributes - 1 != i) {
-        // Swap locations to make sure the attributes with the smallest start
-        // index are relocated to the head of the list.
-        attributes[i] = attributes[numberOfAttributes - 1];
-        attributes[numberOfAttributes - 1] = attribute;
-      }
-    }
-    assert(numberOfAttributes > 0);
-    return numberOfAttributes;
-  }
-}
-
-final class _TextStyleMergingIterator extends _MergedRunIterator<TextStyle, TextStyle> {
-  _TextStyleMergingIterator(super.attributes);
-
-  @override
-  late (int, TextStyle) current;
-
-  @override
   bool moveNext() {
-    if (remainingLength <= 0) {
-      return false;
-    }
-    final int numberOfAttributes = moveNextAttributesToHead();
-    final int runStartIndex = attributes[0].current!.$1;
-    TextStyle? result;
-    for (int i = numberOfAttributes - 1; i >= 0; i -= 1) {
-      final _RunIterator<TextStyle> attribute = attributes[i];
-      final TextStyle value = attribute.current!.$2;
-      assert(attribute.current?.$1 == runStartIndex);
-      result = value.merge(result);
-      if (!attribute.moveNext()) {
-        // This attribute has no more starting indices, throw it out.
-        remainingLength -= 1;
-        attributes[i] = attributes[remainingLength];
-      }
-    }
-    current = (runStartIndex, result!);
-    return remainingLength > 0;
+    _current = (_canMoveNext = inner.moveNext())
+      ? inner.current
+      : null;
+    return _current != null;
   }
 }
 
-final class _DecorationFlagsMergingIterator extends _MergedRunIterator<int, (int, bool)> {
-  _DecorationFlagsMergingIterator(super.attributes, int baseDecorationMask)
+final class _TextStyleMergingIterator extends RunMergingIterator<TextStyle, TextStyle> {
+  _TextStyleMergingIterator(super.attributes, super.baseStyle);
+
+  @override
+  TextStyle fold(TextStyle value, TextStyle accumulatedValue) {
+    return value.merge(accumulatedValue);
+  }
+}
+
+final class _DecorationFlagsMergingIterator extends RunMergingIterator<int, (int, bool)> {
+  _DecorationFlagsMergingIterator(super.attributes, super.baseDecorationMask)
     : assert(baseDecorationMask >= 0),
-      assert(baseDecorationMask < 1 << 4),
-      current = (0, baseDecorationMask);
+      assert(baseDecorationMask < 1 << 4);
 
   @override
-  (int, int) current;
-
-  @override
-  bool moveNext() {
-    if (remainingLength <= 0) {
-      return false;
+  int fold((int, bool) value, int accumulatedValue) {
+    final (int mask, bool isSet) = value;
+    // Set the bit specified current value
+    if ((accumulatedValue & mask != 0) != isSet) {
+      accumulatedValue ^= mask;
     }
-    final int numberOfAttributes = moveNextAttributesToHead();
-    final int runStartIndex = attributes[0].current!.$1;
-    int currentFlags = current.$2;
-    for (int i = numberOfAttributes - 1; i >= 0; i -= 1) {
-      final _RunIterator<(int, bool)> attribute = attributes[i];
-      final (int mask, bool isSet) = attribute.current!.$2;
-      assert(attribute.current?.$1 == runStartIndex);
-      // Set the bit specified current value
-      final bool needsFlipping = (currentFlags & mask != 0) != isSet;
-      if (needsFlipping) {
-        currentFlags ^= mask;
-      }
-      if (!attribute.moveNext()) {
-        // This attribute has no more starting indices, throw it out.
-        remainingLength -= 1;
-        attributes[i] = attributes[remainingLength];
-      }
-    }
-    current = (runStartIndex, currentFlags);
-    return remainingLength > 0;
+    return accumulatedValue;
   }
 }
 
@@ -632,8 +524,15 @@ final class _MutableTextStyleAttributeSet extends TextStyleAttributeSet {
 
 abstract final class _TextStyleAnnotationKey { }
 
+abstract class BasicTextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey>, OverwritableStringAttribute<TextStyleAnnotations, TextStyleAttributeSet> {
+  void visitTextStyles(void Function(int, TextStyle) processTextStyle);
+
+  TextStyle? get baseStyle;
+  TextStyleAnnotations updateBaseTextStyle(TextStyle baseAnnotations);
+}
+
 @immutable
-class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey>, OverwritableStringAttribute<TextStyleAnnotations, TextStyleAttributeSet> {
+class TextStyleAnnotations implements BasicTextStyleAnnotations {
   TextStyleAnnotations._(
     this._fontFamilies,
     this._locale,
@@ -822,10 +721,10 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey>,
     (int, bool) mapOverline(bool? isSet) => (_underlineMask, isSet ?? baseStyleHasOverline);
     (int, bool) mapLineThrough(bool? isSet) => (_underlineMask, isSet ?? baseStyleHasLineThrough);
 
-    final decorationRunList = List<_RunIterator<(int, bool)>?>.filled(3, null)
-     ..[0] = _applyNullable(_RunIterator.new, _map(mapUnderline, _underline?.getRunsEndAfter(index)))
-     ..[1] = _applyNullable(_RunIterator.new, _map(mapOverline, _overline?.getRunsEndAfter(index)))
-     ..[2] = _applyNullable(_RunIterator.new, _map(mapLineThrough, _lineThrough?.getRunsEndAfter(index)));
+    final List<Iterator<(int, (int, bool))>?> decorationRunList = List<Iterator<(int, (int, bool))>?>.filled(3, null)
+     ..[0] = _map(mapUnderline, _underline?.getRunsEndAfter(index))
+     ..[1] = _map(mapOverline, _overline?.getRunsEndAfter(index))
+     ..[2] = _map(mapLineThrough, _lineThrough?.getRunsEndAfter(index));
 
     final decorationRuns = _DecorationFlagsMergingIterator(
       decorationRunList,
@@ -834,7 +733,7 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey>,
       (baseStyleHasLineThrough ? _lineThroughMask : 0)
     );
 
-    final List<_RunIterator<TextStyle>?> runsToMerge = List<_RunIterator<TextStyle>?>.filled(19, null)
+    final runsToMerge = List<Iterator<(int, TextStyle)>?>.filled(19, null)
       ..[0] = fontFamilies._getTextStyleRunsEndAfter(index)
       ..[1] = locale._getTextStyleRunsEndAfter(index)
       ..[2] = fontSize._getTextStyleRunsEndAfter(index)
@@ -850,14 +749,15 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey>,
         // Painting Attributes
       ..[12] = foregorund._getTextStyleRunsEndAfter(index)
       ..[13] = background._getTextStyleRunsEndAfter(index)
-      ..[14] = _applyNullable(_RunIterator.new, _map(_liftDecorationMask, decorationRuns))
+      ..[14] = _map(_liftDecorationMask, decorationRuns)
       ..[15] = decorationColor._getTextStyleRunsEndAfter(index)
       ..[16] = decorationStyle._getTextStyleRunsEndAfter(index)
       ..[17] = decorationThickness._getTextStyleRunsEndAfter(index)
       ..[18] = shadows._getTextStyleRunsEndAfter(index);
-    return _TextStyleMergingIterator(runsToMerge);
+    return _TextStyleMergingIterator(runsToMerge, baseStyle);
   }
 
+  @override
   TextStyleAnnotations overwrite(ui.TextRange range, TextStyleAttributeSet annotationsToOverwrite) {
     final int? end = range.end >= _debugTextLength ? null : range.end;
 
@@ -937,13 +837,6 @@ class TextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey>,
       _debugTextLength,
       baseStyle,
     );
-  }
-
-  void build(ui.ParagraphBuilder builder, {
-    TextScaler textScaler = TextScaler.noScaling,
-    List<PlaceholderDimensions>? dimensions,
-  }) {
-
   }
 }
 
@@ -1182,7 +1075,6 @@ TextStyleAnnotations _convertTextStyleAttributes(InlineSpan span, int stringLeng
 }
 
 AnnotatedString _inlineSpanToTextStyleAnnotations(InlineSpan span, String string) {
-
   // Hit test
   final hitTests = _HitTestTargetRunBuilder();
 

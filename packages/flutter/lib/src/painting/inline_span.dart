@@ -4,6 +4,7 @@
 
 import 'dart:ui' as ui show ParagraphBuilder, StringAttribute;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 
@@ -422,34 +423,51 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
   }
 }
 
-class _InlineSpanTextStyleAnnotations implements TextStyleAnnotations {
+class _InlineSpanTextStyleAnnotations extends BasicTextStyleAnnotations {
   _InlineSpanTextStyleAnnotations._(this._span);
 
   final InlineSpan _span;
 
-  @override
-  void build(ui.ParagraphBuilder builder, {
-    TextScaler textScaler = TextScaler.noScaling,
-    List<PlaceholderDimensions>? dimensions,
-  }) => _span.build(builder, textScaler: textScaler, dimensions: dimensions);
+  static void _visitTextStyleInSpan(InlineSpan span, Accumulator baseOffset, TextStyle? baseTextStyle, void Function(int, TextStyle) processTextStyle) {
+    switch (span) {
+      case TextSpan(:final String? text, :final List<InlineSpan>? children):
+        final TextStyle? newStyle = span.style?.merge(baseTextStyle) ?? baseTextStyle;
+        final int textLength = text?.length ?? 0;
+        if (newStyle != null && textLength > 0) {
+          processTextStyle(baseOffset.value, newStyle);
+          baseOffset.increment(textLength);
+        }
+        if (children != null && children.isNotEmpty) {
+          for (final InlineSpan child in children) {
+            _visitTextStyleInSpan(child, baseOffset, newStyle, processTextStyle);
+          }
+        }
+      case PlaceholderSpan():
+        final TextStyle? newStyle = span.style?.merge(baseTextStyle) ?? baseTextStyle;
+        if (newStyle != null) {
+          processTextStyle(baseOffset.value, newStyle);
+        }
+        baseOffset.increment(1);
+      case _:
+    }
+  }
 
+  @override
+  void visitTextStyles(void Function(int, TextStyle) processTextStyle) {
+    _visitTextStyleInSpan(_span, Accumulator(), null, processTextStyle);
+  }
+
+  @override
+  TextStyleAnnotations erase(TextRange range, TextStyleAttributeSet annotationsToErase) {
+    return TextStyleAnnotations.fromInlineSpan(_span).erase(range, annotationsToErase);
+  }
   @override
   TextStyleAnnotations overwrite(TextRange range, TextStyleAttributeSet annotationsToOverwrite) {
     return TextStyleAnnotations.fromInlineSpan(_span).overwrite(range, annotationsToOverwrite);
   }
 
   @override
-  TextStyle get baseStyle => _span.style;
-
-  @override
-  TextStyleAnnotations erase(TextRange range, TextStyleAttributeSet annotationsToErase) {
-    return TextStyleAnnotations.fromInlineSpan(_span).erase(range, annotationsToErase);
-  }
-
-  @override
-  Iterator<(int, TextStyle)> getRunsEndAfter(int index) {
-    throw UnimplementedError();
-  }
+  TextStyle? get baseStyle => _span.style;
 
   @override
   TextStyleAnnotations updateBaseTextStyle(TextStyle baseAnnotations) {
