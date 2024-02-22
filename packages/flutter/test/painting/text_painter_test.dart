@@ -1583,7 +1583,7 @@ void main() {
         const <ui.TextBox>[TextBox.fromLTRBD(0, baseline - 15, 20, baseline + 5, TextDirection.ltr)],
       );
     });
-  }, skip: kIsWeb && !isCanvasKit); // [intended] strut spport for HTML renderer https://github.com/flutter/flutter/issues/32243.
+  }, skip: kIsWeb && !isCanvasKit); // [intended] strut support for HTML renderer https://github.com/flutter/flutter/issues/32243.
 
   test('TextPainter dispatches memory events', () async {
     await expectLater(
