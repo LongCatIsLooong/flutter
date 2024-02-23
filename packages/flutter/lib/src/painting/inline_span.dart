@@ -391,7 +391,7 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
 
   @override
   T? getAnnotationOfType<T extends StringAnnotation<Key>, Key extends Object>() {
-    final _InlineSpanTextStyleAnnotations textStyleAnnotations = _InlineSpanTextStyleAnnotations._(this);
+    final _InlineSpanTextStyleAnnotations textStyleAnnotations = _InlineSpanTextStyleAnnotations(this, null);
     return textStyleAnnotations is T ? textStyleAnnotations as T : null;
   }
 
@@ -424,14 +424,15 @@ abstract class InlineSpan extends DiagnosticableTree implements AnnotatedString 
 }
 
 class _InlineSpanTextStyleAnnotations extends BasicTextStyleAnnotations {
-  _InlineSpanTextStyleAnnotations._(this._span);
+  _InlineSpanTextStyleAnnotations(this.span, this.baseTextStyleOverride);
 
-  final InlineSpan _span;
+  final InlineSpan span;
+  final TextStyle? baseTextStyleOverride;
 
-  static void _visitTextStyleInSpan(InlineSpan span, Accumulator baseOffset, TextStyle? baseTextStyle, void Function(int, TextStyle) processTextStyle) {
+  static void _visitTextStyleInSpan(InlineSpan span, Accumulator baseOffset, TextStyle? baseTextStyle, TextStyle? baseTextStyleOverride, void Function(int, TextStyle) processTextStyle) {
     switch (span) {
       case TextSpan(:final String? text, :final List<InlineSpan>? children):
-        final TextStyle? newStyle = span.style?.merge(baseTextStyle) ?? baseTextStyle;
+        final TextStyle? newStyle = baseTextStyleOverride ?? span.style?.merge(baseTextStyle) ?? baseTextStyle;
         final int textLength = text?.length ?? 0;
         if (newStyle != null && textLength > 0) {
           processTextStyle(baseOffset.value, newStyle);
@@ -439,7 +440,7 @@ class _InlineSpanTextStyleAnnotations extends BasicTextStyleAnnotations {
         }
         if (children != null && children.isNotEmpty) {
           for (final InlineSpan child in children) {
-            _visitTextStyleInSpan(child, baseOffset, newStyle, processTextStyle);
+            _visitTextStyleInSpan(child, baseOffset, newStyle, null, processTextStyle);
           }
         }
       case PlaceholderSpan():
@@ -453,24 +454,27 @@ class _InlineSpanTextStyleAnnotations extends BasicTextStyleAnnotations {
   }
 
   @override
-  void visitTextStyles(void Function(int, TextStyle) processTextStyle) {
-    _visitTextStyleInSpan(_span, Accumulator(), null, processTextStyle);
+  void toParagraph(void Function(int, TextStyle) processTextStyle) {
+    _visitTextStyleInSpan(span, Accumulator(), null, baseTextStyleOverride, processTextStyle);
   }
 
   @override
   TextStyleAnnotations erase(TextRange range, TextStyleAttributeSet annotationsToErase) {
-    return TextStyleAnnotations.fromInlineSpan(_span).erase(range, annotationsToErase);
+    return TextStyleAnnotations.fromInlineSpan(span).erase(range, annotationsToErase);
   }
+
   @override
   TextStyleAnnotations overwrite(TextRange range, TextStyleAttributeSet annotationsToOverwrite) {
-    return TextStyleAnnotations.fromInlineSpan(_span).overwrite(range, annotationsToOverwrite);
+    return TextStyleAnnotations.fromInlineSpan(span).overwrite(range, annotationsToOverwrite);
   }
 
   @override
-  TextStyle? get baseStyle => _span.style;
+  TextStyle? get baseStyle => span.style;
 
   @override
-  TextStyleAnnotations updateBaseTextStyle(TextStyle baseAnnotations) {
-    return TextStyleAnnotations.fromInlineSpan(_span).updateBaseTextStyle(baseAnnotations);
+  BasicTextStyleAnnotations updateBaseTextStyle(TextStyle baseTextStyle) {
+    return baseTextStyle == baseTextStyleOverride
+      ? this
+      : _InlineSpanTextStyleAnnotations(span, baseTextStyle);
   }
 }
