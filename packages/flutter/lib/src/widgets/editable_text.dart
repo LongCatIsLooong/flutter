@@ -5599,29 +5599,59 @@ class _ScribbleFocusable extends StatefulWidget {
 class _ScribbleFocusableState extends State<_ScribbleFocusable> implements ScribbleClient {
   _ScribbleFocusableState(): _elementIdentifier = (_nextElementIdentifier++).toString();
 
+  bool _scribbleElementRegistered = false;
+  void _updateScribbleElementRegistration(bool shouldRegister) {
+    if (_scribbleElementRegistered == shouldRegister) {
+      return;
+    }
+    _scribbleElementRegistered = shouldRegister;
+    if (shouldRegister) {
+      TextInput.registerScribbleElement(elementIdentifier, this);
+    } else {
+      TextInput.unregisterScribbleElement(elementIdentifier);
+    }
+  }
+
+  void _onFocusabilityChanged() {
+    assert(widget.enabled);
+    _updateScribbleElementRegistration(widget.focusNode.focusabilityListenable.value);
+  }
+
+  void _updateFocusabilitySubscription() {
+    if (widget.enabled) {
+      widget.focusNode.focusabilityListenable.addListener(_onFocusabilityChanged);
+    } else {
+      widget.focusNode.focusabilityListenable.removeListener(_onFocusabilityChanged);
+    }
+    _updateScribbleElementRegistration(widget.focusNode.focusabilityListenable.value);
+  }
+
   @override
   void initState() {
     super.initState();
     if (widget.enabled) {
-      TextInput.registerScribbleElement(elementIdentifier, this);
+      _updateFocusabilitySubscription();
+      return;
     }
   }
 
   @override
   void didUpdateWidget(_ScribbleFocusable oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!oldWidget.enabled && widget.enabled) {
-      TextInput.registerScribbleElement(elementIdentifier, this);
+    if (oldWidget.focusNode != widget.focusNode && oldWidget.enabled) {
+      oldWidget.focusNode.focusabilityListenable.removeListener(_onFocusabilityChanged);
     }
-
-    if (oldWidget.enabled && !widget.enabled) {
-      TextInput.unregisterScribbleElement(elementIdentifier);
-    }
+    _updateFocusabilitySubscription();
   }
 
   @override
   void dispose() {
-    TextInput.unregisterScribbleElement(elementIdentifier);
+    if (_scribbleElementRegistered) {
+      TextInput.unregisterScribbleElement(elementIdentifier);
+    }
+    if (widget.enabled) {
+      widget.focusNode.focusabilityListenable.removeListener(_onFocusabilityChanged);
+    }
     super.dispose();
   }
 

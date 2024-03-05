@@ -746,8 +746,6 @@ void main() {
       ),
     );
 
-    debugDumpApp();
-    debugDumpFocusTree();
     await tester.testTextInput.scribbleRequestElementsInRect(const Rect.fromLTWH(0, 0, 1, 1));
     // No exceptions were thrown.
   }, skip: kIsWeb, variant: const TargetPlatformVariant(<TargetPlatform>{ TargetPlatform.iOS })); // [intended]
