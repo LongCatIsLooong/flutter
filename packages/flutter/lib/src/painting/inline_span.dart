@@ -8,6 +8,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 
+import 'annotated_string.dart';
 import 'basic_types.dart';
 import 'text_painter.dart';
 import 'text_scaler.dart';
