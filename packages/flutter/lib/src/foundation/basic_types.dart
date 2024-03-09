@@ -6,6 +6,7 @@ import 'dart:collection';
 
 import 'package:meta/meta.dart' show immutable;
 
+import 'object.dart' show objectRuntimeType;
 
 // COMMON SIGNATURES
 
@@ -275,14 +276,19 @@ class FlatMapIterator<T> implements Iterator<T> {
   }
 }
 
-sealed class Either<L, R> {
-  const factory Either.left(L value) = Left<L, Never>._;
-  const factory Either.right(R value) = Right<Never, R>._;
-}
+/// A value that is either a [Left] containing a value of type [L], or a [Right]
+/// containing a value of type [R].
+///
+/// This sealed class has two final subclasses [Left] and [Right], which can be
+/// used to represent two possible types of a value, similar to nullable types.
+sealed class Either<L, R> { }
 
+/// The left branch of an [Either].
 @immutable
 final class Left<L, R> implements Either<L, R> {
-  const Left._(this.value);
+  /// Creates a [Left] with the given `value`.
+  const Left(this.value);
+  /// The value of this [Left] branch.
   final L value;
 
   @override
@@ -290,16 +296,22 @@ final class Left<L, R> implements Either<L, R> {
     if (identical(this, other)) {
       return true;
     }
-    return other is Left<L, Never> && other.value == value;
+    return other is Left<L, Object?> && other.value == value;
   }
 
   @override
   int get hashCode => value.hashCode;
+
+  @override
+  String toString() => '${objectRuntimeType(this, 'Left')}($value)';
 }
 
+/// The right branch of an [Either].
 @immutable
 final class Right<L, R> implements Either<L, R> {
-  const Right._(this.value);
+  /// Creates a [Right] with the given `value`.
+  const Right(this.value);
+  /// The value of this [Right] branch.
   final R value;
 
   @override
@@ -307,11 +319,14 @@ final class Right<L, R> implements Either<L, R> {
     if (identical(this, other)) {
       return true;
     }
-    return other is Right<Never, R> && other.value == value;
+    return other is Right<Object?, R> && other.value == value;
   }
 
   @override
   int get hashCode => value.hashCode;
+
+  @override
+  String toString() => '${objectRuntimeType(this, 'Right')}($value)';
 }
 
 extension NullableLeft<L extends Object, R> on Either<L, R> {
