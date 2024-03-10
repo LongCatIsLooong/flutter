@@ -21,17 +21,16 @@ abstract class TextHitTestAnnotations implements StringAnnotation<_HitTestAnnota
   Iterable<HitTestTarget> getHitTestTargets(int codeUnitOffset);
 }
 
-@immutable
-final class SemanticsAttributeSet {
-  const SemanticsAttributeSet({
-    this.semanticsLabel,
-    this.spellOut,
-    this.gestureCallback,
-  });
+extension type SemanticsAttributeSet._((String? semanticsLabel, bool? spellOut, Either<VoidCallback, VoidCallback>? gestureCallback) _value) {
+  SemanticsAttributeSet({
+    String? semanticsLabel,
+    bool? spellOut,
+    Either<VoidCallback, VoidCallback>? gestureCallback,
+  }) : this._((semanticsLabel, spellOut, gestureCallback));
 
-  final String? semanticsLabel;
-  final bool? spellOut;
-  final Either<VoidCallback, VoidCallback>? gestureCallback;
+  String? get semanticsLabel => _value.$1;
+  bool? get spellOut => _value.$2;
+  Either<VoidCallback, VoidCallback>? get gestureCallback => _value.$3;
 }
 
 abstract final class _SemanticsAnnotationKey {}
@@ -39,6 +38,7 @@ abstract final class _SemanticsAnnotationKey {}
 abstract class SemanticsAnnotations implements StringAnnotation<_SemanticsAnnotationKey>, OverwritableStringAttribute<SemanticsAnnotations, SemanticsAttributeSet> {
   Iterable<SemanticsAttributeSet> getSemanticsInformation(int codeUnitOffset);
 }
+
 abstract final class _TextStyleAnnotationKey { }
 
 abstract class BasicTextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey>, OverwritableStringAttribute<TextStyleAnnotations, TextStyleAttributeSet> {
@@ -91,63 +91,8 @@ extension Isomorphic on TextStyleAttributeSet {
   }
 }
 
-abstract class TextStyleAttributeSet {
-  const factory TextStyleAttributeSet({
-    List<String>? fontFamilies,
-    ui.Locale? locale,
-    double? fontSize,
-    ui.FontWeight? fontWeight,
-    ui.FontStyle? fontStyle,
-    List<ui.FontFeature>? fontFeatures,
-    List<ui.FontVariation>? fontVariations,
-    double? height,
-    ui.TextLeadingDistribution? leadingDistribution,
-    ui.TextBaseline? textBaseline,
-    double? wordSpacing,
-    double? letterSpacing,
-    Either<ui.Color, ui.Paint>? foreground,
-    Either<ui.Color, ui.Paint>? background,
-    List<ui.Shadow>? shadows,
-    bool? underline,
-    bool? overline,
-    bool? lineThrough,
-    ui.Color? decorationColor,
-    ui.TextDecorationStyle? decorationStyle,
-    double? decorationThickness,
-  }) = _TextStyleAttributeSet.new;
-
-  List<String>? get fontFamilies;
-  ui.Locale? get locale;
-  double? get fontSize;
-  ui.FontWeight? get fontWeight;
-  ui.FontStyle? get fontStyle;
-
-  List<ui.FontFeature>? get fontFeatures;
-  List<ui.FontVariation>? get fontVariations;
-
-  double? get height;
-  ui.TextLeadingDistribution? get leadingDistribution;
-  ui.TextBaseline? get textBaseline;
-
-  double? get wordSpacing;
-  double? get letterSpacing;
-
-  // How do we compare ui.Paint objects?
-  Either<ui.Color, ui.Paint>? get foreground;
-  Either<ui.Color, ui.Paint>? get background;
-  List<ui.Shadow>? get shadows;
-
-  bool? get underline;
-  bool? get overline;
-  bool? get lineThrough;
-
-  ui.Color? get decorationColor;
-  ui.TextDecorationStyle? get decorationStyle;
-  double? get decorationThickness;
-}
-
-final class _TextStyleAttributeSet implements TextStyleAttributeSet {
-  const _TextStyleAttributeSet({
+class TextStyleAttributeSet {
+  const TextStyleAttributeSet({
     this.fontFamilies,
     this.locale,
     this.fontSize,

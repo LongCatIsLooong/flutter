@@ -18,6 +18,7 @@ import 'dart:ui' as ui show
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
+import 'annotated_string.dart';
 import 'basic_types.dart';
 import 'inline_span.dart';
 import 'placeholder_span.dart';
@@ -1127,7 +1128,8 @@ class TextPainter {
 
   // Creates a ui.Paragraph using the current configurations in this class and
   // assign it to _paragraph.
-  ui.Paragraph _createParagraph(InlineSpan text) {
+  ui.Paragraph _createParagraph(AnnotatedString text) {
+    final BasicTextStyleAnnotations? attributes = text.getAnnotationOfType();
     final ui.ParagraphBuilder builder = ui.ParagraphBuilder(_createParagraphStyle());
     text.build(builder, textScaler: textScaler, dimensions: _placeholderDimensions);
     assert(() {
