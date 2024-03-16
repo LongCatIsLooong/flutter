@@ -1658,6 +1658,7 @@ class TextPainter {
   ///
   /// After disposal this painter is unusable.
   void dispose() {
+    assert(!debugDisposed);
     assert(() {
       _disposed = true;
       return true;
