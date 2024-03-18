@@ -56,14 +56,28 @@ class _TreePath<Value> {
   // Creates the path to the node with the smallest key greater than or equal to
   // `minKey` in the given tree, and concatenates that path after the given
   // `prefix` path.
-  static _TreePath<T>? smallest<T>(RBTree<T>? root, int minKey, { _TreePath<T>? prefix }) {
+  static _TreePath<T>? noLessThan<T>(RBTree<T>? root, int minKey, { _TreePath<T>? prefix }) {
     if (root == null) {
       return prefix;
     }
     return switch (root.key.compareTo(minKey)) {
-      -1 => _TreePath.smallest(root.right, minKey, prefix: prefix),
-      0  => _TreePath.smallest(root.right, minKey, prefix: _TreePath<T>(root, prefix, minKey)),
-      _  => _TreePath.smallest(root.left, minKey, prefix: _TreePath<T>(root, prefix, minKey)),
+      -1 => _TreePath.noLessThan(root.right, minKey, prefix: prefix),
+      0  => _TreePath.noLessThan(root.right, minKey, prefix: _TreePath<T>(root, prefix, minKey)),
+      _  => _TreePath.noLessThan(root.left, minKey, prefix: _TreePath<T>(root, prefix, minKey)),
+    };
+  }
+
+  // Creates the path to the node with the largest key less than or equal to
+  // `minKey` in the given tree, and concatenates that path after the given
+  // `prefix` path.
+  static _TreePath<T>? noGreaterThan<T>(RBTree<T>? root, int minKey, { _TreePath<T>? prefix }) {
+    if (root == null) {
+      return prefix;
+    }
+    return switch (root.key.compareTo(minKey)) {
+      -1 => _TreePath.noGreaterThan(root.right, minKey, prefix: prefix),
+      0  => _TreePath<T>(root, prefix, minKey),
+      _  => _TreePath.noGreaterThan(root.left, minKey, prefix: _TreePath<T>(root, prefix, minKey)),
     };
   }
 
@@ -91,7 +105,7 @@ class _TreePath<Value> {
     final RBTree<Value>? right = end.right;
     if (right != null) {
       // Search the right branch for the next node
-      return smallest(right, minKey, prefix: this);
+      return noLessThan(right, minKey, prefix: this);
     }
     final _TreePath<Value>? ancestor = firstLeftAncestor;
     return ancestor != null && ancestor.end.key < minKey ? ancestor.next : ancestor;
@@ -115,7 +129,7 @@ class _TreeWalker<Value> implements Iterator<(int, Value)> {
 
   @override
   bool moveNext() {
-    _path = moveNextCalled ? _path?.next : _TreePath.smallest(root, startingIndex);
+    _path = moveNextCalled ? _path!.next : _TreePath.noLessThan(root, startingIndex);
     moveNextCalled = true;
     return _path != null;
   }
@@ -397,12 +411,6 @@ class RBTree<Value> {
       : left?.skipUntil(threshold)?.join(right, key, value) ?? right.insert(key, value);
   }
 
-  /// Returns an [Iterator] that emits `(int, Value)` from this tree in ascending
-  /// order, skipping those with keys less than `startingKey`.
-  ///
-  /// O(N).
-  Iterator<(int, Value)> getRunsEndAfter(int startingKey) => _TreeWalker<Value>(this, startingKey);
-
   bool get debugCheckNoRedViolations {
     final RBTree<Value>? left = this.left;
     final RBTree<Value>? right = this.right;
@@ -413,15 +421,86 @@ class RBTree<Value> {
     return leftValid && rightValid;
   }
 
-  List<int> get keys {
-    final List<int> list = [];
-    final iter = getRunsEndAfter(0);
-    while (iter.moveNext()) {
-      list.add(iter.current.$1);
-    }
-    return list;
-  }
+  //List<int> get keys {
+  //  final List<int> list = [];
+  //  final Iterator<(int, Value)> iter = getRunsEndAfter(0);
+  //  while (iter.moveNext()) {
+  //    list.add(iter.current.$1);
+  //  }
+  //  return list;
+  //}
 
   @override
   String toString() => '${isBlack ? "black" : "red"}: $key, $blackHeight';
+}
+
+enum _TreeWalkerState {
+  initial, // moveNext hasn't been called
+  startedWithDefaultValue, // emitting the defaultValue instead of walking the tree
+  treeWalk, // walking the tree
+}
+
+class _TreeWalkerWithDefaults<Value extends Object> implements Iterator<(int, Value?)> {
+  _TreeWalkerWithDefaults(this.root, this.startingIndex, this.defaultValue) : _current = (0, defaultValue);
+
+  final RBTree<Value?> root;
+  final int startingIndex;
+  final Value? defaultValue;
+
+  _TreeWalkerState state = _TreeWalkerState.initial;
+  _TreePath<Value?>? _path;
+
+  @override
+  (int, Value?) get current => _current;
+  (int, Value?) _current;
+
+  _TreePath<Value?>? _advanceState() {
+    switch (state) {
+      case _TreeWalkerState.startedWithDefaultValue:
+        state = _TreeWalkerState.treeWalk;
+        return _path;
+      case _TreeWalkerState.treeWalk:
+        state = _TreeWalkerState.treeWalk;
+        return _path?.next;
+      case _TreeWalkerState.initial when defaultValue == null:
+        assert(_path == null);
+        state = _TreeWalkerState.treeWalk;
+        return _TreePath.noGreaterThan(root, startingIndex);
+      case _TreeWalkerState.initial:
+        assert(_path == null);
+        final _TreePath<Value?>? path = _TreePath.noGreaterThan(root, startingIndex);
+        state = path != null && path.end.key <= startingIndex
+          ? _TreeWalkerState.startedWithDefaultValue
+          : _TreeWalkerState.treeWalk;
+        return path;
+    }
+  }
+
+  @override
+  bool moveNext() {
+    final _TreePath<Value?>? path = _path = _advanceState();
+    switch (state) {
+      case _TreeWalkerState.initial:
+        assert(false);
+        return false;
+      case _TreeWalkerState.startedWithDefaultValue:
+        assert(_current == (0, defaultValue));
+        return true;
+      case _TreeWalkerState.treeWalk:
+        if (path == null) {
+          return false;
+        } else {
+          _current = (path.end.key, path.end.value ?? defaultValue);
+          return true;
+        }
+    }
+  }
+}
+
+extension type RBTreeTextRun<Value extends Object>(RBTree<Value?> tree) implements Object {
+  /// Returns an [Iterator] that emits `(int, Value)` from this tree in ascending
+  /// order, starting from the largest node that is no greater than `startingKey`.
+  ///
+  /// O(N).
+  Iterator<(int, Value?)> getRunsEndAfter(int startingKey, Value? defaultValue) => _TreeWalkerWithDefaults<Value>(tree, startingKey, defaultValue);
 }

@@ -25,8 +25,8 @@ import 'placeholder_span.dart';
 import 'strut_style.dart';
 import 'text_scaler.dart';
 import 'text_span.dart';
-import 'text_style_attributes.dart';
 import 'text_style.dart';
+import 'text_style_attributes.dart';
 
 export 'dart:ui' show LineMetrics;
 export 'package:flutter/services.dart' show TextRange, TextSelection;

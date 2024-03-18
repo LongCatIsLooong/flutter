@@ -53,17 +53,38 @@ RBTree<Value?>? _insertRange<Value extends Object>(RBTree<Value?>? tree, int sta
     : (leftTree ?? rightTree)?.insert(start, value) ?? RBTree<Value?>.black(start, value);
 }
 
+abstract class Run<T> {
+  Iterator<(int, T?)> getRunsEndAfter(int index);
+}
+
+
+extension type _RBTreeRun<Value extends Object>({ RBTree<Value?> tree }) implements Object {
+}
+
+class _RBTreeRun<T extends Object> implements Run<T> {
+  _RBTreeRun(this.attributeRuns, this.defaultValue);
+
+  final RBTree<T?>? attributeRuns;
+  final T? defaultValue;
+
+  @override
+  Iterator<(int, T?)> getRunsEndAfter(int index) {
+    return FlatMap(attributeRuns).flatMap(RBTreeTextRun.new)?.getRunsEndAfter(index, defaultValue)
+      ?? const _EmptyIterator<(int, T)>();
+  }
+}
+
 abstract class TextStyleAttributeGetter<T extends Object> {
   Iterator<(int, T?)> getRunsEndAfter(int index);
   Iterator<(int, _TextStyleAttributeSetter)>? _getTextStyleRunsEndAfter(int index);
 }
 
-class _AttributeIterable<Attribute extends Object, Output extends Object> implements TextStyleAttributeGetter<Attribute> {
+class _AttributeIterable<Attribute extends Object> implements TextStyleAttributeGetter<Attribute> {
   _AttributeIterable(this.storage, this.defaultValue, this.setter);
 
   final RBTree<Attribute?>? storage;
-  final Attribute defaultValue;
-  final _MutableTextStyleAttributeSet Function(_MutableTextStyleAttributeSet, Attribute) setter;
+  final Attribute? defaultValue;
+  final _MutableTextStyleAttributeSet Function(_MutableTextStyleAttributeSet, Attribute?) setter;
 
   Attribute? _transform(Attribute? value) => value ?? defaultValue;
 
@@ -95,6 +116,50 @@ class _EmptyIterator<T> implements Iterator<T> {
 @pragma('vm:prefer-inline')
 Iterator<(int, V)>? _map<T, V>(V Function(T) transform, Iterator<(int, T)>? inner) {
   return inner == null ? null : _TransformedIndexedIterator<T, V>(inner, transform);
+}
+
+class _RunIteratorWithDefaultValue<T> implements Iterator<(int, T)> {
+  _RunIteratorWithDefaultValue(this.inner, this.defaultValue)
+    : _current = (0, defaultValue);
+
+  final RBTree<(int, T)>? inner;
+  final T defaultValue;
+
+  bool pastIndexZero = false;
+  (int, T) _current;
+  @override
+  (int, T) get current => _current;
+
+  bool moveInnerNext() {
+    final Iterator<(int, T)>? inner = this.inner;
+    if (inner != null && inner.moveNext()) {
+      final (int index, T value) = inner.current;
+      _current = (index, value ?? defaultValue);
+      return true;
+    }
+
+  }
+
+  @override
+  bool moveNext() {
+    if (!pastIndexZero) {
+      pastIndexZero = true;
+      final Iterator<(int, T)>? inner = this.inner;
+      if (inner != null && inner.moveNext()) {
+        final (int index, T value) = inner.current;
+        _current = (index, value ?? defaultValue);
+        return true;
+      }
+      return defaultValue != null;
+    }
+    if (inner != null && inner.moveNext()) {
+      final (int index, T value) = inner.current;
+      _current = (index, transform(value));
+      return true;
+    }
+
+  }
+  return false;
 }
 
 class _TransformedIndexedIterator<T, V> implements Iterator<(int, V)> {
@@ -129,7 +194,7 @@ final class _TextStyleMergingIterator extends RunMergingIterator<_MutableTextSty
   }
 }
 
-_MutableTextStyleAttributeSet _setFontFamilies(_MutableTextStyleAttributeSet style, List<String> input) => style..fontFamilies = input;
+_MutableTextStyleAttributeSet _setFontFamilies(_MutableTextStyleAttributeSet style, List<String>? input) => style..fontFamilies = input;
 List<String>? _getFontFamilies(TextStyle textStyle) {
   final String? fontFamily = textStyle.fontFamily;
   final List<String>? fontFamilyFallback = textStyle.fontFamilyFallback;
@@ -141,71 +206,60 @@ List<String>? _getFontFamilies(TextStyle textStyle) {
     ];
 }
 
-_MutableTextStyleAttributeSet _setLocale(_MutableTextStyleAttributeSet style, ui.Locale input) => style..locale = input;
+_MutableTextStyleAttributeSet _setLocale(_MutableTextStyleAttributeSet style, ui.Locale? input) => style..locale = input;
 ui.Locale? _getLocale(TextStyle textStyle) => textStyle.locale;
 
-_MutableTextStyleAttributeSet _setFontSize(_MutableTextStyleAttributeSet style, double input) => style..fontSize = input;
+_MutableTextStyleAttributeSet _setFontSize(_MutableTextStyleAttributeSet style, double? input) => style..fontSize = input;
 double? _getFontSize(TextStyle textStyle) => textStyle.fontSize;
 
-_MutableTextStyleAttributeSet _setFontWeight(_MutableTextStyleAttributeSet style, ui.FontWeight input) => style..fontWeight = input;
+_MutableTextStyleAttributeSet _setFontWeight(_MutableTextStyleAttributeSet style, ui.FontWeight? input) => style..fontWeight = input;
 ui.FontWeight?_getFontWeight(TextStyle textStyle) => textStyle.fontWeight;
 
-_MutableTextStyleAttributeSet _setFontStyle(_MutableTextStyleAttributeSet style, ui.FontStyle input) => style..fontStyle = input;
+_MutableTextStyleAttributeSet _setFontStyle(_MutableTextStyleAttributeSet style, ui.FontStyle? input) => style..fontStyle = input;
 ui.FontStyle?_getFontStyle(TextStyle textStyle) => textStyle.fontStyle;
 
-_MutableTextStyleAttributeSet _setFontFeatures(_MutableTextStyleAttributeSet style, List<ui.FontFeature> input) => style..fontFeatures = input;
+_MutableTextStyleAttributeSet _setFontFeatures(_MutableTextStyleAttributeSet style, List<ui.FontFeature>? input) => style..fontFeatures = input;
 List<ui.FontFeature>?_getFontFeatures(TextStyle textStyle) => textStyle.fontFeatures;
 
-_MutableTextStyleAttributeSet _setFontVariations(_MutableTextStyleAttributeSet style, List<ui.FontVariation> input) => style..fontVariations = input;
+_MutableTextStyleAttributeSet _setFontVariations(_MutableTextStyleAttributeSet style, List<ui.FontVariation>? input) => style..fontVariations = input;
 List<ui.FontVariation>?_getFontVariations(TextStyle textStyle) => textStyle.fontVariations;
 
-_MutableTextStyleAttributeSet _setHeight(_MutableTextStyleAttributeSet style, double input) => style..height = input;
+_MutableTextStyleAttributeSet _setHeight(_MutableTextStyleAttributeSet style, double? input) => style..height = input;
 double? _getHeight(TextStyle textStyle) => textStyle.height;
 
-_MutableTextStyleAttributeSet _setLeadingDistribution(_MutableTextStyleAttributeSet style, ui.TextLeadingDistribution input) => style..leadingDistribution = input;
+_MutableTextStyleAttributeSet _setLeadingDistribution(_MutableTextStyleAttributeSet style, ui.TextLeadingDistribution? input) => style..leadingDistribution = input;
 ui.TextLeadingDistribution? _getLeadingDistribution(TextStyle textStyle) => textStyle.leadingDistribution;
 
-_MutableTextStyleAttributeSet _setTextBaseline(_MutableTextStyleAttributeSet style, ui.TextBaseline input) => style..textBaseline = input;
+_MutableTextStyleAttributeSet _setTextBaseline(_MutableTextStyleAttributeSet style, ui.TextBaseline? input) => style..textBaseline = input;
 ui.TextBaseline? _getTextBaseline(TextStyle textStyle) => textStyle.textBaseline;
 
-_MutableTextStyleAttributeSet _setWordSpacing(_MutableTextStyleAttributeSet style, double input) => style..wordSpacing = input;
+_MutableTextStyleAttributeSet _setWordSpacing(_MutableTextStyleAttributeSet style, double? input) => style..wordSpacing = input;
 double? _getWordSpacing(TextStyle textStyle) => textStyle.wordSpacing;
 
-_MutableTextStyleAttributeSet _setLetterSpacing(_MutableTextStyleAttributeSet style, double input) => style..letterSpacing = input;
+_MutableTextStyleAttributeSet _setLetterSpacing(_MutableTextStyleAttributeSet style, double? input) => style..letterSpacing = input;
 double? _getLetterSpacing(TextStyle textStyle) => textStyle.letterSpacing;
 
-_MutableTextStyleAttributeSet _setForeground(_MutableTextStyleAttributeSet style, Either<ui.Color, ui.Paint> input) => style..foreground = input;
+_MutableTextStyleAttributeSet _setForeground(_MutableTextStyleAttributeSet style, Either<ui.Color, ui.Paint>? input) => style..foreground = input;
 Either<ui.Color, ui.Paint>? _getForeground(TextStyle textStyle) => FlatMap(textStyle.color).flatMap(Left.new) ?? FlatMap(textStyle.foreground).flatMap(Right.new);
 
-_MutableTextStyleAttributeSet _setBackground(_MutableTextStyleAttributeSet style, Either<ui.Color, ui.Paint> input) => style..background = input;
+_MutableTextStyleAttributeSet _setBackground(_MutableTextStyleAttributeSet style, Either<ui.Color, ui.Paint>? input) => style..background = input;
 Either<ui.Color, ui.Paint>? _getBackground(TextStyle textStyle) => FlatMap(textStyle.backgroundColor).flatMap(Left.new) ?? FlatMap(textStyle.background).flatMap(Right.new);
 
-_MutableTextStyleAttributeSet _setDecorationColor(_MutableTextStyleAttributeSet style, ui.Color input) => style..decorationColor = input;
+_MutableTextStyleAttributeSet _setDecorationColor(_MutableTextStyleAttributeSet style, ui.Color? input) => style..decorationColor = input;
 ui.Color? _getDecorationColor(TextStyle textStyle) => textStyle.decorationColor;
 
-_MutableTextStyleAttributeSet _setDecorationStyle(_MutableTextStyleAttributeSet style, ui.TextDecorationStyle input) => style..decorationStyle = input;
+_MutableTextStyleAttributeSet _setDecorationStyle(_MutableTextStyleAttributeSet style, ui.TextDecorationStyle? input) => style..decorationStyle = input;
 ui.TextDecorationStyle? _getDecorationStyle(TextStyle textStyle) => textStyle.decorationStyle;
 
-_MutableTextStyleAttributeSet _setDecorationThickness(_MutableTextStyleAttributeSet style, double input) => style..decorationThickness = input;
+_MutableTextStyleAttributeSet _setDecorationThickness(_MutableTextStyleAttributeSet style, double? input) => style..decorationThickness = input;
 double? _getDecorationThickness(TextStyle textStyle) => textStyle.decorationThickness;
 
 List<ui.Shadow>? _getShadows(TextStyle textStyle) => textStyle.shadows;
-_MutableTextStyleAttributeSet _setShadows(_MutableTextStyleAttributeSet style, List<ui.Shadow> input) => style..shadows = input;
+_MutableTextStyleAttributeSet _setShadows(_MutableTextStyleAttributeSet style, List<ui.Shadow>? input) => style..shadows = input;
 
-//const int _underlineMask = 1 << 0;
-//const int _overlineMask = 1 << 1;
-//const int _lineThroughMask = 1 << 2;
-//_MutableTextStyleAttributeSet _setDecorationMask(_MutableTextStyleAttributeSet style, int mask) {
-//   final ui.TextDecoration decoration = ui.TextDecoration.combine(<ui.TextDecoration>[
-//    if (_underlineMask & mask != 0) ui.TextDecoration.underline,
-//    if (_overlineMask & mask != 0) ui.TextDecoration.overline,
-//    if (_lineThroughMask & mask != 0) ui.TextDecoration.lineThrough,
-//  ]);
-//  return style..de = decoration;
-//}
-_MutableTextStyleAttributeSet _setUnderline(_MutableTextStyleAttributeSet style, bool input) => style..underline = input;
-_MutableTextStyleAttributeSet _setOverline(_MutableTextStyleAttributeSet style, bool input) => style..overline = input;
-_MutableTextStyleAttributeSet _setLineThrough(_MutableTextStyleAttributeSet style, bool input) => style..lineThrough = input;
+_MutableTextStyleAttributeSet _setUnderline(_MutableTextStyleAttributeSet style, bool? input) => style..underline = input;
+_MutableTextStyleAttributeSet _setOverline(_MutableTextStyleAttributeSet style, bool? input) => style..overline = input;
+_MutableTextStyleAttributeSet _setLineThrough(_MutableTextStyleAttributeSet style, bool? input) => style..lineThrough = input;
 
 bool? _getUnderline(TextStyle textStyle) => textStyle.decoration?.contains(ui.TextDecoration.underline);
 bool? _getOverline(TextStyle textStyle) => textStyle.decoration?.contains(ui.TextDecoration.overline);
@@ -348,13 +402,13 @@ class TextStyleAnnotations implements BasicTextStyleAnnotations {
     return _convertTextStyleAttributes(span, debugStringLength);
   }
 
-  static _AttributeIterable<Value, TextStyle> _createAttribute<Value extends Object>(
-    RBTree<Value?>? storage,
-    Value defaultValue,
-    _MutableTextStyleAttributeSet Function(_MutableTextStyleAttributeSet, Value) setter,
-  ) {
-    return _AttributeIterable<Value, TextStyle>(storage, defaultValue, setter);
-  }
+  //static _AttributeIterable<Value> _AttributeIterable<Value extends Object>(
+  //  RBTree<Value?>? storage,
+  //  Value defaultValue,
+  //  _MutableTextStyleAttributeSet Function(_MutableTextStyleAttributeSet, Value?) setter,
+  //) {
+  //  return _AttributeIterable<Value>(storage, defaultValue, setter);
+  //}
 
   @override
   final TextStyle baseStyle;
@@ -392,113 +446,61 @@ class TextStyleAnnotations implements BasicTextStyleAnnotations {
   final int _textLength;
 
   final RBTree<List<String>?>? _fontFamilies;
-  late final TextStyleAttributeGetter<List<String>> fontFamilies = _createAttribute(_fontFamilies, _getFontFamilies(baseStyle)!, _setFontFamilies);
+  late final TextStyleAttributeGetter<List<String>> fontFamilies = _AttributeIterable(_fontFamilies, _getFontFamilies(baseStyle), _setFontFamilies);
 
   final RBTree<ui.Locale?>? _locale;
-  late final TextStyleAttributeGetter<ui.Locale> locale = _createAttribute(_locale, baseStyle.locale!, _setLocale);
+  late final TextStyleAttributeGetter<ui.Locale> locale = _AttributeIterable(_locale, baseStyle.locale, _setLocale);
 
   final RBTree<double?>? _fontSize;
-  late final TextStyleAttributeGetter<double> fontSize = _createAttribute(_fontSize, baseStyle.fontSize!, _setFontSize);
+  late final TextStyleAttributeGetter<double> fontSize = _AttributeIterable(_fontSize, baseStyle.fontSize, _setFontSize);
 
   final RBTree<ui.FontWeight?>? _fontWeight;
-  late final TextStyleAttributeGetter<ui.FontWeight> fontWeight = _createAttribute(_fontWeight, baseStyle.fontWeight!, _setFontWeight);
+  late final TextStyleAttributeGetter<ui.FontWeight> fontWeight = _AttributeIterable(_fontWeight, baseStyle.fontWeight, _setFontWeight);
 
   final RBTree<ui.FontStyle?>? _fontStyle;
-  late final TextStyleAttributeGetter<ui.FontStyle> fontStyle = _createAttribute(_fontStyle, baseStyle.fontStyle!, _setFontStyle);
+  late final TextStyleAttributeGetter<ui.FontStyle> fontStyle = _AttributeIterable(_fontStyle, baseStyle.fontStyle, _setFontStyle);
 
   final RBTree<List<ui.FontFeature>?>? _fontFeatures;
-  late final TextStyleAttributeGetter<List<ui.FontFeature>> fontFeatures = _createAttribute(_fontFeatures, baseStyle.fontFeatures!, _setFontFeatures);
+  late final TextStyleAttributeGetter<List<ui.FontFeature>> fontFeatures = _AttributeIterable(_fontFeatures, baseStyle.fontFeatures, _setFontFeatures);
 
   final RBTree<List<ui.FontVariation>?>? _fontVariations;
-  late final TextStyleAttributeGetter<List<ui.FontVariation>> fontVariations = _createAttribute(_fontVariations, baseStyle.fontVariations!, _setFontVariations);
+  late final TextStyleAttributeGetter<List<ui.FontVariation>> fontVariations = _AttributeIterable(_fontVariations, baseStyle.fontVariations, _setFontVariations);
 
   final RBTree<ui.TextLeadingDistribution?>? _leadingDistribution;
-  late final TextStyleAttributeGetter<ui.TextLeadingDistribution> leadingDistribution = _createAttribute(_leadingDistribution, baseStyle.leadingDistribution!, _setLeadingDistribution);
+  late final TextStyleAttributeGetter<ui.TextLeadingDistribution> leadingDistribution = _AttributeIterable(_leadingDistribution, baseStyle.leadingDistribution, _setLeadingDistribution);
 
   final RBTree<double?>? _height;
-  late final TextStyleAttributeGetter<double> height = _createAttribute(_height, baseStyle.height!, _setHeight);
+  late final TextStyleAttributeGetter<double> height = _AttributeIterable(_height, baseStyle.height, _setHeight);
 
   final RBTree<ui.TextBaseline?>? _textBaseline;
-  late final TextStyleAttributeGetter<ui.TextBaseline> textBaseline = _createAttribute(_textBaseline, baseStyle.textBaseline!, _setTextBaseline);
+  late final TextStyleAttributeGetter<ui.TextBaseline> textBaseline = _AttributeIterable(_textBaseline, baseStyle.textBaseline, _setTextBaseline);
 
   final RBTree<double?>? _letterSpacing;
-  late final TextStyleAttributeGetter<double> letterSpacing = _createAttribute(_letterSpacing, baseStyle.letterSpacing!, _setLetterSpacing);
+  late final TextStyleAttributeGetter<double> letterSpacing = _AttributeIterable(_letterSpacing, baseStyle.letterSpacing, _setLetterSpacing);
   final RBTree<double?>? _wordSpacing;
-  late final TextStyleAttributeGetter<double> wordSpacing = _createAttribute(_wordSpacing, baseStyle.wordSpacing!, _setWordSpacing);
+  late final TextStyleAttributeGetter<double> wordSpacing = _AttributeIterable(_wordSpacing, baseStyle.wordSpacing, _setWordSpacing);
 
   final RBTree<Either<ui.Color, ui.Paint>?>? _foreground;
-  late final TextStyleAttributeGetter<Either<ui.Color, ui.Paint>> foregorund = _createAttribute(_foreground, _getForeground(baseStyle)!, _setForeground);
+  late final TextStyleAttributeGetter<Either<ui.Color, ui.Paint>> foregorund = _AttributeIterable(_foreground, _getForeground(baseStyle), _setForeground);
   final RBTree<Either<ui.Color, ui.Paint>?>? _background;
-  late final TextStyleAttributeGetter<Either<ui.Color, ui.Paint>> background = _createAttribute(_background, _getBackground(baseStyle)!, _setBackground);
+  late final TextStyleAttributeGetter<Either<ui.Color, ui.Paint>> background = _AttributeIterable(_background, _getBackground(baseStyle), _setBackground);
 
   final RBTree<bool?>? _underline;
-  late final TextStyleAttributeGetter<bool> underline = _createAttribute(_underline, _getUnderline(baseStyle)!, _setUnderline);
+  late final TextStyleAttributeGetter<bool> underline = _AttributeIterable(_underline, _getUnderline(baseStyle), _setUnderline);
   final RBTree<bool?>? _overline;
-  late final TextStyleAttributeGetter<bool> overline = _createAttribute(_overline, _getOverline(baseStyle)!, _setOverline);
+  late final TextStyleAttributeGetter<bool> overline = _AttributeIterable(_overline, _getOverline(baseStyle), _setOverline);
   final RBTree<bool?>? _lineThrough;
-  late final TextStyleAttributeGetter<bool> lineThrough = _createAttribute(_lineThrough, _getLineThrough(baseStyle)!, _setLineThrough);
+  late final TextStyleAttributeGetter<bool> lineThrough = _AttributeIterable(_lineThrough, _getLineThrough(baseStyle), _setLineThrough);
 
   final RBTree<ui.Color?>? _decorationColor;
-  late final TextStyleAttributeGetter<ui.Color> decorationColor = _createAttribute(_decorationColor, baseStyle.decorationColor!, _setDecorationColor);
+  late final TextStyleAttributeGetter<ui.Color> decorationColor = _AttributeIterable(_decorationColor, baseStyle.decorationColor, _setDecorationColor);
   final RBTree<ui.TextDecorationStyle?>? _decorationStyle;
-  late final TextStyleAttributeGetter<ui.TextDecorationStyle> decorationStyle = _createAttribute(_decorationStyle, baseStyle.decorationStyle!, _setDecorationStyle);
+  late final TextStyleAttributeGetter<ui.TextDecorationStyle> decorationStyle = _AttributeIterable(_decorationStyle, baseStyle.decorationStyle, _setDecorationStyle);
   final RBTree<double?>? _decorationThickness;
-  late final TextStyleAttributeGetter<double> decorationThickness = _createAttribute(_decorationThickness, baseStyle.decorationThickness!, _setDecorationThickness);
+  late final TextStyleAttributeGetter<double> decorationThickness = _AttributeIterable(_decorationThickness, baseStyle.decorationThickness, _setDecorationThickness);
 
   final RBTree<List<ui.Shadow>?>? _shadows;
-  late final TextStyleAttributeGetter<List<ui.Shadow>> shadows = _createAttribute(_shadows, baseStyle.shadows!, _setShadows);
-
-  //TextStyle getAnnotationAt(int index) {
-  //  final underline = _underline?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
-  //  final overline = _overline?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
-  //  final lineThrough = _lineThrough?.getNodeGreaterThan(index)?.value ?? baseStyle.decoration?.contains(ui.TextDecoration.underline) ?? false;
-  //  final ui.TextDecoration? decoration = underline || overline || lineThrough
-  //    ? null
-  //    : ui.TextDecoration.combine([
-  //        if (underline) ui.TextDecoration.underline,
-  //        if (overline) ui.TextDecoration.overline,
-  //        if (lineThrough) ui.TextDecoration.lineThrough,
-  //      ]);
-  //  final foreground = _foreground?.getNodeGreaterThan(index)?.value;
-  //  final background = _background?.getNodeGreaterThan(index)?.value;
-
-  //  final (String? fontFamily, List<String>? fallback) = switch (_fontFamilies?.getNodeLessThanOrEqualTo(index)?.value) {
-  //    null => (null, null),
-  //    [] => ('', const []),
-  //    [final fontFamily, ...final fallback] => (fontFamily, fallback)
-  //  };
-
-  //  final TextStyle textStyle = TextStyle(
-  //    fontFamily: fontFamily,
-  //    fontFamilyFallback: fallback,
-  //    locale: _locale?.getNodeLessThanOrEqualTo(index)?.value,
-
-  //    fontWeight: _fontWeight?.getNodeLessThanOrEqualTo(index)?.value,
-  //    fontStyle: _fontStyle?.getNodeLessThanOrEqualTo(index)?.value,
-
-  //    fontFeatures: _fontFeatures?.getNodeGreaterThan(index)?.value,
-  //    fontVariations: _fontVariations?.getNodeGreaterThan(index)?.value,
-
-  //    leadingDistribution: _leadingDistribution?.getNodeLessThanOrEqualTo(index)?.value,
-  //    height: _height?.getNodeLessThanOrEqualTo(index)?.value,
-  //    textBaseline: _textBaseline?.getNodeLessThanOrEqualTo(index)?.value,
-
-  //    fontSize: _fontSize?.getNodeLessThanOrEqualTo(index)?.value,
-  //    letterSpacing: _letterSpacing?.getNodeLessThanOrEqualTo(index)?.value,
-  //    wordSpacing: _wordSpacing?.getNodeLessThanOrEqualTo(index)?.value,
-
-  //    color: foreground?.maybeLeft,
-  //    foreground: foreground?.maybeRight,
-  //    backgroundColor: background?.maybeLeft,
-  //    background: background?.maybeRight,
-  //    decoration: decoration,
-  //    decorationColor: _decorationColor?.getNodeLessThanOrEqualTo(index)?.value,
-  //    decorationStyle: _decorationStyle?.getNodeLessThanOrEqualTo(index)?.value,
-  //    decorationThickness: _decorationThickness?.getNodeLessThanOrEqualTo(index)?.value,
-  //    shadows: _shadows?.getNodeLessThanOrEqualTo(index)?.value,
-  //  );
-  //  return baseStyle.merge(textStyle);
-  //}
+  late final TextStyleAttributeGetter<List<ui.Shadow>> shadows = _AttributeIterable<List<ui.Shadow>>(_shadows, baseStyle.shadows, _setShadows);
 
   Iterator<(int, TextStyleAttributeSet)> getRunsEndAfter(int index) {
     final _AttributeRunsToMerge runsToMerge = _AttributeRunsToMerge.filled(21, null)

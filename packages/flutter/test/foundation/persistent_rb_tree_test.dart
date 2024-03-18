@@ -93,7 +93,7 @@ void main() {
   group('BST operations', () {
     int getKey<Value>((int, Value) pair) => pair.$1;
 
-    test('visitAscending startingKey filtering', () {
+    test('getRunsEndAfter', () {
       final List<int> sortedList = List<int>.generate(10, (int index) => index * index);
       final _TestTree tree = _TestTree.fromSortedList(sortedList.map((int i) => (i, i)).toList());
 
