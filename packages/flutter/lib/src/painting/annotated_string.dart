@@ -14,6 +14,13 @@ import 'text_span.dart';
 import 'text_style.dart';
 import 'text_style_attributes.dart';
 
+// ### NOTES
+// 1. TextSpan interop
+// 2. Font matching / Shaping / Layout / Paint subsystems
+// 3. Hit-testing
+// 4. Semantics
+
+
 //typedef _TextStyleAttributeSetter<Attribute> = (void Function(_MutableTextStyleAttributeSet, Attribute), Attribute);
 typedef _TextStyleAttributeSetter = ValueSetter<_MutableTextStyleAttributeSet>;
 
