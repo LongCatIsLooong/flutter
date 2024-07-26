@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'package:flutter/material.dart';
+library;
+
 import 'dart:collection';
 import 'dart:math' as math show pi;
 import 'dart:ui' as ui;
@@ -465,7 +468,7 @@ class _RenderCupertinoTextSelectionToolbarShape extends RenderShiftedBox {
         ..shader = ui.Gradient.linear(
           Offset.zero,
           const Offset(10.0, 10.0),
-          const <Color>[Color(0x00000000), Color(0xFFFF00FF), Color(0xFFFF00FF), Color(0x00000000)],
+          const <Color>[CupertinoColors.transparent, Color(0xFFFF00FF), Color(0xFFFF00FF), CupertinoColors.transparent],
           const <double>[0.25, 0.25, 0.75, 0.75],
           TileMode.repeated,
         )
@@ -568,7 +571,7 @@ class _CupertinoTextSelectionToolbarContentState extends State<_CupertinoTextSel
   }
 
   void _statusListener(AnimationStatus status) {
-    if (status != AnimationStatus.dismissed) {
+    if (!status.isDismissed) {
       return;
     }
 
@@ -887,13 +890,12 @@ class _CupertinoTextSelectionToolbarItemsElement extends RenderObjectElement {
     _mountChild(toolbarItems.nextButton, _CupertinoTextSelectionToolbarItemsSlot.nextButton);
 
     // Mount list children.
-    _children = List<Element>.filled(toolbarItems.children.length, _NullElement.instance);
     Element? previousChild;
-    for (int i = 0; i < _children.length; i += 1) {
-      final Element newChild = inflateWidget(toolbarItems.children[i], IndexedSlot<Element?>(i, previousChild));
-      _children[i] = newChild;
-      previousChild = newChild;
-    }
+    _children = List<Element>.generate(toolbarItems.children.length, (int i) {
+      final Element result = inflateWidget(toolbarItems.children[i], IndexedSlot<Element?>(i, previousChild));
+      previousChild = result;
+      return result;
+    }, growable: false);
   }
 
   @override
@@ -1272,20 +1274,4 @@ class _RenderCupertinoTextSelectionToolbarItems extends RenderBox with Container
 enum _CupertinoTextSelectionToolbarItemsSlot {
   backButton,
   nextButton,
-}
-
-class _NullElement extends Element {
-  _NullElement() : super(const _NullWidget());
-
-  static _NullElement instance = _NullElement();
-
-  @override
-  bool get debugDoingBuild => throw UnimplementedError();
-}
-
-class _NullWidget extends Widget {
-  const _NullWidget();
-
-  @override
-  Element createElement() => throw UnimplementedError();
 }

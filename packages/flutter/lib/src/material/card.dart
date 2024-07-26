@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+/// @docImport 'dialog.dart';
+/// @docImport 'ink_well.dart';
+/// @docImport 'list_tile.dart';
+library;
+
 import 'package:flutter/widgets.dart';
 
 import 'card_theme.dart';
@@ -224,8 +229,8 @@ class Card extends StatelessWidget {
 
     return Semantics(
       container: semanticContainer,
-      child: Container(
-        margin: margin ?? cardTheme.margin ?? defaults.margin!,
+      child: Padding(
+        padding: margin ?? cardTheme.margin ?? defaults.margin!,
         child: Material(
           type: MaterialType.card,
           color: color ?? cardTheme.color ?? defaults.color,

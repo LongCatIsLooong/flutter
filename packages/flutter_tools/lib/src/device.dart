@@ -16,6 +16,7 @@ import 'base/utils.dart';
 import 'build_info.dart';
 import 'devfs.dart';
 import 'device_port_forwarder.dart';
+import 'device_vm_service_discovery_for_attach.dart';
 import 'project.dart';
 import 'vmservice.dart';
 import 'web/compile.dart';
@@ -737,6 +738,35 @@ abstract class Device {
   /// Clear the device's logs.
   void clearLogs();
 
+  /// Get the [VMServiceDiscoveryForAttach] instance for this device, which
+  /// discovers, and forwards any necessary ports to the vm service uri of a
+  /// running app on the device.
+  ///
+  /// If `appId` is specified, on supported platforms, the service discovery
+  /// will only return the VM service URI from the given app.
+  ///
+  /// If `fuchsiaModule` is specified, this will only return the VM service uri
+  /// from the specified Fuchsia module.
+  ///
+  /// If `filterDevicePort` is specified, this will only return the VM service
+  /// uri that matches the given port on the device.
+  VMServiceDiscoveryForAttach getVMServiceDiscoveryForAttach({
+    String? appId,
+    String? fuchsiaModule,
+    int? filterDevicePort,
+    int? expectedHostPort,
+    required bool ipv6,
+    required Logger logger,
+  }) =>
+      LogScanningVMServiceDiscoveryForAttach(
+        Future<DeviceLogReader>.value(getLogReader()),
+        portForwarder: portForwarder,
+        devicePort: filterDevicePort,
+        hostPort: expectedHostPort,
+        ipv6: ipv6,
+        logger: logger,
+      );
+
   /// Start an app package on the current device.
   ///
   /// [platformArgs] allows callers to pass platform-specific arguments to the
@@ -912,12 +942,11 @@ enum ImpellerStatus {
 
   const ImpellerStatus._(this.asBool);
 
-  factory ImpellerStatus.fromBool(bool? b) {
-    if (b == null) {
-      return platformDefault;
-    }
-    return b ? enabled : disabled;
-  }
+  factory ImpellerStatus.fromBool(bool? b) => switch (b) {
+    true  => enabled,
+    false => disabled,
+    null  => platformDefault,
+  };
 
   final bool? asBool;
 }
@@ -963,7 +992,9 @@ class DebuggingOptions {
     this.webEnableExpressionEvaluation = false,
     this.webHeaders = const <String, String>{},
     this.webLaunchUrl,
-    this.webRenderer = WebRendererMode.auto,
+    WebRendererMode? webRenderer,
+    this.webUseWasm = false,
+    this.webUseLocalCanvaskit = false,
     this.vmserviceOutFile,
     this.fastStart = false,
     this.nullAssertions = false,
@@ -976,7 +1007,8 @@ class DebuggingOptions {
     this.enableEmbedderApi = false,
     this.usingCISystem = false,
     this.debugLogsDirectoryPath,
-   }) : debuggingEnabled = true;
+   })  : debuggingEnabled = true,
+        webRenderer = webRenderer ?? WebRendererMode.getDefault(useWasm: webUseWasm);
 
   DebuggingOptions.disabled(this.buildInfo, {
       this.dartEntrypointArgs = const <String>[],
@@ -993,7 +1025,9 @@ class DebuggingOptions {
       this.webBrowserFlags = const <String>[],
       this.webLaunchUrl,
       this.webHeaders = const <String, String>{},
-      this.webRenderer = WebRendererMode.auto,
+      WebRendererMode? webRenderer,
+      this.webUseWasm = false,
+      this.webUseLocalCanvaskit = false,
       this.cacheSkSL = false,
       this.traceAllowlist,
       this.enableImpeller = ImpellerStatus.platformDefault,
@@ -1030,7 +1064,8 @@ class DebuggingOptions {
       webEnableExpressionEvaluation = false,
       nullAssertions = false,
       nativeNullAssertions = false,
-      serveObservatory = false;
+      serveObservatory = false,
+      webRenderer = webRenderer ?? WebRendererMode.getDefault(useWasm: webUseWasm);
 
   DebuggingOptions._({
     required this.buildInfo,
@@ -1074,6 +1109,8 @@ class DebuggingOptions {
     required this.webHeaders,
     required this.webLaunchUrl,
     required this.webRenderer,
+    required this.webUseWasm,
+    required this.webUseLocalCanvaskit,
     required this.vmserviceOutFile,
     required this.fastStart,
     required this.nullAssertions,
@@ -1160,6 +1197,12 @@ class DebuggingOptions {
 
   /// Which web renderer to use for the debugging session
   final WebRendererMode webRenderer;
+
+  /// Whether to compile to webassembly
+  final bool webUseWasm;
+
+  /// If true, serve CanvasKit assets locally rather than using the CDN.
+  final bool webUseLocalCanvaskit;
 
   /// A file where the VM Service URL should be written after the application is started.
   final String? vmserviceOutFile;
@@ -1270,6 +1313,8 @@ class DebuggingOptions {
     'webLaunchUrl': webLaunchUrl,
     'webHeaders': webHeaders,
     'webRenderer': webRenderer.name,
+    'webUseWasm': webUseWasm,
+    'webUseLocalCanvaskit': webUseLocalCanvaskit,
     'vmserviceOutFile': vmserviceOutFile,
     'fastStart': fastStart,
     'nullAssertions': nullAssertions,
@@ -1326,6 +1371,8 @@ class DebuggingOptions {
       webHeaders: (json['webHeaders']! as Map<dynamic, dynamic>).cast<String, String>(),
       webLaunchUrl: json['webLaunchUrl'] as String?,
       webRenderer: WebRendererMode.values.byName(json['webRenderer']! as String),
+      webUseWasm: json['webUseWasm']! as bool,
+      webUseLocalCanvaskit: json['webUseLocalCanvaskit']! as bool,
       vmserviceOutFile: json['vmserviceOutFile'] as String?,
       fastStart: json['fastStart']! as bool,
       nullAssertions: json['nullAssertions']! as bool,
