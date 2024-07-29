@@ -2,12 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-import 'package:meta/meta.dart' show immutable;
-
-/// Signature for visiting a [RBTree].
-///
-/// Returns false to stop traversing.
-typedef RBTreeVisitor<Value> = bool Function(RBTree<Value> node);
+import 'package:meta/meta.dart' show immutable, useResult;
 
 // Creates a RBTree from the range [startIndex, endIndex) of the given sorted
 // association list. All nodes will be black except for some leaves to avoid
@@ -23,7 +18,7 @@ RBTree<Value> _fromSortedList<Value>(List<(int, Value)> sortedList, int startInd
   // there's no right node.
   if (midIndex == startIndex) {
     assert(endIndex == startIndex + 1);
-    return paintDeepestLeavesRed ? RBTree<Value>.red(key, value) : RBTree<Value>.black(key, value);
+    return paintDeepestLeavesRed ? RBTree.red(key, value) : RBTree.black(key, value);
   }
 
   // Whether the left branch and the right branch have the same cardinality.
@@ -41,7 +36,7 @@ RBTree<Value> _fromSortedList<Value>(List<(int, Value)> sortedList, int startInd
     : null;
   final RBTree<Value> left = _fromSortedList(sortedList, startIndex, midIndex, !isBalanced || paintDeepestLeavesRed);
   assert(left.blackHeight == (right?.blackHeight ?? 0));
-  return RBTree<Value>.black(key, value, left: left, right: right);
+  return RBTree.black(key, value, left: left, right: right);
 }
 
 /// The upward path from the [end] node to the root node of the binary tree.
@@ -70,16 +65,16 @@ class _TreePath<Value> {
   // Creates the path to the node with the largest key less than or equal to
   // `minKey` in the given tree, and concatenates that path after the given
   // `prefix` path.
-  static _TreePath<T>? noGreaterThan<T>(RBTree<T>? root, int minKey, { _TreePath<T>? prefix }) {
-    if (root == null) {
-      return prefix;
-    }
-    return switch (root.key.compareTo(minKey)) {
-      -1 => _TreePath.noGreaterThan(root.right, minKey, prefix: prefix),
-      0  => _TreePath<T>(root, prefix, minKey),
-      _  => _TreePath.noGreaterThan(root.left, minKey, prefix: _TreePath<T>(root, prefix, minKey)),
-    };
-  }
+  //static _TreePath<T>? noGreaterThan<T>(RBTree<T>? root, int minKey, { _TreePath<T>? prefix }) {
+  //  if (root == null) {
+  //    return prefix;
+  //  }
+  //  return switch (root.key.compareTo(minKey)) {
+  //    -1 => _TreePath.noGreaterThan(root.right, minKey, prefix: prefix),
+  //    0  => _TreePath<T>(root, prefix, minKey),
+  //    _  => _TreePath.noGreaterThan(root.left, minKey, prefix: _TreePath<T>(root, prefix, minKey)),
+  //  };
+  //}
 
   final int minKey;
 
@@ -135,6 +130,54 @@ class _TreeWalker<Value> implements Iterator<(int, Value)> {
   }
 }
 
+/// A [RBTree] with a red root node, constructed using [RBTree.red].
+extension type RedNode<Value>._(RBTree<Value> node) implements RBTree<Value>, _UnsafeNode<Value> {
+  RedNode._construct(int key, Value value, { BlackNode<Value>? left, BlackNode<Value>? right })
+   : node = RBTree<Value>._(key, value, false, left?.blackHeight ?? 0, left, right);
+}
+
+/// A [RBTree] with a black root node, constructed using [RBTree.black].
+extension type BlackNode<Value>._(RBTree<Value> node) implements _UnsafeNode<Value>, RBTree<Value> {
+  BlackNode._construct(int key, Value value, { RBTree<Value>? left, RBTree<Value>? right })
+   : node = RBTree<Value>._(key, value, true, (left?.blackHeight ?? 0) + 1, left, right);
+}
+
+extension type _UnsafeNode<Value>._(RBTree<Value> node) {
+  /// Creates a red node that may have red children (but the children must not
+  /// have red violations themselves).
+  ///
+  /// This [_UnsafeNode] type are generally created by operations that may
+  /// temporarily introduce a red violation to keep the height invariant when
+  /// modifying the tree (such as insertion).
+  ///
+  /// A [_UnsafeNode] is typically converted back to a "safe" [RBTree] node by
+  /// using `_balance` and then `_turnBlack` at the root.
+  _UnsafeNode._unsafeRed(int key, Value value, { RBTree<Value>? left, RBTree<Value>? right })
+   : assert(left?._debugCheckNoRedViolations ?? true),
+     assert(right?._debugCheckNoRedViolations ?? true),
+     node = RBTree<Value>._(key, value, false, left?.blackHeight ?? 0, left, right);
+
+  /// Creates a [_UnsafeNode] from a [RBTree] that has no red violations (i.e. safe).
+  _UnsafeNode.safe(this.node) : assert(node._debugCheckNoRedViolations);
+
+   // Returns node.
+   //
+   // In debug mode, this getter also verifies the subtree has no red violations.
+   RBTree<Value> get ensureSafe {
+     assert(node._debugCheckNoRedViolations);
+     return node;
+   }
+
+  @pragma('dart2js:tryInline')
+  @pragma('vm:prefer-inline')
+  @pragma('wasm:prefer-inline')
+  BlackNode<Value> _turnBlack() {
+    return node.isBlack
+      ? BlackNode<Value>._(node)
+      : RBTree.black(node.key, node.value, left: node.left, right: node.right);
+  }
+}
+
 /// An int-keyed persistent red-black tree, specialized for storing text
 /// annotations.
 ///
@@ -148,41 +191,15 @@ class _TreeWalker<Value> implements Iterator<(int, Value)> {
 ///
 /// This red-black tree implementation does not allow key duplicates.
 @immutable
-class RBTree<Value> {
+final class RBTree<Value> {
   /// Creates a [RBTree].
   RBTree._(this.key, this.value, this.isBlack, this.blackHeight, this.left, this.right)
    : assert(left == null || left.key < key),
      assert(right == null || key < right.key),
-     assert((left?.blackHeight ?? 0) == (right?.blackHeight ?? 0)),
-     assert(blackHeight == (left?.blackHeight ?? 0) + (isBlack ? 1 : 0));
-
-  /// Creates a [RBTree] with a red root node.
-  ///
-  /// {@template flutter.foundation.rbtree.constructor_invariants}
-  /// In debug mode, this constructor asserts if the resulting tree is not a
-  /// valid BST, or there are black violations. But it currently does not check
-  /// for red violations, as oprations such as insertion may involve temporarily
-  /// violating invariant 1.
-  ///
-  /// Consider using [debugCheckNoRedViolations] in debug mode after finish
-  /// updating the tree to make sure all invariants are maintained.
-  /// {@endtemplate}
-  RBTree.red(this.key, this.value, { this.left, this.right })
-   : assert(left == null || left.key < key),
-     assert(right == null || key < right.key),
-     assert((left?.blackHeight ?? 0) == (right?.blackHeight ?? 0)),
-     isBlack = false,
-     blackHeight = left?.blackHeight ?? 0;
-
-  /// Creates a [RBTree] with a black root node.
-  ///
-  /// {@macro flutter.foundation.rbtree.constructor_invariants}
-  RBTree.black(this.key, this.value, { this.left, this.right })
-   : assert(left == null || left.key < key),
-     assert(right == null || key < right.key),
-     assert((left?.blackHeight ?? 0) == (right?.blackHeight ?? 0), '$left and $right do not have the same black height.'),
-     isBlack = true,
-     blackHeight = (left?.blackHeight ?? 0) + 1;
+     assert((left?.blackHeight ?? 0) == (right?.blackHeight ?? 0), '$left and $right do not have the same height.'),
+     assert(blackHeight == (left?.blackHeight ?? 0) + (isBlack ? 1 : 0)),
+     _minNode = left?.minNode,
+     _maxNode = right?.maxNode;
 
   /// Creates a [RBTree] from a sorted, non-empty association [List].
   factory RBTree.fromSortedList(List<(int, Value)> sortedList) {
@@ -194,8 +211,18 @@ class RBTree<Value> {
       return true;
     }());
     final RBTree<Value> tree = _fromSortedList(sortedList, 0, sortedList.length, false);
-    assert(tree.debugCheckNoRedViolations);
+    assert(tree._debugCheckNoRedViolations);
     return tree;
+  }
+
+  /// Creates a [RBTree] with a red root node.
+  static RedNode<Value> red<Value>(int key, Value value, { BlackNode<Value>? left, BlackNode<Value>? right }) {
+    return RedNode<Value>._construct(key, value, left: left, right:right);
+  }
+
+  /// Creates a [RBTree] with a black root node.
+  static BlackNode<Value> black<Value>(int key, Value value, { RBTree<Value>? left, RBTree<Value>? right }) {
+    return BlackNode<Value>._construct(key, value, left: left, right:right);
   }
 
   /// The int key of this node.
@@ -219,47 +246,84 @@ class RBTree<Value> {
 
   /// The node with the smallest key in this [RBTree].
   ///
-  /// O(log(N)) for the initial invocation and the value is cached.
-  late final RBTree<Value> _minNode = left?._minNode ?? this;
+  /// The value is cached. O(1).
+  RBTree<Value> get minNode => _minNode ?? this;
+  final RBTree<Value>? _minNode;
 
   /// The node with the largest key in this [RBTree].
   ///
-  /// O(log(N)) for the initial invocation and the value is cached.
-  late final RBTree<Value> _maxNode = right?._maxNode ?? this;
+  /// The value is cached. O(1).
+  RBTree<Value> get maxNode => _maxNode ?? this;
+  final RBTree<Value>? _maxNode;
 
-  /// Retrives the node in the tree with the largest key that is less than or
+  /// Retrieves the node in the tree with the largest key that is less than or
   /// equal to the given `key`.
   ///
   /// O(log(N)).
-  RBTree<Value>? getNodeLessThanOrEqualTo(int key) => switch (key.compareTo(this.key)) {
-    == 0 => this,
-    <  0 => left?.getNodeLessThanOrEqualTo(key),
-    _    => right?.getNodeLessThanOrEqualTo(key) ?? this,
-  };
+  //RBTree<Value>? getNodeLessThanOrEqualTo(int maxKey) {
+  //  if (maxKey <= minNode.key) {
+  //    return maxKey == minNode.key ? minNode : null;
+  //  } else if (maxNode.key <= maxKey ) {
+  //    return maxNode;
+  //  }
+  //  return switch (maxKey.compareTo(this.key)) {
+  //    == 0 => this,
+  //    >  0 => right?.getNodeLessThanOrEqualTo(maxKey) ?? this,
+  //    _    => left!.getNodeLessThanOrEqualTo(maxKey),
+  //  };
+  //}
+  RBTree<Value>? getNodeLessThanOrEqualTo(int maxKey) {
+    if (maxKey <= minNode.key) {
+      return maxKey == minNode.key ? minNode : null;
+    } else if (maxNode.key <= maxKey ) {
+      return maxNode;
+    }
+    RBTree<Value> node = this;
+    while (node.key != maxKey) {
+      final RBTree<Value>? next = maxKey < node.key ? node.left : node.right;
+      if (next == null) {
+        return node;
+      }
+      node = next;
+    }
+    return node;
+  }
 
-  /// Retrives the node in the tree with the smallest key that's greater than
+  /// Retrieves the node in the tree with the smallest key that's greater than
   /// the given `key`.
   ///
   /// O(log(N)).
-  RBTree<Value>? getNodeGreaterThan(int key) => switch (key.compareTo(this.key)) {
-    == 0 => right?._minNode,
-    <  0 => left?.getNodeGreaterThan(key) ?? this,
-    _    => right?.getNodeGreaterThan(key),
-  };
+  RBTree<Value>? getNodeGreaterThan(int minKey) {
+    if (maxNode.key <= minKey) {
+      return null;
+    } else if (minKey < minNode.key) {
+      return minNode;
+    }
+    RBTree<Value> node = this;
+    while (node.key != minKey) {
+      final RBTree<Value>? next = minKey < node.key ? node.left : node.right;
+      if (next == null) {
+        return node;
+      }
+      node = next;
+    }
+    return node.right?.minNode ?? node;
+  }
 
   /// Replaces [left] with the given `leftTree`, and fix any red violations if
   /// `this` is a black node.
-  RBTree<Value> _balanceLeft(RBTree<Value> leftTree) {
-    assert(debugCheckNoRedViolations);
-    assert(leftTree.blackHeight == (right?.blackHeight ?? 0));
-    assert(leftTree.key < key);
+  _UnsafeNode<Value> _balanceLeft(_UnsafeNode<Value> leftTree) {
+    assert(_debugCheckNoRedViolations);
+    assert(leftTree.node.blackHeight == (right?.blackHeight ?? 0));
+    assert(leftTree.node.key < key);
     if (identical(leftTree, left)) {
-      return this;
+      return _UnsafeNode<Value>.safe(this);
     }
     if (!isBlack) {
-      return RBTree<Value>.red(key, value, left: leftTree, right: right);
+      // Only attempt to fix red violations at black nodes.
+      return _UnsafeNode<Value>._unsafeRed(key, value, left: leftTree.ensureSafe, right: right);
     }
-    return switch (leftTree) {
+    final RBTree<Value> safe = switch (leftTree) {
       RBTree<Value>(isBlack: false, key: final int xKey, value: final Value xValue,
         left: final RBTree<Value>? a,
         right: RBTree<Value>(isBlack: false, key: final int yKey, value: final Value yValue,
@@ -273,27 +337,28 @@ class RBTree<Value> {
           right: final RBTree<Value>? b,
         ),
         right: final RBTree<Value>? c,
-      ) => RBTree<Value>.red(yKey, yValue,
-          left: RBTree<Value>.black(xKey, xValue, left: a, right: b),
-          right: RBTree<Value>.black(key, value, left: c, right: right),
+      ) => RBTree.red(yKey, yValue,
+          left: RBTree.black(xKey, xValue, left: a, right: b),
+          right: RBTree.black(key, value, left: c, right: right),
         ),
-      _ => RBTree<Value>.black(key, value, left: leftTree, right: right),
+      _ => RBTree.black(key, value, left: leftTree.ensureSafe, right: right),
     };
+    return _UnsafeNode<Value>.safe(safe);
   }
 
   /// Replaces [right] with the given `rightTree`, and fix any red violations if
   /// `this` is a black node.
-  RBTree<Value> _balanceRight(RBTree<Value> rightTree) {
-    assert(debugCheckNoRedViolations);
-    assert(rightTree.blackHeight == (left?.blackHeight ?? 0));
-    assert(rightTree.key > key);
+  _UnsafeNode<Value> _balanceRight(_UnsafeNode<Value> rightTree) {
+    assert(_debugCheckNoRedViolations);
+    assert(rightTree.node.blackHeight == (left?.blackHeight ?? 0));
+    assert(rightTree.node.key > key);
     if (identical(rightTree, right)) {
-      return this;
+      return _UnsafeNode<Value>.safe(this);
     }
     if (!isBlack) {
-      return RBTree<Value>.red(key, value, left: left, right: rightTree);
+      return _UnsafeNode<Value>._unsafeRed(key, value, left: left, right: rightTree.ensureSafe);
     }
-    return switch (rightTree) {
+    final RBTree<Value> safe = switch (rightTree) {
       RBTree<Value>(isBlack: false, key: final int yKey, value: final Value yValue,
         left: final RBTree<Value>? b,
         right: RBTree<Value>(isBlack: false, key: final int zKey, value: final Value zValue,
@@ -307,54 +372,56 @@ class RBTree<Value> {
           right: final RBTree<Value>? c
         ),
         right: final RBTree<Value>? d
-      ) => RBTree<Value>.red(yKey, yValue,
-            left: RBTree<Value>.black(key, value, left: left, right: b),
-            right: RBTree<Value>.black(zKey, zValue, left: c, right: d),
+      ) => red(yKey, yValue,
+            left: RBTree.black(key, value, left: left, right: b),
+            right: RBTree.black(zKey, zValue, left: c, right: d),
           ),
-      _ => RBTree<Value>.black(key, value, left: left, right: rightTree),
+      _ => black(key, value, left: left, right: rightTree.ensureSafe),
     };
+    return _UnsafeNode<Value>.safe(safe);
   }
 
-  RBTree<Value> _insert(int key, Value value) => switch (key.compareTo(this.key)) {
-    < 0 => _balanceLeft(left?._insert(key, value) ?? RBTree<Value>.red(key, value)),
-    > 0 => _balanceRight(right?._insert(key, value) ?? RBTree<Value>.red(key, value)),
-    _   => value == this.value ? this : RBTree<Value>._(key, value, isBlack, blackHeight, left, right),
+  _UnsafeNode<Value> _insert(int key, Value value) => switch (key.compareTo(this.key)) {
+    < 0 => _balanceLeft(left?._insert(key, value) ?? _UnsafeNode<Value>.safe(red(key, value))),
+    > 0 => _balanceRight(right?._insert(key, value) ?? _UnsafeNode<Value>.safe(red(key, value))),
+    _   => _UnsafeNode<Value>.safe(value == this.value ? this : RBTree<Value>._(key, value, isBlack, blackHeight, left, right)),
   };
-
-  @pragma('vm:prefer-inline')
-  RBTree<Value> _turnBlack() => !isBlack ? RBTree<Value>.black(key, value, left: left, right: right) : this;
 
   /// Inserts the given key value pair to the [RBTree] and returns the resulting
   /// new [RBTree].
   ///
   /// O(log(N)) where N is the number of nodes in the tree.
+  @pragma('dart2js:tryInline')
   @pragma('vm:prefer-inline')
-  RBTree<Value> insert(int key, Value value) {
-    final RBTree<Value> tree = _insert(key, value)._turnBlack();
-    assert(tree.debugCheckNoRedViolations);
+  @pragma('wasm:prefer-inline')
+  @useResult
+  BlackNode<Value> insert(int key, Value value) {
+    final BlackNode<Value> tree = _insert(key, value)._turnBlack();
+    assert(tree._debugCheckNoRedViolations);
     return tree;
   }
 
-  RBTree<Value> _joinTaller(RBTree<Value>? tallerRightTree, int key, Value value) {
+  _UnsafeNode<Value> _joinTaller(RBTree<Value>? tallerRightTree, int key, Value value) {
     if (tallerRightTree == null) {
       return insert(key, value);
     }
     assert(blackHeight <= tallerRightTree.blackHeight);
     return blackHeight == tallerRightTree.blackHeight
-      ? RBTree<Value>.red(key, value, left: this, right: tallerRightTree)
+      ? _UnsafeNode<Value>._unsafeRed(key, value, left: this, right: tallerRightTree)
       : tallerRightTree._balanceLeft(_joinTaller(tallerRightTree.left, key, value));
   }
 
-  RBTree<Value> _joinShorter(RBTree<Value>? shorterRightTree, int key, Value value) {
+  _UnsafeNode<Value> _joinShorter(RBTree<Value>? shorterRightTree, int key, Value value) {
     if (shorterRightTree == null) {
       return insert(key, value);
     }
     assert(shorterRightTree.blackHeight <= blackHeight);
     if (blackHeight == shorterRightTree.blackHeight) {
-      return RBTree<Value>.red(key, value, left: this, right: shorterRightTree);
+      // Calling _redUnsafe here is fine: it will be fixed by _balanceRight in _joinShorter, or _turnBlack in join.
+      return _UnsafeNode<Value>._unsafeRed(key, value, left: this, right: shorterRightTree);
     }
     assert(right != null || (isBlack && blackHeight == 1 && shorterRightTree.blackHeight == 0));
-    return _balanceRight(right?._joinShorter(shorterRightTree, key, value) ?? RBTree<Value>.red(key, value, right: shorterRightTree));
+    return _balanceRight(right?._joinShorter(shorterRightTree, key, value) ?? _UnsafeNode<Value>._unsafeRed(key, value, right: shorterRightTree));
   }
 
   /// Right joins the given [RBTree] and the give key value pair to the [RBTree],
@@ -364,24 +431,52 @@ class RBTree<Value> {
   /// less than the smallest key in the given `rightTree`.
   ///
   /// O(log(N)).
+  @pragma('dart2js:tryInline')
   @pragma('vm:prefer-inline')
-  RBTree<Value> join(RBTree<Value> rightTree, int key, Value value) {
-    assert(debugCheckNoRedViolations);
-    assert(rightTree.debugCheckNoRedViolations);
-    assert(_maxNode.key < key);
-    assert(key < rightTree._minNode.key);
-    final RBTree<Value> tree = blackHeight < rightTree.blackHeight
+  @pragma('wasm:prefer-inline')
+  @useResult
+  BlackNode<Value> join(RBTree<Value> rightTree, int key, Value value) {
+    assert(_debugCheckNoRedViolations);
+    assert(rightTree._debugCheckNoRedViolations);
+    assert(maxNode.key < key);
+    assert(key < rightTree.minNode.key);
+    final BlackNode<Value> tree = blackHeight < rightTree.blackHeight
       ? _joinTaller(rightTree, key, value)._turnBlack()
       : _joinShorter(rightTree, key, value)._turnBlack();
-    assert(tree.debugCheckNoRedViolations);
+    assert(tree._debugCheckNoRedViolations);
     return tree;
   }
 
-  /// Returns a [RBTree] containing the nodes from this [RBTree] that are less
-  /// than the given `threshold`.
+
+  /// Right joins the given [RBTree] this [RBTree], and returns the resulting
+  /// [RBTree].
+  ///
+  /// Every node from `rightTree` must be greater than the largest key in this
+  /// [RBTree].
+  ///
+  /// O(log(N)).
+  @useResult
+  RBTree<Value> merge(RBTree<Value> rightTree) {
+    assert(_debugCheckNoRedViolations);
+    assert(rightTree._debugCheckNoRedViolations);
+    assert(maxNode.key < rightTree.minNode.key);
+    final RBTree<Value> rightMin = rightTree.minNode;
+    final RBTree<Value>? rightWithoutMin = rightTree.skipUntil(rightMin.key + 1);
+    final RBTree<Value> tree = rightWithoutMin == null
+      ? insert(rightMin.key, rightMin.value)
+      : join(rightWithoutMin, rightMin.key, rightMin.value);
+    assert(tree._debugCheckNoRedViolations);
+    return tree;
+  }
+
+  /// Returns a [RBTree] containing the nodes from this [RBTree] whose `key`s
+  /// are less than the given `threshold`.
   ///
   /// O(log(N)).
   RBTree<Value>? takeLessThan(int threshold) {
+    if (maxNode.key < threshold) {
+      return this;
+    }
     if (key == threshold) {
       return left;
     }
@@ -394,11 +489,14 @@ class RBTree<Value> {
       : left?.join(newRightSubtree, key, value) ?? newRightSubtree.insert(key, value);
   }
 
-  /// Returns a [RBTree] containing the nodes from this [RBTree] that are greater
-  /// than or equal to the given `key`.
+  /// Returns a [RBTree] containing the nodes from this [RBTree] whose `key`s
+  /// are greater than or equal to the given `key`.
   ///
   /// O(log(N)).
   RBTree<Value>? skipUntil(int threshold) {
+    if (minNode.key >= threshold) {
+      return this;
+    }
     final RBTree<Value>? right = this.right;
     if (key == threshold) {
       return right?.insert(threshold, value) ?? RBTree<Value>._(key, value, isBlack, blackHeight, null, null);
@@ -407,100 +505,97 @@ class RBTree<Value> {
       return right?.skipUntil(threshold);
     }
     return right == null
-      ? left?.skipUntil(threshold)?.insert(key, value) ?? this
+      ? left?.skipUntil(threshold)?.insert(key, value) ?? RBTree<Value>._(key, value, isBlack, blackHeight, null, null)
       : left?.skipUntil(threshold)?.join(right, key, value) ?? right.insert(key, value);
   }
 
-  bool get debugCheckNoRedViolations {
+  /// Returns an [Iterator] that emits `(int, Value)` from this tree in ascending
+  /// order, starting from the largest node that is no greater than `startingKey`.
+  ///
+  /// O(N).
+  Iterator<(int, Value)> getRunsEndAfter(int startingKey) => _TreeWalker<Value>(this, startingKey);
+
+  bool get _debugCheckNoRedViolations {
     final RBTree<Value>? left = this.left;
     final RBTree<Value>? right = this.right;
     final bool leftValid = left == null
-                        || (left.debugCheckNoRedViolations && (isBlack || left.isBlack));
+                        || (left._debugCheckNoRedViolations && (isBlack || left.isBlack));
     final bool rightValid = right == null
-                        || (right.debugCheckNoRedViolations && (isBlack || right.isBlack));
+                        || (right._debugCheckNoRedViolations && (isBlack || right.isBlack));
     return leftValid && rightValid;
   }
-
-  //List<int> get keys {
-  //  final List<int> list = [];
-  //  final Iterator<(int, Value)> iter = getRunsEndAfter(0);
-  //  while (iter.moveNext()) {
-  //    list.add(iter.current.$1);
-  //  }
-  //  return list;
-  //}
 
   @override
   String toString() => '${isBlack ? "black" : "red"}: $key, $blackHeight';
 }
 
-enum _TreeWalkerState {
-  initial, // moveNext hasn't been called
-  startedWithDefaultValue, // emitting the defaultValue instead of walking the tree
-  treeWalk, // walking the tree
-}
+//enum _TreeWalkerState {
+//  initial, // moveNext hasn't been called
+//  startedWithDefaultValue, // emitting the defaultValue instead of walking the tree
+//  treeWalk, // walking the tree
+//}
+//
+//class _TreeWalkerWithDefaults<Value extends Object> implements Iterator<(int, Value?)> {
+//  _TreeWalkerWithDefaults(this.root, this.startingIndex, this.defaultValue) : _current = (0, defaultValue);
+//
+//  final RBTree<Value?> root;
+//  final int startingIndex;
+//  final Value? defaultValue;
+//
+//  _TreeWalkerState state = _TreeWalkerState.initial;
+//  _TreePath<Value?>? _path;
+//
+//  @override
+//  (int, Value?) get current => _current;
+//  (int, Value?) _current;
+//
+//  _TreePath<Value?>? _advanceState() {
+//    switch (state) {
+//      case _TreeWalkerState.startedWithDefaultValue:
+//        state = _TreeWalkerState.treeWalk;
+//        return _path;
+//      case _TreeWalkerState.treeWalk:
+//        state = _TreeWalkerState.treeWalk;
+//        return _path?.next;
+//      case _TreeWalkerState.initial when defaultValue == null:
+//        assert(_path == null);
+//        state = _TreeWalkerState.treeWalk;
+//        return _TreePath.noGreaterThan(root, startingIndex);
+//      case _TreeWalkerState.initial:
+//        assert(_path == null);
+//        final _TreePath<Value?>? path = _TreePath.noGreaterThan(root, startingIndex);
+//        state = path != null && path.end.key <= startingIndex
+//          ? _TreeWalkerState.startedWithDefaultValue
+//          : _TreeWalkerState.treeWalk;
+//        return path;
+//    }
+//  }
+//
+//  @override
+//  bool moveNext() {
+//    final _TreePath<Value?>? path = _path = _advanceState();
+//    switch (state) {
+//      case _TreeWalkerState.initial:
+//        assert(false);
+//        return false;
+//      case _TreeWalkerState.startedWithDefaultValue:
+//        assert(_current == (0, defaultValue));
+//        return true;
+//      case _TreeWalkerState.treeWalk:
+//        if (path == null) {
+//          return false;
+//        } else {
+//          _current = (path.end.key, path.end.value ?? defaultValue);
+//          return true;
+//        }
+//    }
+//  }
+//}
 
-class _TreeWalkerWithDefaults<Value extends Object> implements Iterator<(int, Value?)> {
-  _TreeWalkerWithDefaults(this.root, this.startingIndex, this.defaultValue) : _current = (0, defaultValue);
-
-  final RBTree<Value?> root;
-  final int startingIndex;
-  final Value? defaultValue;
-
-  _TreeWalkerState state = _TreeWalkerState.initial;
-  _TreePath<Value?>? _path;
-
-  @override
-  (int, Value?) get current => _current;
-  (int, Value?) _current;
-
-  _TreePath<Value?>? _advanceState() {
-    switch (state) {
-      case _TreeWalkerState.startedWithDefaultValue:
-        state = _TreeWalkerState.treeWalk;
-        return _path;
-      case _TreeWalkerState.treeWalk:
-        state = _TreeWalkerState.treeWalk;
-        return _path?.next;
-      case _TreeWalkerState.initial when defaultValue == null:
-        assert(_path == null);
-        state = _TreeWalkerState.treeWalk;
-        return _TreePath.noGreaterThan(root, startingIndex);
-      case _TreeWalkerState.initial:
-        assert(_path == null);
-        final _TreePath<Value?>? path = _TreePath.noGreaterThan(root, startingIndex);
-        state = path != null && path.end.key <= startingIndex
-          ? _TreeWalkerState.startedWithDefaultValue
-          : _TreeWalkerState.treeWalk;
-        return path;
-    }
-  }
-
-  @override
-  bool moveNext() {
-    final _TreePath<Value?>? path = _path = _advanceState();
-    switch (state) {
-      case _TreeWalkerState.initial:
-        assert(false);
-        return false;
-      case _TreeWalkerState.startedWithDefaultValue:
-        assert(_current == (0, defaultValue));
-        return true;
-      case _TreeWalkerState.treeWalk:
-        if (path == null) {
-          return false;
-        } else {
-          _current = (path.end.key, path.end.value ?? defaultValue);
-          return true;
-        }
-    }
-  }
-}
-
-extension type RBTreeTextRun<Value extends Object>(RBTree<Value?> tree) implements Object {
-  /// Returns an [Iterator] that emits `(int, Value)` from this tree in ascending
-  /// order, starting from the largest node that is no greater than `startingKey`.
-  ///
-  /// O(N).
-  Iterator<(int, Value?)> getRunsEndAfter(int startingKey, Value? defaultValue) => _TreeWalkerWithDefaults<Value>(tree, startingKey, defaultValue);
-}
+//extension type RBTreeTextRun<Value extends Object>(RBTree<Value?> tree) implements Object {
+//  /// Returns an [Iterator] that emits `(int, Value)` from this tree in ascending
+//  /// order, starting from the largest node that is no greater than `startingKey`.
+//  ///
+//  /// O(N).
+//  Iterator<(int, Value?)> getRunsEndAfter(int startingKey, Value? defaultValue) => _TreeWalkerWithDefaults<Value>(tree, startingKey, defaultValue);
+//}

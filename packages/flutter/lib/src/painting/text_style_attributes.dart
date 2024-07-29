@@ -10,14 +10,7 @@ import 'package:flutter/gestures.dart';
 import 'annotated_string.dart';
 import 'text_style.dart';
 
-interface class StringAnnotation<Key extends Object> {}
-
-abstract class OverwritableStringAttribute<Self extends OverwritableStringAttribute<Self, Attribute>, Attribute> {
-  Self overwrite(ui.TextRange range, Attribute newAttribute);
-}
-
-abstract final class _HitTestAnnotationKey {}
-abstract class TextHitTestAnnotations implements StringAnnotation<_HitTestAnnotationKey>, OverwritableStringAttribute<TextHitTestAnnotations, List<HitTestTarget>> {
+abstract class TextHitTestAnnotations {
   Iterable<HitTestTarget> getHitTestTargets(int codeUnitOffset);
 }
 
@@ -33,19 +26,9 @@ extension type SemanticsAttributeSet._((String? semanticsLabel, bool? spellOut, 
   Either<VoidCallback, VoidCallback>? get gestureCallback => _value.$3;
 }
 
-abstract final class _SemanticsAnnotationKey {}
 /// An annotation type that represents the extra semantics information of the text.
-abstract class SemanticsAnnotations implements StringAnnotation<_SemanticsAnnotationKey>, OverwritableStringAttribute<SemanticsAnnotations, SemanticsAttributeSet> {
+abstract class SemanticsAnnotations {
   Iterable<SemanticsAttributeSet> getSemanticsInformation(int codeUnitOffset);
-}
-
-abstract final class _TextStyleAnnotationKey { }
-
-abstract class BasicTextStyleAnnotations implements StringAnnotation<_TextStyleAnnotationKey>, OverwritableStringAttribute<TextStyleAnnotations, TextStyleAttributeSet> {
-  ui.Paragraph toParagraph();
-
-  TextStyle? get baseStyle;
-  BasicTextStyleAnnotations updateBaseTextStyle(TextStyle baseAnnotations);
 }
 
 extension Isomorphic on TextStyleAttributeSet {

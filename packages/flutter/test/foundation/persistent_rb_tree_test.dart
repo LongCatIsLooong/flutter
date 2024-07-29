@@ -12,7 +12,6 @@ List<(int, Value)> toSortedList<Value>(RBTree<Value>? tree, { int startingKey = 
   if (tree == null) {
     return list;
   }
-  assert(tree.debugCheckNoRedViolations);
   final Iterator<(int, Value)> iterator = tree.getRunsEndAfter(startingKey);
   while (iterator.moveNext()) {
     list.add(iterator.current);

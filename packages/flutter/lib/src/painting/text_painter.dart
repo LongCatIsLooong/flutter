@@ -752,8 +752,8 @@ class TextPainter {
     if (_text == value) {
       return;
     }
-    final TextStyleAnnotations? newStyle = value?.getAnnotationOfType();
-    final TextStyleAnnotations? oldStyle = _text?.getAnnotationOfType();
+    //final TextStyleAnnotations? newStyle = value?.getAnnotationOfType();
+    //final TextStyleAnnotations? oldStyle = _text?.getAnnotationOfType();
     if (newStyle?.baseStyle != oldStyle?.baseStyle) {
       _layoutTemplate?.dispose();
       _layoutTemplate = null;

@@ -14,10 +14,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
+import 'annotated_string.dart';
 import 'basic_types.dart';
 import 'inline_span.dart';
 import 'text_painter.dart';
 import 'text_scaler.dart';
+import 'text_style.dart';
 
 // Examples can assume:
 // late TextSpan myTextSpan;
@@ -578,5 +580,28 @@ class TextSpan extends InlineSpan implements HitTestTarget, MouseTrackerAnnotati
     return children?.map<DiagnosticsNode>((InlineSpan child) {
       return child.toDiagnosticsNode();
     }).toList() ?? const <DiagnosticsNode>[];
+  }
+
+  @override
+  int getContentLength(Map<Object, int> childrenLength) {
+    int foldl(int length, InlineSpan span) => length + getContentLength(childrenLength);
+
+    int computeContentLength() {
+      final int parentLength = text?.length ?? 0;
+      return children?.fold<int>(parentLength, foldl) ?? parentLength;
+    }
+    return childrenLength.putIfAbsent(this, computeContentLength);
+  }
+
+  @override
+  AnnotatedString buildAnnotations(int offset, Map<Object, int> childrenLength, AnnotatedString? annotatedString) {
+    final int length = getContentLength(childrenLength);
+    final TextStyle? style = this.style;
+
+    AnnotatedString updatedString = annotatedString ?? AnnotatedString(toPlainText(includeSemanticsLabels: false));
+    if (style != null) {
+      updatedString = updatedString.applyTextStyle(style, TextRange(start: offset, end: offset + length));
+    }
+    return updatedString;
   }
 }

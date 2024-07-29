@@ -346,7 +346,15 @@ extension NullableRight<R extends Object> on Either<Object?, R> {
   };
 }
 
+/// An [Iterator] that merges multiple runs of different sub-attributes into a
+/// single run.
+///
+/// This is similar to [IterableZip], but instead of stopping when any
+/// sub-iterator runs out, [RunMergingIterator] exhausts all sub-iterators.
+///
+/// To use this base class, Implement [fold]
 abstract base class RunMergingIterator<T, RunAttribute> implements Iterator<(int, T)> {
+  /// Creates a run from a list of sub-attributes.
   RunMergingIterator(this._rawAttributes, T initialValue)
     : _current = (0, initialValue);
 
@@ -456,6 +464,8 @@ abstract base class RunMergingIterator<T, RunAttribute> implements Iterator<(int
     return _remainingLength > 0;
   }
 
+  @pragma('dart2js:tryInline')
   @pragma('vm:prefer-inline')
+  @pragma('wasm:prefer-inline')
   T fold(RunAttribute value, T accumulatedValue);
 }

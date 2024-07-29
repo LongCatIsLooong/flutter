@@ -18,6 +18,5 @@ void main() {
     ));
 
     expect(string.string, text);
-    string.getAnnotationOfType<TextStyleAnnotations>();
   });
 }
