@@ -131,13 +131,13 @@ class _TreeWalker<Value> implements Iterator<(int, Value)> {
 }
 
 /// A [RBTree] with a red root node, constructed using [RBTree.red].
-extension type RedNode<Value>._(RBTree<Value> node) implements RBTree<Value>, _UnsafeNode<Value> {
+extension type RedNode<Value>._(RBTree<Value> node) implements RBTree<Value> {
   RedNode._construct(int key, Value value, { BlackNode<Value>? left, BlackNode<Value>? right })
    : node = RBTree<Value>._(key, value, false, left?.blackHeight ?? 0, left, right);
 }
 
 /// A [RBTree] with a black root node, constructed using [RBTree.black].
-extension type BlackNode<Value>._(RBTree<Value> node) implements _UnsafeNode<Value>, RBTree<Value> {
+extension type BlackNode<Value>._(RBTree<Value> node) implements RBTree<Value> {
   BlackNode._construct(int key, Value value, { RBTree<Value>? left, RBTree<Value>? right })
    : node = RBTree<Value>._(key, value, true, (left?.blackHeight ?? 0) + 1, left, right);
 }
@@ -301,11 +301,13 @@ final class RBTree<Value> {
     }
     RBTree<Value> node = this;
     while (node.key != minKey) {
-      final RBTree<Value>? next = minKey < node.key ? node.left : node.right;
-      if (next == null) {
+      if (node.key < minKey) {
+        node = node.right ?? (throw StateError('Unreachable: ${node.key} < $minKey with a null right branch.'));
+      } else if (node.left case final RBTree<Value> left? when left.maxNode.key > minKey) {
+        node = left;
+      } else {
         return node;
       }
-      node = next;
     }
     return node.right?.minNode ?? node;
   }
@@ -403,7 +405,7 @@ final class RBTree<Value> {
 
   _UnsafeNode<Value> _joinTaller(RBTree<Value>? tallerRightTree, int key, Value value) {
     if (tallerRightTree == null) {
-      return insert(key, value);
+      return _UnsafeNode<Value>.safe(insert(key, value));
     }
     assert(blackHeight <= tallerRightTree.blackHeight);
     return blackHeight == tallerRightTree.blackHeight
@@ -413,7 +415,7 @@ final class RBTree<Value> {
 
   _UnsafeNode<Value> _joinShorter(RBTree<Value>? shorterRightTree, int key, Value value) {
     if (shorterRightTree == null) {
-      return insert(key, value);
+      return _UnsafeNode<Value>.safe(insert(key, value));
     }
     assert(shorterRightTree.blackHeight <= blackHeight);
     if (blackHeight == shorterRightTree.blackHeight) {

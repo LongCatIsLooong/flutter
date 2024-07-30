@@ -50,12 +50,7 @@ void main() {
     });
 
     test('red constructor checks for black violations', () {
-      final child1 = _TestTree.red(0, null);
-      final child2 = _TestTree.black(100, null);
-
-      //expect(() => _TestTree.red(50, null, left: child1), returnsNormally);
-      //expect(() => _TestTree.red(50, null, left: child1, right: child2), throwsAssertionError);
-      expect(() => _TestTree.red(50, null, right: child2), throwsAssertionError);
+      expect(() => _TestTree.red(50, null, right: _TestTree.black(100, null)), throwsAssertionError);
     });
 
     test('black constructor checks for black violations', () {
@@ -97,7 +92,7 @@ void main() {
       final _TestTree tree = _TestTree.fromSortedList(sortedList.map((int i) => (i, i)).toList());
 
       expect(toSortedList(tree, startingKey: -1).map(getKey), <int>[0, 1, 4, 9, 16, 25, 36, 49, 64, 81]);
-      expect(toSortedList(tree, startingKey: 0).map(getKey), <int>[0, 1, 4, 9, 16, 25, 36, 49, 64, 81]);
+      expect(toSortedList(tree).map(getKey), <int>[0, 1, 4, 9, 16, 25, 36, 49, 64, 81]);
       expect(toSortedList(tree, startingKey: 1).map(getKey), <int>[1, 4, 9, 16, 25, 36, 49, 64, 81]);
       expect(toSortedList(tree, startingKey: 24).map(getKey), <int>[25, 36, 49, 64, 81]);
       expect(toSortedList(tree, startingKey: 100).map(getKey), <int>[]);
