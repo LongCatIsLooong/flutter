@@ -256,29 +256,6 @@ Duration lerpDuration(Duration a, Duration b, double t) {
   );
 }
 
-class FlatMapIterator<T> implements Iterator<T> {
-  FlatMapIterator(this.iterators);
-
-  final Iterator<Iterator<T>> iterators;
-  Iterator<T>? _currentIterator;
-
-  @override
-  T get current => _currentIterator!.current;
-
-  @override
-  bool moveNext() {
-    if (_currentIterator?.moveNext() ?? false) {
-      return true;
-    }
-    while (iterators.moveNext()) {
-      if ((_currentIterator = iterators.current).moveNext()) {
-        return true;
-      }
-    }
-    return false;
-  }
-}
-
 /// A value that is either a [Left] containing a value of type [L], or a [Right]
 /// containing a value of type [R].
 ///

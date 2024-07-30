@@ -21,7 +21,6 @@ import 'dart:ui' as ui show
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
-import 'annotated_string.dart';
 import 'basic_types.dart';
 import 'inline_span.dart';
 import 'placeholder_span.dart';
@@ -29,7 +28,6 @@ import 'strut_style.dart';
 import 'text_scaler.dart';
 import 'text_span.dart';
 import 'text_style.dart';
-import 'text_style_attributes.dart';
 
 export 'dart:ui' show LineMetrics;
 export 'package:flutter/services.dart' show TextRange, TextSelection;
@@ -746,15 +744,13 @@ class TextPainter {
   /// The [InlineSpan] this provides is in the form of a tree that may contain
   /// multiple instances of [TextSpan]s and [WidgetSpan]s. To obtain a plain text
   /// representation of the contents of this [TextPainter], use [plainText].
-  AnnotatedString? get text => _text;
-  AnnotatedString? _text;
-  set text(AnnotatedString? value) {
+  InlineSpan? get text => _text;
+  InlineSpan? _text;
+  set text(InlineSpan? value) {
     if (_text == value) {
       return;
     }
-    //final TextStyleAnnotations? newStyle = value?.getAnnotationOfType();
-    //final TextStyleAnnotations? oldStyle = _text?.getAnnotationOfType();
-    if (newStyle?.baseStyle != oldStyle?.baseStyle) {
+    if (_text?.style != value?.style) {
       _layoutTemplate?.dispose();
       _layoutTemplate = null;
     }
@@ -764,6 +760,7 @@ class TextPainter {
       : _text?.compareTo(value) ?? RenderComparison.layout;
 
     _text = value;
+    _cachedPlainText = null;
 
     if (comparison.index >= RenderComparison.layout.index) {
       markNeedsLayout();
@@ -778,7 +775,11 @@ class TextPainter {
   /// Returns a plain text version of the text to paint.
   ///
   /// This uses [InlineSpan.toPlainText] to get the full contents of all nodes in the tree.
-  String get plainText => _text!.string;
+  String get plainText {
+    _cachedPlainText ??= _text?.toPlainText(includeSemanticsLabels: false);
+    return _cachedPlainText ?? '';
+  }
+  String? _cachedPlainText;
 
   /// How the text should be aligned horizontally.
   ///
@@ -1136,8 +1137,7 @@ class TextPainter {
 
   // Creates a ui.Paragraph using the current configurations in this class and
   // assign it to _paragraph.
-  ui.Paragraph _createParagraph(AnnotatedString text) {
-    final BasicTextStyleAnnotations? attributes = text.getAnnotationOfType();
+  ui.Paragraph _createParagraph(InlineSpan text) {
     final ui.ParagraphBuilder builder = ui.ParagraphBuilder(_createParagraphStyle());
     text.build(builder, textScaler: textScaler, dimensions: _placeholderDimensions);
     assert(() {

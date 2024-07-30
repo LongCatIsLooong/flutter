@@ -10,6 +10,7 @@ import 'dart:ui' as ui show ParagraphBuilder, PlaceholderAlignment;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/src/painting/annotated_string.dart';
 
 import 'basic.dart';
 import 'framework.dart';
@@ -276,6 +277,37 @@ class WidgetSpan extends PlaceholderSpan {
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {
     super.debugFillProperties(properties);
     properties.add(DiagnosticsProperty<Widget>('widget', child));
+  }
+
+  @override
+  AnnotatedString buildAnnotations(int offset, Map<Object, int> childrenLength, AnnotatedString? annotatedString) {
+    final _WidgetSpanAnnotation? widgetSpans = annotatedString?.getAnnotationOfType();
+    final _WidgetSpanAnnotation updatedSpans = _WidgetSpanAnnotation(
+      widgetSpans?.widgetSpans.insert(offset, this) ?? RBTree.red(offset, this),
+    );
+    return (annotatedString ?? AnnotatedString(toPlainText(includeSemanticsLabels: false))).setAnnotation(updatedSpans);
+  }
+}
+
+class _EmptyIterator<E> implements Iterator<E> {
+  const _EmptyIterator();
+  @override
+  bool moveNext() => false;
+  @override
+  E get current => throw FlutterError('unreachable');
+}
+
+@immutable
+class _WidgetSpanAnnotation {
+  const _WidgetSpanAnnotation(this.widgetSpans);
+
+  final RBTree<WidgetSpan> widgetSpans;
+}
+
+extension WidgetSpanAnnotation on AnnotatedString {
+  Iterator<(int, WidgetSpan)> getRunsEndAfter(int index) {
+    final _WidgetSpanAnnotation? annotations = getAnnotationOfType();
+    return annotations?.widgetSpans.getRunsEndAfter(index) ?? const _EmptyIterator<(int, WidgetSpan)>();
   }
 }
 

@@ -605,3 +605,4 @@ class TextSpan extends InlineSpan implements HitTestTarget, MouseTrackerAnnotati
     return updatedString;
   }
 }
+

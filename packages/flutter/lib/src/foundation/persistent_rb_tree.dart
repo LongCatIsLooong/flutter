@@ -337,11 +337,11 @@ final class RBTree<Value> {
           right: final RBTree<Value>? b,
         ),
         right: final RBTree<Value>? c,
-      ) => RBTree.red(yKey, yValue,
-          left: RBTree.black(xKey, xValue, left: a, right: b),
-          right: RBTree.black(key, value, left: c, right: right),
+      ) => red(yKey, yValue,
+          left: black(xKey, xValue, left: a, right: b),
+          right: black(key, value, left: c, right: right),
         ),
-      _ => RBTree.black(key, value, left: leftTree.ensureSafe, right: right),
+      _ => black(key, value, left: leftTree.ensureSafe, right: right),
     };
     return _UnsafeNode<Value>.safe(safe);
   }

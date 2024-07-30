@@ -9,7 +9,6 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 
-import 'text_style.dart';
 import 'text_style_attributes.dart';
 
 // ### NOTES
@@ -42,37 +41,6 @@ class _TextHitTestAnnotations implements TextHitTestAnnotations {
 
   TextHitTestAnnotations overwrite(ui.TextRange range, List<HitTestTarget> newAttribute) {
     throw UnimplementedError();
-  }
-}
-
-/// An annotation type that represents the extra semantics information of the text.
-class _SemanticsAnnotations {
-  const _SemanticsAnnotations(this.semanticsLabels, this.spellOut, this.gestureCallbacks, this.textLength);
-
-  final RBTree<String?>? semanticsLabels;
-  final RBTree<bool?>? spellOut;
-  // Either onTap callbacks or onLongPress callbacks.
-  final RBTree<Either<VoidCallback, VoidCallback>?>? gestureCallbacks;
-  final int textLength;
-
-  Iterable<SemanticsAttributeSet> getSemanticsInformation(int codeUnitOffset) {
-    // TODO: implement getSemanticsInformation
-    throw UnimplementedError();
-  }
-
-  _SemanticsAnnotations overwrite(ui.TextRange range, SemanticsAttributeSet newAttribute) {
-    final int? end = range.end >= textLength ? null : range.end;
-
-    RBTree<Value?>? update<Value extends Object>(Value? newAttribute, RBTree<Value?>? tree) {
-      return newAttribute == null ? tree : tree.insertRange(range.start, end, newAttribute);
-    }
-
-    return _SemanticsAnnotations(
-      update(newAttribute.semanticsLabel, semanticsLabels),
-      update(newAttribute.spellOut, spellOut),
-      update(newAttribute.gestureCallback, gestureCallbacks),
-      textLength,
-    );
   }
 }
 
