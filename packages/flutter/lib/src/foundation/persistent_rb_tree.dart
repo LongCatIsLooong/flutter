@@ -131,16 +131,10 @@ class _TreeWalker<Value> implements Iterator<(int, Value)> {
 }
 
 /// A [RBTree] with a red root node, constructed using [RBTree.red].
-extension type RedNode<Value>._(RBTree<Value> node) implements RBTree<Value> {
-  RedNode._construct(int key, Value value, { BlackNode<Value>? left, BlackNode<Value>? right })
-   : node = RBTree<Value>._(key, value, false, left?.blackHeight ?? 0, left, right);
-}
-
+// https://github.com/dart-lang/sdk/issues/56351
+extension type RedNode<Value>._(RBTree<Value> node) implements RBTree<Value>, _UnsafeNode<Value> {}
 /// A [RBTree] with a black root node, constructed using [RBTree.black].
-extension type BlackNode<Value>._(RBTree<Value> node) implements RBTree<Value> {
-  BlackNode._construct(int key, Value value, { RBTree<Value>? left, RBTree<Value>? right })
-   : node = RBTree<Value>._(key, value, true, (left?.blackHeight ?? 0) + 1, left, right);
-}
+extension type BlackNode<Value>._(RBTree<Value> node) implements RBTree<Value>, _UnsafeNode<Value> {}
 
 extension type _UnsafeNode<Value>._(RBTree<Value> node) {
   /// Creates a red node that may have red children (but the children must not
@@ -189,7 +183,7 @@ extension type _UnsafeNode<Value>._(RBTree<Value> node) {
 ///  2. Every path from the a node to a leaf node must have the same number of
 ///     black nodes (a "black violation" if this invariant is not maintained).
 ///
-/// This red-black tree implementation does not allow key duplicates.
+/// This red-black tree implementation does not allow key duplications.
 @immutable
 final class RBTree<Value> {
   /// Creates a [RBTree].
@@ -217,12 +211,12 @@ final class RBTree<Value> {
 
   /// Creates a [RBTree] with a red root node.
   static RedNode<Value> red<Value>(int key, Value value, { BlackNode<Value>? left, BlackNode<Value>? right }) {
-    return RedNode<Value>._construct(key, value, left: left, right:right);
+    return RedNode<Value>._(RBTree<Value>._(key, value, false, left?.blackHeight ?? 0, left, right));
   }
 
   /// Creates a [RBTree] with a black root node.
   static BlackNode<Value> black<Value>(int key, Value value, { RBTree<Value>? left, RBTree<Value>? right }) {
-    return BlackNode<Value>._construct(key, value, left: left, right:right);
+    return BlackNode<Value>._(RBTree<Value>._(key, value, true, (left?.blackHeight ?? 0) + 1, left, right));
   }
 
   /// The int key of this node.
@@ -260,18 +254,6 @@ final class RBTree<Value> {
   /// equal to the given `key`.
   ///
   /// O(log(N)).
-  //RBTree<Value>? getNodeLessThanOrEqualTo(int maxKey) {
-  //  if (maxKey <= minNode.key) {
-  //    return maxKey == minNode.key ? minNode : null;
-  //  } else if (maxNode.key <= maxKey ) {
-  //    return maxNode;
-  //  }
-  //  return switch (maxKey.compareTo(this.key)) {
-  //    == 0 => this,
-  //    >  0 => right?.getNodeLessThanOrEqualTo(maxKey) ?? this,
-  //    _    => left!.getNodeLessThanOrEqualTo(maxKey),
-  //  };
-  //}
   RBTree<Value>? getNodeLessThanOrEqualTo(int maxKey) {
     if (maxKey <= minNode.key) {
       return maxKey == minNode.key ? minNode : null;
@@ -279,6 +261,7 @@ final class RBTree<Value> {
       return maxNode;
     }
     RBTree<Value> node = this;
+    // find the node that satisfies node.key <= key < node.right.min
     while (node.key != maxKey) {
       final RBTree<Value>? next = maxKey < node.key ? node.left : node.right;
       if (next == null) {
@@ -300,6 +283,7 @@ final class RBTree<Value> {
       return minNode;
     }
     RBTree<Value> node = this;
+    // find the node that satisfies node.left.max <= key < node.key
     while (node.key != minKey) {
       if (node.key < minKey) {
         node = node.right ?? (throw StateError('Unreachable: ${node.key} < $minKey with a null right branch.'));
