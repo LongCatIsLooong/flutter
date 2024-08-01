@@ -394,7 +394,7 @@ abstract class InlineSpan extends DiagnosticableTree {
   ///  * [TextStyle.compareTo], which does the same thing for [TextStyle]s.
   RenderComparison compareTo(InlineSpan other);
 
-  @visibleForOverriding
+  @protected
   AnnotatedString buildAnnotations(int offset, Map<Object, int> childrenLength, AnnotatedString? annotatedString);
 
   int getContentLength(Map<Object, int> childrenLength);

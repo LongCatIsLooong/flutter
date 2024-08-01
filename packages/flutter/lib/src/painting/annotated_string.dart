@@ -12,6 +12,7 @@ import 'package:flutter/src/painting/basic_types.dart';
 import 'package:flutter/src/painting/text_painter.dart';
 import 'package:flutter/src/painting/text_scaler.dart';
 import 'package:flutter/src/painting/text_style.dart';
+import 'package:meta/meta.dart';
 
 import 'inline_span.dart';
 import 'text_style_attributes.dart';
@@ -58,6 +59,32 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
 
   @override
   void build(ui.ParagraphBuilder builder, {TextScaler textScaler = TextScaler.noScaling, List<PlaceholderDimensions>? dimensions}) {
+    final _TextStyleAnnotations? annotations = getAnnotationOfType();
+    final iterator = annotations?.getRunsEndAfter(0);
+
+    int styleStartIndex = 0;
+    TextStyleAttributeSet? styleToApply;
+    while(iterator != null && iterator.moveNext()) {
+      final (int nextStartIndex, TextStyleAttributeSet? nextStyle) = iterator.current;
+      assert(nextStartIndex > styleStartIndex || (nextStartIndex == 0 && styleStartIndex == 0), '$nextStartIndex > $styleStartIndex');
+      if (nextStartIndex != styleStartIndex) {
+        if (styleToApply != null) {
+          builder.pushStyle(styleToApply.toTextStyle(const TextStyle()).getTextStyle(textScaler: textScaler));
+        }
+        builder.addText(string.substring(styleStartIndex, nextStartIndex));
+        if (styleToApply != null) {
+          builder.pop();
+        }
+      }
+      styleStartIndex = nextStartIndex;
+      styleToApply = nextStyle;
+    }
+    if (styleStartIndex < string.length) {
+      if (styleToApply != null) {
+        builder.pushStyle(styleToApply.toTextStyle(const TextStyle()).getTextStyle(textScaler: textScaler));
+      }
+      builder.addText(string.substring(styleStartIndex, string.length));
+    }
   }
 
   @override
@@ -268,7 +295,7 @@ extension _InsertRange<Value extends Object> on RBTree<Value?>? {
     }
 
     final RBTree<Value?>? nodeBeforeEnd = tree.getNodeLessThanOrEqualTo(end);
-    final RBTree<Value?>? rightSubtree = tree.getNodeGreaterThan(end);
+    final RBTree<Value?>? rightSubtree = tree.skipUntil(end + 1);
     // If true, the [end] node doesn't have to be added.
     final bool skipEndNode = equality(value, nodeBeforeEnd?.value);
     switch ((skipStartNode, skipEndNode)) {
@@ -281,9 +308,10 @@ extension _InsertRange<Value extends Object> on RBTree<Value?>? {
       case (false, true):
         return _joinWithPivot(rightSubtree, start, value);
       case (false, false):
-        final RBTree<Value?> newRightTree = rightSubtree?.insert(end, nodeBeforeEnd?.value)
-          ?? RBTree.black(end, nodeBeforeEnd?.value);
-        return leftSubtree?.join(newRightTree, start, value) ?? newRightTree.insert(start, value);
+        final RBTree<Value?>? newRightTree = rightSubtree?.insert(end, nodeBeforeEnd?.value);
+        return newRightTree == null
+          ? leftSubtree?.insert(start, value).insert(end, nodeBeforeEnd?.value) ?? RBTree.black(start, value, right: RBTree.red(end, nodeBeforeEnd?.value))
+          : leftSubtree?.join(newRightTree, start, value) ?? newRightTree.insert(start, value);
     }
   }
 }
@@ -628,7 +656,7 @@ class _TextStyleAnnotations {
   final TextStyleAttributeGetter<double> decorationThickness;
   final TextStyleAttributeGetter<List<ui.Shadow>> shadows;
 
-  Iterator<(int, TextStyleAttributeSet)> getRunsEndAfter(int index) {
+  Iterator<(int, TextStyleAttributeSet?)> getRunsEndAfter(int index) {
     final _AttributeRunsToMerge runsToMerge = _AttributeRunsToMerge.filled(21, null)
       ..[0] = fontFamilies._getTextStyleRunsEndAfter(index)
       ..[1] = locale._getTextStyleRunsEndAfter(index)
@@ -691,14 +719,19 @@ class _TextStyleAnnotations {
 }
 
 extension TextStyleAnnotatedString on AnnotatedString {
+  @useResult
   AnnotatedString applyTextStyle(TextStyle style, ui.TextRange range) {
     assert(range.isNormalized);
     assert(!range.isCollapsed);
     assert(range.end <= string.length);
     final _TextStyleAnnotations? annotations = getAnnotationOfType();
-    final TextStyleAttributeSet newStyleSet = _MutableTextStyleAttributeSet.fromTextStyle(style);
-    final newAnnotation = (annotations ?? _TextStyleAnnotations(baseStyle: null))
-      .overwrite(range.start, range.end == string.length ? null : range.end, newStyleSet);
+    final TextStyle? baseStyle = annotations == null && range.start == 0 && range.end == string.length
+      ? style
+      : null;
+
+    final newAnnotation = baseStyle != null
+      ? _TextStyleAnnotations(baseStyle: baseStyle)
+      : (annotations ?? _TextStyleAnnotations(baseStyle: null)).overwrite(range.start, range.end == string.length ? null : range.end, _MutableTextStyleAttributeSet.fromTextStyle(style));
     return setAnnotation(newAnnotation);
   }
 }

@@ -41,25 +41,48 @@ RBTree<Value> _fromSortedList<Value>(List<(int, Value)> sortedList, int startInd
 
 /// The upward path from the [end] node to the root node of the binary tree.
 ///
-/// This class is used for tree traversal.
+/// This class is used for tree traversal. Since we're only interested in
+/// ascending traversal, only "left" ancestors are stored, such that if [end]
+/// does not have a right branch, [path]'s [end] is the next largest node in the
+/// tree.
 class _TreePath<Value> {
-  _TreePath(this.end, this.path, this.minKey)
-    : assert(path == null || path.end.left == end || path.end.right == end),
+  _TreePath(this.end, this.path)
+    : assert(path == null || path.end.key > end.key),
       key = end.key;
       //key = end.key + (path?.key ?? 0);
 
-  // Creates the path to the node with the smallest key greater than or equal to
-  // `minKey` in the given tree, and concatenates that path after the given
-  // `prefix` path.
-  static _TreePath<T>? noLessThan<T>(RBTree<T>? root, int minKey, { _TreePath<T>? prefix }) {
-    if (root == null) {
-      return prefix;
+  // Creates the path from `root` to the node `getNodeLessThanOrEqualTo(maxKey)`
+  // returns. Returns the path to the smallest node if every node > maxKey.
+  static _TreePath<T>? noLessThan<T>(RBTree<T> root, int maxKey) {
+    if (root.maxNode.key <= maxKey) {
+      return _TreePath<T>(root.maxNode, null);
     }
-    return switch (root.key.compareTo(minKey)) {
-      -1 => _TreePath.noLessThan(root.right, minKey, prefix: prefix),
-      0  => _TreePath.noLessThan(root.right, minKey, prefix: _TreePath<T>(root, prefix, minKey)),
-      _  => _TreePath.noLessThan(root.left, minKey, prefix: _TreePath<T>(root, prefix, minKey)),
-    };
+
+    RBTree<T> node = root;
+    _TreePath<T>? path;
+
+    while (node.key != maxKey) {
+      final RBTree<T>? next; //= maxKey < node.key ? node.left : node.right;
+      if (maxKey < node.key) {
+        if (path == null || node.key < path.end.key) {
+          path = _TreePath<T>(node, path);
+        }
+        next = node.left;
+        if (next == null) {
+          return path;
+        }
+      } else {
+        next = node.right;
+        if (next == null) {
+          return path == null || node.key < path.end.key
+            ? _TreePath<T>(node, path)
+            : path;
+        }
+      }
+      node = next;
+    }
+    assert(path == null || node.key < path.end.key);
+    return _TreePath<T>(node, path);
   }
 
   // Creates the path to the node with the largest key less than or equal to
@@ -76,7 +99,7 @@ class _TreePath<Value> {
   //  };
   //}
 
-  final int minKey;
+  //final int minKey;
 
   final int key;
 
@@ -86,24 +109,18 @@ class _TreePath<Value> {
   /// The path from [end]'s parent to the root node.
   final _TreePath<Value>? path;
 
-  _TreePath<Value>? get firstLeftAncestor {
-    final _TreePath<Value>? path = this.path;
-    if (path == null) {
-      return null;
-    }
-    assert(path.end.left == end || path.end.right == end);
-    return path.end.left == end ? path : path.firstLeftAncestor;
-  }
-
   /// The path to the next node (in ascending order) in the tree.
   _TreePath<Value>? get next {
+    // The easy case: end has a right node.
     final RBTree<Value>? right = end.right;
     if (right != null) {
-      // Search the right branch for the next node
-      return noLessThan(right, minKey, prefix: this);
+      _TreePath<Value>? path = this.path; // Pop `end`, it has been visited.
+      for (RBTree<Value>? node = right; node != null; node = node.left) {
+        path = _TreePath<Value>(node, path);
+      }
+      return path;
     }
-    final _TreePath<Value>? ancestor = firstLeftAncestor;
-    return ancestor != null && ancestor.end.key < minKey ? ancestor.next : ancestor;
+    return this.path;
   }
 }
 
@@ -124,16 +141,21 @@ class _TreeWalker<Value> implements Iterator<(int, Value)> {
 
   @override
   bool moveNext() {
-    _path = moveNextCalled ? _path!.next : _TreePath.noLessThan(root, startingIndex);
-    moveNextCalled = true;
+    if (!moveNextCalled) {
+      moveNextCalled = true;
+      _path = _TreePath.noLessThan(root, startingIndex);
+    } else {
+      _path = _path?.next;
+    }
     return _path != null;
   }
 }
 
 /// A [RBTree] with a red root node, constructed using [RBTree.red].
-// https://github.com/dart-lang/sdk/issues/56351
+/// It's a subtype of _UnsafeNode for convenience.
 extension type RedNode<Value>._(RBTree<Value> node) implements RBTree<Value>, _UnsafeNode<Value> {}
 /// A [RBTree] with a black root node, constructed using [RBTree.black].
+/// It's a subtype of _UnsafeNode for convenience.
 extension type BlackNode<Value>._(RBTree<Value> node) implements RBTree<Value>, _UnsafeNode<Value> {}
 
 extension type _UnsafeNode<Value>._(RBTree<Value> node) {
@@ -146,7 +168,7 @@ extension type _UnsafeNode<Value>._(RBTree<Value> node) {
   ///
   /// A [_UnsafeNode] is typically converted back to a "safe" [RBTree] node by
   /// using `_balance` and then `_turnBlack` at the root.
-  _UnsafeNode._unsafeRed(int key, Value value, { RBTree<Value>? left, RBTree<Value>? right })
+  _UnsafeNode.unsafeRed(int key, Value value, { RBTree<Value>? left, RBTree<Value>? right })
    : assert(left?._debugCheckNoRedViolations ?? true),
      assert(right?._debugCheckNoRedViolations ?? true),
      node = RBTree<Value>._(key, value, false, left?.blackHeight ?? 0, left, right);
@@ -265,6 +287,8 @@ final class RBTree<Value> {
     while (node.key != maxKey) {
       final RBTree<Value>? next = maxKey < node.key ? node.left : node.right;
       if (next == null) {
+        assert(node.right == null); // since maxKey > minNode.key
+        assert(node.key < maxKey);
         return node;
       }
       node = next;
@@ -307,9 +331,9 @@ final class RBTree<Value> {
     }
     if (!isBlack) {
       // Only attempt to fix red violations at black nodes.
-      return _UnsafeNode<Value>._unsafeRed(key, value, left: leftTree.ensureSafe, right: right);
+      return _UnsafeNode<Value>.unsafeRed(key, value, left: leftTree.ensureSafe, right: right);
     }
-    final RBTree<Value> safe = switch (leftTree) {
+    return switch (leftTree) {
       RBTree<Value>(isBlack: false, key: final int xKey, value: final Value xValue,
         left: final RBTree<Value>? a,
         right: RBTree<Value>(isBlack: false, key: final int yKey, value: final Value yValue,
@@ -329,7 +353,6 @@ final class RBTree<Value> {
         ),
       _ => black(key, value, left: leftTree.ensureSafe, right: right),
     };
-    return _UnsafeNode<Value>.safe(safe);
   }
 
   /// Replaces [right] with the given `rightTree`, and fix any red violations if
@@ -342,9 +365,9 @@ final class RBTree<Value> {
       return _UnsafeNode<Value>.safe(this);
     }
     if (!isBlack) {
-      return _UnsafeNode<Value>._unsafeRed(key, value, left: left, right: rightTree.ensureSafe);
+      return _UnsafeNode<Value>.unsafeRed(key, value, left: left, right: rightTree.ensureSafe);
     }
-    final RBTree<Value> safe = switch (rightTree) {
+    return switch (rightTree) {
       RBTree<Value>(isBlack: false, key: final int yKey, value: final Value yValue,
         left: final RBTree<Value>? b,
         right: RBTree<Value>(isBlack: false, key: final int zKey, value: final Value zValue,
@@ -364,12 +387,11 @@ final class RBTree<Value> {
           ),
       _ => black(key, value, left: left, right: rightTree.ensureSafe),
     };
-    return _UnsafeNode<Value>.safe(safe);
   }
 
   _UnsafeNode<Value> _insert(int key, Value value) => switch (key.compareTo(this.key)) {
-    < 0 => _balanceLeft(left?._insert(key, value) ?? _UnsafeNode<Value>.safe(red(key, value))),
-    > 0 => _balanceRight(right?._insert(key, value) ?? _UnsafeNode<Value>.safe(red(key, value))),
+    < 0 => _balanceLeft(left?._insert(key, value) ?? red(key, value)),
+    > 0 => _balanceRight(right?._insert(key, value) ?? red(key, value)),
     _   => _UnsafeNode<Value>.safe(value == this.value ? this : RBTree<Value>._(key, value, isBlack, blackHeight, left, right)),
   };
 
@@ -389,25 +411,25 @@ final class RBTree<Value> {
 
   _UnsafeNode<Value> _joinTaller(RBTree<Value>? tallerRightTree, int key, Value value) {
     if (tallerRightTree == null) {
-      return _UnsafeNode<Value>.safe(insert(key, value));
+      return _insert(key, value);
     }
     assert(blackHeight <= tallerRightTree.blackHeight);
     return blackHeight == tallerRightTree.blackHeight
-      ? _UnsafeNode<Value>._unsafeRed(key, value, left: this, right: tallerRightTree)
+      ? _UnsafeNode<Value>.unsafeRed(key, value, left: this, right: tallerRightTree)
       : tallerRightTree._balanceLeft(_joinTaller(tallerRightTree.left, key, value));
   }
 
   _UnsafeNode<Value> _joinShorter(RBTree<Value>? shorterRightTree, int key, Value value) {
     if (shorterRightTree == null) {
-      return _UnsafeNode<Value>.safe(insert(key, value));
+      return _insert(key, value);
     }
     assert(shorterRightTree.blackHeight <= blackHeight);
     if (blackHeight == shorterRightTree.blackHeight) {
       // Calling _redUnsafe here is fine: it will be fixed by _balanceRight in _joinShorter, or _turnBlack in join.
-      return _UnsafeNode<Value>._unsafeRed(key, value, left: this, right: shorterRightTree);
+      return _UnsafeNode<Value>.unsafeRed(key, value, left: this, right: shorterRightTree);
     }
     assert(right != null || (isBlack && blackHeight == 1 && shorterRightTree.blackHeight == 0));
-    return _balanceRight(right?._joinShorter(shorterRightTree, key, value) ?? _UnsafeNode<Value>._unsafeRed(key, value, right: shorterRightTree));
+    return _balanceRight(right?._joinShorter(shorterRightTree, key, value) ?? _UnsafeNode<Value>.unsafeRed(key, value, right: shorterRightTree));
   }
 
   /// Right joins the given [RBTree] and the give key value pair to the [RBTree],
@@ -424,7 +446,7 @@ final class RBTree<Value> {
   BlackNode<Value> join(RBTree<Value> rightTree, int key, Value value) {
     assert(_debugCheckNoRedViolations);
     assert(rightTree._debugCheckNoRedViolations);
-    assert(maxNode.key < key);
+    assert(maxNode.key < key, '${maxNode.key} < $key < ${rightTree.minNode.key}');
     assert(key < rightTree.minNode.key);
     final BlackNode<Value> tree = blackHeight < rightTree.blackHeight
       ? _joinTaller(rightTree, key, value)._turnBlack()
@@ -512,7 +534,11 @@ final class RBTree<Value> {
   }
 
   @override
-  String toString() => '${isBlack ? "black" : "red"}: $key, $blackHeight';
+  String toString() {
+    final iter = getRunsEndAfter(0);
+    final xs = [for(;iter.moveNext();) iter.current.$1];
+    return 'root: ${isBlack ? "black" : "red"}: $key. elements: $xs';
+  }
 }
 
 //enum _TreeWalkerState {

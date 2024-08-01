@@ -94,8 +94,8 @@ void main() {
       expect(toSortedList(tree, startingKey: -1).map(getKey), <int>[0, 1, 4, 9, 16, 25, 36, 49, 64, 81]);
       expect(toSortedList(tree).map(getKey), <int>[0, 1, 4, 9, 16, 25, 36, 49, 64, 81]);
       expect(toSortedList(tree, startingKey: 1).map(getKey), <int>[1, 4, 9, 16, 25, 36, 49, 64, 81]);
-      expect(toSortedList(tree, startingKey: 24).map(getKey), <int>[25, 36, 49, 64, 81]);
-      expect(toSortedList(tree, startingKey: 100).map(getKey), <int>[]);
+      expect(toSortedList(tree, startingKey: 24).map(getKey), <int>[16, 25, 36, 49, 64, 81]);
+      expect(toSortedList(tree, startingKey: 100).map(getKey), <int>[81]);
     });
 
     test('getNodeLessThanOrEqualTo', () {
@@ -199,18 +199,19 @@ void main() {
     test('skipUntil / takeLessThan', () {
       const int lower = 1;
       const int upper = 37;
+      // [1 ... 36]
       final _TestTree tree = _TestTree.fromSortedList(<(int, void)>[for (int i = lower; i < upper; i++) (i, null)]);
 
       for (int threshold = 0; threshold < 40; threshold += 1) {
-        final int mid = threshold.clamp(lower, upper);
+        final int effectiveThreshold = threshold.clamp(lower, upper);
         expect(
           toSortedList(tree.takeLessThan(threshold)).map(getKey),
-          <int>[for (int i = lower; i < mid; i += 1) i],
+          <int>[for (int i = lower; i < effectiveThreshold; i += 1) i],
           reason: 'less than $threshold',
         );
         expect(
           toSortedList(tree.skipUntil(threshold)).map(getKey),
-          <int>[for (int i = mid; i < upper; i += 1) i],
+          <int>[for (int i = effectiveThreshold; i < upper; i += 1) i],
           reason: 'greater than or equal to $threshold',
         );
       }
