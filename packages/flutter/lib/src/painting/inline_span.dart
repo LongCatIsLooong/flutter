@@ -68,7 +68,7 @@ class InlineSpanSemanticsInformation {
     String? semanticsLabel,
     List<ui.StringAttribute> stringAttributes = const <ui.StringAttribute>[],
     GestureRecognizer? recognizer,
-  }) : this._(text, isPlaceholder: true, semanticsLabel: semanticsLabel, stringAttributes: stringAttributes, recognizer: recognizer);
+  }) : this._(text, semanticsLabel: semanticsLabel, stringAttributes: stringAttributes, recognizer: recognizer);
 
   const InlineSpanSemanticsInformation._(
     this.text, {

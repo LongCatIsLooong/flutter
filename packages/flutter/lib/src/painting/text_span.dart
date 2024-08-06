@@ -17,6 +17,7 @@ import 'package:flutter/services.dart';
 import 'annotated_string.dart';
 import 'basic_types.dart';
 import 'inline_span.dart';
+import 'string_annotations.dart';
 import 'text_painter.dart';
 import 'text_scaler.dart';
 import 'text_style.dart';
@@ -584,13 +585,17 @@ class TextSpan extends InlineSpan implements HitTestTarget, MouseTrackerAnnotati
 
   @override
   int getContentLength(Map<Object, int> childrenLength) {
-    int foldl(int length, InlineSpan span) => length + span.getContentLength(childrenLength);
-
-    int computeContentLength() {
-      final int parentLength = text?.length ?? 0;
-      return children?.fold<int>(parentLength, foldl) ?? parentLength;
+    int length = text?.length ?? 0;
+    final List<InlineSpan>? children = this.children;
+    if (children != null) {
+      for (int i = children.length - 1; i >= 0; i -= 1) {
+        final InlineSpan child = children[i];
+        length += child.getContentLength(childrenLength);
+      }
     }
-    return childrenLength.putIfAbsent(this, computeContentLength);
+    return length;
+    // Insanely slow because TextSpan.hashCode ?
+    //return childrenLength.putIfAbsent(this, computeContentLength);
   }
 
   @override
