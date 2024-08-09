@@ -323,102 +323,115 @@ extension NullableRight<R extends Object> on Either<Object?, R> {
   };
 }
 
-/// An [Iterator] that merges multiple runs of different sub-attributes into a
-/// single run.
+/// Efficiently computes the [union] of a [List] of ordered [Iterator]s, and
+/// returns the result as an [Iterator].
 ///
-/// This is similar to [IterableZip], but instead of stopping when any
-/// sub-iterator runs out, [RunMergingIterator] exhausts all sub-iterators.
+/// The input [List] will be mutated and must not be used again.
 ///
-/// To use this base class, Implement [fold]
-abstract base class RunMergingIterator<T, RunAttribute> implements Iterator<(int, T)> {
-  /// Creates a run from a list of sub-attributes.
-  RunMergingIterator(this._attributes, T initialValue)
-    : _current = (0, initialValue);
+/// This class represents an operation that can be thought of as a composition
+/// of [compare] and [union]: values emitted from the input [Iterator]s are first
+/// sorted using [compare], and values that are deemed equal are combined into
+/// a single value by using `Iterable.fold(null, union)`.
+///
+/// A typical use case of this is run merging:
+/// ```dart
+/// [(1, 'aa'), (2, 'aaa'), (3, 'a')]
+/// [(2, 'b'),  (4, 'bb')]
+/// ```
+/// Result:
+/// ```dart
+/// [(1, 'aa'), (2, 'baaa'), (3, 'a'), (4, 'bb')]
+/// ```
+abstract base class UnionSortedIterator<Input, Output extends Object> implements Iterator<Output> {
+  UnionSortedIterator(this._inputs);
 
-  final List<Iterator<(int, RunAttribute)>?> _attributes;
+  final List<Iterator<Input>?> _inputs;
 
-  // The number of attributes in [attributes] that has not reached end. This
-  // value being 0 indicates that this iterator has reached end.
+  /// Compares `a` and `b`, returning a negative integer if a < b, a positive
+  /// integer if a > b, or 0 if a == b.
+  ///
+  /// All values emitted from the input [Iterator]s that are deemed equal by
+  /// [compare] will be "folded" into a single value by [union].
+  int compare(Input a, Input b);
+
+  /// The union operation that will be applied to all values emitted by the input
+  /// [Iterator]s which are deemed equal by the [compare] operator.
+  ///
+  /// The union operator should typically be commutative, as the implementation
+  /// does not guarantee the order in which elements that belong to the same
+  /// [compare] group will to applied.
+  Output union(Output? a, Input b);
+
   late int _remainingLength; // This is initialized in _initialize().
 
   bool _hasStarted = false;
 
   @override
-  (int, T) get current => _current;
-  (int, T) _current;
+  Output get current => _current;
+  late Output _current;
 
   // Throw exhausted attributes out of the list bounds. Returns the new list length.
   // As a side effect, this function also calls `moveNext` on all iterators in
   // the list.
-  bool _initialize() {
-    bool emitBaseValue = true;
-
+  void _initialize() {
     int i = 0;
-    int j = _attributes.length - 1;
+    int j = _inputs.length - 1;
     while (i < j) {
-      if (_attributes[i]?.moveNext() ?? false) {
-        emitBaseValue = emitBaseValue && _attributes[i]?.current.$1 != 0;
+      if (_inputs[i]?.moveNext() ?? false) {
         i += 1;
-      } else {
-        // i is now the first empty element.
-        while (j > i && !(_attributes[j]?.moveNext() ?? false)) {
-          j -= 1;
-        }
-        // j is now the last non-empty element after i
-        if (i == j) {
-          _remainingLength = i;
-          return emitBaseValue;
-        } else {
-          emitBaseValue = emitBaseValue && _attributes[j]?.current.$1 != 0;
-          _attributes[i] = _attributes[j];
-          i += 1;
-          j -= 1;
-        }
+        continue;
+      }
+      // i is now the first empty element.
+      while (i < j && !(_inputs[j]?.moveNext() ?? false)) {
+        j -= 1;
+      }
+      // j is now the last non-empty element after i
+      if (i < j) {
+        _inputs[i] = _inputs[j];
+        i += 1;
+        j -= 1;
       }
     }
     _remainingLength = i;
-    assert(_attributes.sublist(0, _remainingLength).toSet().length == _remainingLength);
-    return emitBaseValue;
+    assert(_inputs.sublist(0, _remainingLength).toSet().length == _remainingLength);
   }
 
-  // Move Iterators in the attributes list with the smallest starting index
-  // to the start of the attributes list.
-  int _moveNextAttributesToHead() {
+  // Move Iterators in the _input list with the smallest `current` value to the
+  // start of the _input list.
+  int _moveNextIteratorsToHead() {
     assert(_remainingLength > 0);
     if (_remainingLength == 1) {
       return 1;
     }
-    int runStartIndex = -1;
-    // The number of attributes that currently start at runStartIndex.
-    int numberOfAttributes = 0;
 
-    for (int i = 0; i < _remainingLength; i += 1) {
-      final Iterator<(int, RunAttribute)> attribute = _attributes[i]!;
-      final int index = attribute.current.$1;
-      if (numberOfAttributes > 0 && runStartIndex < index) {
-        // This attribute has a larger startIndex than the current runStartIndex.
-        continue;
-      }
-      if (index != runStartIndex) {
-        assert(numberOfAttributes == 0 || runStartIndex > index);
-        // This attribute has a smaller startIndex than the current runStartIndex.
-        runStartIndex = index;
-        numberOfAttributes = 1;
-      } else {
-        numberOfAttributes += 1;
+    Input currentMinValue = _inputs[0]!.current;
+    // The number of iterators whose current value equals to `currentMinValue`.
+    int numberOfMinIterators = 1;
+
+    for (int i = 1; i < _remainingLength; i += 1) {
+      final Iterator<Input> inputIterator = _inputs[i]!;
+      final Input value = inputIterator.current;
+      switch (compare(value, currentMinValue)) {
+        case < 0:
+          currentMinValue = value;
+          numberOfMinIterators = 1;
+        case == 0:
+          numberOfMinIterators += 1;
+        case _:
+          continue;
       }
 
-      // Move the attribute to the head of the list.
-      assert(numberOfAttributes - 1 <= i);
-      if (numberOfAttributes - 1 != i) {
-        // Swap locations to make sure the attributes with the smallest start
-        // index are relocated to the head of the list.
-        _attributes[i] = _attributes[numberOfAttributes - 1];
-        _attributes[numberOfAttributes - 1] = attribute;
+      // Move the iterator to the head of the _input list.
+      assert(numberOfMinIterators - 1 <= i);
+      if (numberOfMinIterators - 1 != i) {
+        // Swap locations to make sure the Iterator with the smallest `current`
+        // are relocated to the head of the list.
+        _inputs[i] = _inputs[numberOfMinIterators - 1];
+        _inputs[numberOfMinIterators - 1] = inputIterator;
       }
     }
-    assert(numberOfAttributes > 0);
-    return numberOfAttributes;
+    assert(numberOfMinIterators > 0);
+    return numberOfMinIterators;
   }
 
   @override
@@ -432,26 +445,20 @@ abstract base class RunMergingIterator<T, RunAttribute> implements Iterator<(int
     if (_remainingLength == 0) {
       return false;
     }
-    final int numberOfAttributes = _moveNextAttributesToHead();
-    final int runStartIndex = _attributes[0]!.current.$1;
-    T accumulated = current.$2;
+
+    Output? accumulated;
+    final int numberOfAttributes = _moveNextIteratorsToHead();
+    assert(numberOfAttributes > 0);
     for (int i = numberOfAttributes - 1; i >= 0; i -= 1) {
-      final Iterator<(int, RunAttribute)> runIterator = _attributes[i]!;
-      final RunAttribute value = runIterator.current.$2;
-      assert(runIterator.current.$1 == runStartIndex, '$i: ${runIterator.current.$1} != $runStartIndex');
-      accumulated = fold(value, accumulated);
-      if (!runIterator.moveNext()) {
-        // This attribute has no more starting indices, throw it out.
+      final Iterator<Input> input = _inputs[i]!;
+      accumulated = union(accumulated, input.current);
+      if (!input.moveNext()) {
+        // This iterator is empty, throw it out.
         _remainingLength -= 1;
-        _attributes[i] = _attributes[_remainingLength];
+        _inputs[i] = _inputs[_remainingLength];
       }
     }
-    _current = (runStartIndex, accumulated);
+    _current = accumulated!;
     return true;
   }
-
-  @pragma('dart2js:tryInline')
-  @pragma('vm:prefer-inline')
-  @pragma('wasm:prefer-inline')
-  T fold(RunAttribute value, T accumulatedValue);
 }

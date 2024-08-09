@@ -45,7 +45,7 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
 
   /// Retrieve annotations of a specific type.
   @pragma('dart2js:as:trust')
-  T? getAnnotationOfType<T extends Object>() => _attributeStorage[T] as T?;
+  T? getAnnotation<T extends Object>() => _attributeStorage[T] as T?;
 
   /// Update annotations of a specific type `T` and return a new [AnnotatedString].
   ///
@@ -64,21 +64,19 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
     while(iterator != null && iterator.moveNext()) {
       final (int nextStartIndex, TextStyleAttributeSet? nextStyle) = iterator.current;
       assert(nextStartIndex > styleStartIndex || (nextStartIndex == 0 && styleStartIndex == 0), '$nextStartIndex > $styleStartIndex');
-      if (nextStartIndex != styleStartIndex) {
-        if (styleToApply != null) {
-          builder.pushStyle(styleToApply.toTextStyle(const TextStyle()).getTextStyle(textScaler: textScaler));
-        }
-        builder.addText(string.substring(styleStartIndex, nextStartIndex));
-        if (styleToApply != null) {
-          builder.pop();
-        }
+      if (styleToApply != null) {
+        builder.pushStyle(styleToApply.getTextStyle(textScaler: textScaler));
+      }
+      builder.addText(string.substring(styleStartIndex, nextStartIndex));
+      if (styleToApply != null) {
+        builder.pop();
       }
       styleStartIndex = nextStartIndex;
       styleToApply = nextStyle;
     }
     if (styleStartIndex < string.length) {
       if (styleToApply != null) {
-        builder.pushStyle(styleToApply.toTextStyle(const TextStyle()).getTextStyle(textScaler: textScaler));
+        builder.pushStyle(styleToApply.getTextStyle(textScaler: textScaler));
       }
       builder.addText(string.substring(styleStartIndex, string.length));
     }
@@ -96,14 +94,21 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
 
   @override
   RenderComparison compareTo(InlineSpan other) {
-    throw UnimplementedError();
+    if (identical(this, other)) {
+      return RenderComparison.identical;
+    }
+    if (other is! AnnotatedString) {
+      return RenderComparison.layout;
+    }
+    return RenderComparison.layout;
   }
 
   @override
   Never codeUnitAtVisitor(int index, Accumulator offset) => throw FlutterError('No');
 
   @override
-  Never computeSemanticsInformation(List<InlineSpanSemanticsInformation> collector) => throw FlutterError('No');
+  //Never computeSemanticsInformation(List<InlineSpanSemanticsInformation> collector) => throw FlutterError('No');
+  void computeSemanticsInformation(List<InlineSpanSemanticsInformation> collector) { }// TODO
 
   @override
   Never computeToPlainText(StringBuffer buffer, {bool includeSemanticsLabels = true, bool includePlaceholders = true}) => throw FlutterError('No');
@@ -115,7 +120,7 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
   bool debugAssertIsValid() => true;
 
   @override
-  int getContentLength(Map<Object, int> childrenLength) => string.length;
+  int get contentLength => string.length;
 
   @override
   List<InlineSpanSemanticsInformation> getSemanticsInformation() => getCombinedSemanticsInfo();

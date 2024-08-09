@@ -584,13 +584,13 @@ class TextSpan extends InlineSpan implements HitTestTarget, MouseTrackerAnnotati
   }
 
   @override
-  int getContentLength(Map<Object, int> childrenLength) {
+  int get contentLength {
     int length = text?.length ?? 0;
     final List<InlineSpan>? children = this.children;
     if (children != null) {
       for (int i = children.length - 1; i >= 0; i -= 1) {
         final InlineSpan child = children[i];
-        length += child.getContentLength(childrenLength);
+        length += child.contentLength;
       }
     }
     return length;
@@ -600,19 +600,19 @@ class TextSpan extends InlineSpan implements HitTestTarget, MouseTrackerAnnotati
 
   @override
   AnnotatedString buildAnnotations(int offset, Map<Object, int> childrenLength, AnnotatedString? annotatedString) {
-    final int length = getContentLength(childrenLength);
+    final int endOffset = offset + contentLength;
     final TextStyle? style = this.style;
 
     AnnotatedString updatedString = annotatedString ?? AnnotatedString(toPlainText(includeSemanticsLabels: false));
     if (style != null) {
-      updatedString = updatedString.applyTextStyle(style, TextRange(start: offset, end: offset + length));
+      updatedString = updatedString.overwriteTextStyle(style, TextRange(start: offset, end: endOffset));
     }
     final List<InlineSpan>? children = this.children;
     if (children != null) {
-      int childOffset = length;
+      int childOffset = endOffset;
       for (int i = children.length - 1; i >= 0; i -= 1) {
         final InlineSpan child = children[i];
-        childOffset -= child.getContentLength(childrenLength);
+        childOffset -= child.contentLength;
         updatedString = child.buildAnnotations(childOffset, childrenLength, updatedString);
       }
     }

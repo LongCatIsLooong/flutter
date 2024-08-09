@@ -76,7 +76,7 @@ abstract class PlaceholderSpan extends InlineSpan {
   }
 
   @override
-  int getContentLength(Map<Object, int> childrenLength) => 1;
+  int get contentLength => 1;
 
   @override
   void debugFillProperties(DiagnosticPropertiesBuilder properties) {

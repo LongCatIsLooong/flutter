@@ -8,6 +8,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 
 import 'annotated_string.dart';
+import 'text_scaler.dart';
 import 'text_style.dart';
 
 abstract class TextHitTestAnnotations {
@@ -70,6 +71,56 @@ extension Isomorphic on TextStyleAttributeSet {
       decorationStyle: decorationStyle,
       decorationThickness: decorationThickness,
       shadows: shadows,
+    );
+  }
+
+  ui.TextStyle getTextStyle({
+    TextScaler textScaler = TextScaler.noScaling,
+  }) {
+    final (String? fontFamily, List<String>? fallback) = switch (fontFamilies) {
+      null => (null, null),
+      [] => ('', const <String>[]),
+      [final String fontFamily, ...final List<String> fallback] => (fontFamily, fallback)
+    };
+
+    final ui.TextDecoration? decoration = underline == null && overline == null && lineThrough == null
+      ? null
+      : ui.TextDecoration.combine(<ui.TextDecoration>[
+          if (underline ?? false) ui.TextDecoration.underline,
+          if (overline ?? false) ui.TextDecoration.overline,
+          if (lineThrough ?? false) ui.TextDecoration.lineThrough,
+        ]);
+
+    final double? fontSize = switch (this.fontSize) {
+      null => null,
+      final double size => textScaler.scale(size),
+    };
+    return ui.TextStyle(
+      color: foreground?.maybeLeft,
+      decoration: decoration,
+      decorationColor: decorationColor,
+      decorationStyle: decorationStyle,
+      decorationThickness: decorationThickness,
+      fontWeight: fontWeight,
+      fontStyle: fontStyle,
+      textBaseline: textBaseline,
+      leadingDistribution: leadingDistribution,
+      fontFamily: fontFamily,
+      fontFamilyFallback: fallback,
+      fontSize: fontSize,
+      letterSpacing: letterSpacing,
+      wordSpacing: wordSpacing,
+      height: height,
+      locale: locale,
+      foreground: foreground?.maybeRight,
+      background: switch (background) {
+        Right(:final value) => value,
+        Left(:final value) => ui.Paint()..color = value,
+        null => null,
+      },
+      shadows: shadows,
+      fontFeatures: fontFeatures,
+      fontVariations: fontVariations,
     );
   }
 }
@@ -148,4 +199,5 @@ class TextStyleAttributeSet {
   final ui.TextDecorationStyle? decorationStyle;
   @override
   final double? decorationThickness;
+
 }

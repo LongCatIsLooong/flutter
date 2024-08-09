@@ -10,7 +10,6 @@ import 'dart:ui' as ui show ParagraphBuilder, PlaceholderAlignment;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/src/painting/annotated_string.dart';
 
 import 'basic.dart';
 import 'framework.dart';
@@ -281,7 +280,7 @@ class WidgetSpan extends PlaceholderSpan {
 
   @override
   AnnotatedString buildAnnotations(int offset, Map<Object, int> childrenLength, AnnotatedString? annotatedString) {
-    final _WidgetSpanAnnotation? widgetSpans = annotatedString?.getAnnotationOfType();
+    final _WidgetSpanAnnotation? widgetSpans = annotatedString?.getAnnotation();
     final _WidgetSpanAnnotation updatedSpans = _WidgetSpanAnnotation(
       widgetSpans?.widgetSpans.insert(offset, this) ?? RBTree.red(offset, this),
     );
@@ -306,7 +305,7 @@ class _WidgetSpanAnnotation {
 
 extension WidgetSpanAnnotation on AnnotatedString {
   Iterator<(int, WidgetSpan)> getRunsEndAfter(int index) {
-    final _WidgetSpanAnnotation? annotations = getAnnotationOfType();
+    final _WidgetSpanAnnotation? annotations = getAnnotation();
     return annotations?.widgetSpans.getRunsEndAfter(index) ?? const _EmptyIterator<(int, WidgetSpan)>();
   }
 }

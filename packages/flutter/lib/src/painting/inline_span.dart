@@ -64,22 +64,16 @@ class InlineSpanSemanticsInformation {
   /// Use [InlineSpanSemanticsInformation.placeholder] instead of directly setting
   /// [isPlaceholder].
   const InlineSpanSemanticsInformation(
-    String text, {
-    String? semanticsLabel,
-    List<ui.StringAttribute> stringAttributes = const <ui.StringAttribute>[],
-    GestureRecognizer? recognizer,
-  }) : this._(text, semanticsLabel: semanticsLabel, stringAttributes: stringAttributes, recognizer: recognizer);
-
-  const InlineSpanSemanticsInformation._(
     this.text, {
     this.isPlaceholder = false,
     this.semanticsLabel,
     this.stringAttributes = const <ui.StringAttribute>[],
     this.recognizer,
-  }) : assert(!isPlaceholder || (text == '\uFFFC' && semanticsLabel == null && recognizer == null));
+  }) : assert(!isPlaceholder || (text == '\uFFFC' && semanticsLabel == null && recognizer == null)),
+       requiresOwnNode = isPlaceholder || recognizer != null;
 
   /// The text info for a [PlaceholderSpan].
-  static const InlineSpanSemanticsInformation placeholder = InlineSpanSemanticsInformation._('\uFFFC', isPlaceholder: true);
+  static const InlineSpanSemanticsInformation placeholder = InlineSpanSemanticsInformation('\uFFFC', isPlaceholder: true);
 
   /// The text value, if any. For [PlaceholderSpan]s, this will be the unicode
   /// placeholder value.
@@ -98,7 +92,7 @@ class InlineSpanSemanticsInformation {
   ///
   /// This will be the case of the [recognizer] is not null, of if
   /// [isPlaceholder] is true.
-  bool get requiresOwnNode => isPlaceholder || recognizer != null;
+  final bool requiresOwnNode;
 
   /// The string attributes attached to this semantics information
   final List<ui.StringAttribute> stringAttributes;
@@ -397,7 +391,7 @@ abstract class InlineSpan extends DiagnosticableTree {
   @protected
   AnnotatedString buildAnnotations(int offset, Map<Object, int> childrenLength, AnnotatedString? annotatedString);
 
-  int getContentLength(Map<Object, int> childrenLength);
+  int get contentLength;
 
   @override
   bool operator ==(Object other) {
