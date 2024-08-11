@@ -279,21 +279,13 @@ class WidgetSpan extends PlaceholderSpan {
   }
 
   @override
-  AnnotatedString buildAnnotations(int offset, Map<Object, int> childrenLength, AnnotatedString? annotatedString) {
+  AnnotatedString buildAnnotations(int offset, AnnotatedString? annotatedString) {
     final _WidgetSpanAnnotation? widgetSpans = annotatedString?.getAnnotation();
     final _WidgetSpanAnnotation updatedSpans = _WidgetSpanAnnotation(
       widgetSpans?.widgetSpans.insert(offset, this) ?? RBTree.red(offset, this),
     );
     return (annotatedString ?? AnnotatedString(toPlainText(includeSemanticsLabels: false))).setAnnotation(updatedSpans);
   }
-}
-
-class _EmptyIterator<E> implements Iterator<E> {
-  const _EmptyIterator();
-  @override
-  bool moveNext() => false;
-  @override
-  E get current => throw FlutterError('unreachable');
 }
 
 @immutable
@@ -304,9 +296,9 @@ class _WidgetSpanAnnotation {
 }
 
 extension WidgetSpanAnnotation on AnnotatedString {
-  Iterator<(int, WidgetSpan)> getRunsEndAfter(int index) {
+  Iterator<(int, WidgetSpan)>? getWidgetSpanRunsEndAfter(int index) {
     final _WidgetSpanAnnotation? annotations = getAnnotation();
-    return annotations?.widgetSpans.getRunsEndAfter(index) ?? const _EmptyIterator<(int, WidgetSpan)>();
+    return annotations?.widgetSpans.getRunsEndAfter(index);
   }
 }
 

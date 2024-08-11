@@ -7,7 +7,7 @@ library;
 
 import 'dart:collection';
 
-import 'package:meta/meta.dart' show immutable;
+import 'package:meta/meta.dart' show immutable, visibleForOverriding;
 
 import 'object.dart' show objectRuntimeType;
 
@@ -352,6 +352,7 @@ abstract base class UnionSortedIterator<Input, Output extends Object> implements
   ///
   /// All values emitted from the input [Iterator]s that are deemed equal by
   /// [compare] will be "folded" into a single value by [union].
+  @visibleForOverriding
   int compare(Input a, Input b);
 
   /// The union operation that will be applied to all values emitted by the input
@@ -360,11 +361,10 @@ abstract base class UnionSortedIterator<Input, Output extends Object> implements
   /// The union operator should typically be commutative, as the implementation
   /// does not guarantee the order in which elements that belong to the same
   /// [compare] group will to applied.
+  @visibleForOverriding
   Output union(Output? a, Input b);
 
-  late int _remainingLength; // This is initialized in _initialize().
-
-  bool _hasStarted = false;
+  late int _remainingLength = _initialize();
 
   @override
   Output get current => _current;
@@ -373,7 +373,7 @@ abstract base class UnionSortedIterator<Input, Output extends Object> implements
   // Throw exhausted attributes out of the list bounds. Returns the new list length.
   // As a side effect, this function also calls `moveNext` on all iterators in
   // the list.
-  void _initialize() {
+  int _initialize() {
     int i = 0;
     int j = _inputs.length - 1;
     while (i < j) {
@@ -381,19 +381,19 @@ abstract base class UnionSortedIterator<Input, Output extends Object> implements
         i += 1;
         continue;
       }
-      // i is now the first empty element.
+      // i is now points to the first empty iterator in _inputs.
       while (i < j && !(_inputs[j]?.moveNext() ?? false)) {
         j -= 1;
       }
-      // j is now the last non-empty element after i
+      // j is now points to the last known non-empty iterator in _inputs.
       if (i < j) {
         _inputs[i] = _inputs[j];
         i += 1;
         j -= 1;
       }
     }
-    _remainingLength = i;
-    assert(_inputs.sublist(0, _remainingLength).toSet().length == _remainingLength);
+    assert(_inputs.sublist(0, i).toSet().length == i);
+    return i;
   }
 
   // Move Iterators in the _input list with the smallest `current` value to the
@@ -436,15 +436,10 @@ abstract base class UnionSortedIterator<Input, Output extends Object> implements
 
   @override
   bool moveNext() {
-    // If none of the attributes starts from index 0, send the baseValue first.
-    if (!_hasStarted) {
-      _hasStarted = true;
-      _initialize();
-    }
-    assert(_remainingLength >= 0);
     if (_remainingLength == 0) {
       return false;
     }
+    assert(_remainingLength > 0);
 
     Output? accumulated;
     final int numberOfAttributes = _moveNextIteratorsToHead();

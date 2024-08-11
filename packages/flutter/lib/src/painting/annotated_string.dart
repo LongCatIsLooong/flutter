@@ -45,7 +45,9 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
 
   /// Retrieve annotations of a specific type.
   @pragma('dart2js:as:trust')
-  T? getAnnotation<T extends Object>() => _attributeStorage[T] as T?;
+  T? getAnnotation<T extends Object>() {
+    return _attributeStorage[T] as T?;
+  }
 
   /// Update annotations of a specific type `T` and return a new [AnnotatedString].
   ///
@@ -60,30 +62,35 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
     final Iterator<(int, TextStyleAttributeSet?)>? iterator = getTextStyleRunsEndAfter(0);
 
     int styleStartIndex = 0;
-    TextStyleAttributeSet? styleToApply;
+    ui.TextStyle? styleToApply;
+    if (baseStyle != null) {
+      builder.pushStyle(baseStyle!.getTextStyle(textScaler: textScaler));
+    }
     while(iterator != null && iterator.moveNext()) {
       final (int nextStartIndex, TextStyleAttributeSet? nextStyle) = iterator.current;
       assert(nextStartIndex > styleStartIndex || (nextStartIndex == 0 && styleStartIndex == 0), '$nextStartIndex > $styleStartIndex');
-      if (styleToApply != null) {
-        builder.pushStyle(styleToApply.getTextStyle(textScaler: textScaler));
-      }
-      builder.addText(string.substring(styleStartIndex, nextStartIndex));
-      if (styleToApply != null) {
-        builder.pop();
+      if (nextStartIndex > styleStartIndex) {
+        if (styleToApply != null) {
+          builder.pushStyle(styleToApply);
+        }
+        builder.addText(string.substring(styleStartIndex, nextStartIndex));
+        if (styleToApply != null) {
+          builder.pop();
+        }
       }
       styleStartIndex = nextStartIndex;
-      styleToApply = nextStyle;
+      styleToApply = nextStyle?.getTextStyle(textScaler: textScaler);
     }
     if (styleStartIndex < string.length) {
       if (styleToApply != null) {
-        builder.pushStyle(styleToApply.getTextStyle(textScaler: textScaler));
+        builder.pushStyle(styleToApply);
       }
       builder.addText(string.substring(styleStartIndex, string.length));
     }
   }
 
   @override
-  AnnotatedString buildAnnotations(int offset, Map<Object, int> childrenLength, AnnotatedString? annotatedString) {
+  AnnotatedString buildAnnotations(int offset, AnnotatedString? annotatedString) {
     assert(annotatedString == null);
     assert(offset == 0);
     return this;
@@ -100,33 +107,46 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
     if (other is! AnnotatedString) {
       return RenderComparison.layout;
     }
+    // TODO
     return RenderComparison.layout;
   }
 
   @override
-  Never codeUnitAtVisitor(int index, Accumulator offset) => throw FlutterError('No');
+  int? codeUnitAtVisitor(int index, Accumulator offset) {
+    final int localOffset = index - offset.value;
+    assert(localOffset >= 0);
+    offset.increment(string.length);
+    return localOffset < string.length ? string.codeUnitAt(localOffset) : null;
+  }
 
   @override
-  //Never computeSemanticsInformation(List<InlineSpanSemanticsInformation> collector) => throw FlutterError('No');
-  void computeSemanticsInformation(List<InlineSpanSemanticsInformation> collector) { }// TODO
+  void computeSemanticsInformation(List<InlineSpanSemanticsInformation> collector) {
+    // ??
+    collector.addAll(getCombinedSemanticsInfo());
+  }
 
   @override
-  Never computeToPlainText(StringBuffer buffer, {bool includeSemanticsLabels = true, bool includePlaceholders = true}) => throw FlutterError('No');
+  String computeToPlainText(StringBuffer buffer, {bool includeSemanticsLabels = true, bool includePlaceholders = true}) {
+    final bool addSemanticsLabels = includeSemanticsLabels || false;
+    final bool removePlaceholders = !includePlaceholders || false;
+    if (!addSemanticsLabels && !removePlaceholders) {
+      return string;
+    }
+    throw UnimplementedError();
+  }
 
   @override
-  Never getSpanForPositionVisitor(ui.TextPosition position, Accumulator offset)  => throw FlutterError('No');
+  AnnotatedString? getSpanForPositionVisitor(ui.TextPosition position, Accumulator offset) {
+    final int localOffset = position.offset - offset.value;
+    offset.increment(string.length);
+    return 0 <= localOffset && localOffset < string.length ? this : null;
+  }
 
   @override
   bool debugAssertIsValid() => true;
 
   @override
   int get contentLength => string.length;
-
-  @override
-  List<InlineSpanSemanticsInformation> getSemanticsInformation() => getCombinedSemanticsInfo();
-
-  @override
-  InlineSpan? getSpanForPosition(ui.TextPosition position) => this;
 
   @override
   TextStyle? get style => baseStyle;
@@ -138,12 +158,15 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
   bool visitDirectChildren(InlineSpanVisitor visitor) => true;
 
   @override
+  List<InlineSpanSemanticsInformation> getSemanticsInformation() => getCombinedSemanticsInfo();
+
+  @override
+  AnnotatedString? getSpanForPosition(TextPosition position) {
+    return 0 <= position.offset && position.offset < string.length ? this : null;
+  }
+
+  @override
   String toPlainText({bool includeSemanticsLabels = true, bool includePlaceholders = true}) {
-    final bool addSemanticsLabels = includeSemanticsLabels || false;
-    final bool removePlaceholders = !includePlaceholders || false;
-    if (!addSemanticsLabels && !removePlaceholders) {
-      return string;
-    }
-    throw UnimplementedError();
+    return computeToPlainText(StringBuffer());
   }
 }

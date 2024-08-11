@@ -599,7 +599,7 @@ class TextSpan extends InlineSpan implements HitTestTarget, MouseTrackerAnnotati
   }
 
   @override
-  AnnotatedString buildAnnotations(int offset, Map<Object, int> childrenLength, AnnotatedString? annotatedString) {
+  AnnotatedString buildAnnotations(int offset, AnnotatedString? annotatedString) {
     final int endOffset = offset + contentLength;
     final TextStyle? style = this.style;
 
@@ -613,7 +613,7 @@ class TextSpan extends InlineSpan implements HitTestTarget, MouseTrackerAnnotati
       for (int i = children.length - 1; i >= 0; i -= 1) {
         final InlineSpan child = children[i];
         childOffset -= child.contentLength;
-        updatedString = child.buildAnnotations(childOffset, childrenLength, updatedString);
+        updatedString = child.buildAnnotations(childOffset, updatedString);
       }
     }
     return updatedString;

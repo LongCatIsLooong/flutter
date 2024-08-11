@@ -389,7 +389,7 @@ abstract class InlineSpan extends DiagnosticableTree {
   RenderComparison compareTo(InlineSpan other);
 
   @protected
-  AnnotatedString buildAnnotations(int offset, Map<Object, int> childrenLength, AnnotatedString? annotatedString);
+  AnnotatedString buildAnnotations(int offset, AnnotatedString? annotatedString);
 
   int get contentLength;
 
