@@ -17,14 +17,16 @@ import 'text_style_attributes.dart';
 /// An immutable representation of
 @immutable
 class AnnotatedString extends DiagnosticableTree implements InlineSpan {
-  const AnnotatedString(this.string) : _attributeStorage = const PersistentHashMap<Type, Object?>.empty();
-  const AnnotatedString._(this.string, this._attributeStorage);
+  const AnnotatedString(this.text) : _attributeStorage = const PersistentHashMap<Type, Object?>.empty();
+  const AnnotatedString._(this.text, this._attributeStorage);
 
   AnnotatedString.fromAnnotatedString(AnnotatedString string) :
-    string = string.string,
+    text = string.text,
     _attributeStorage = string._attributeStorage;
 
-  final String string;
+  static AnnotatedString fromInlineSpan(InlineSpan span) => span.buildAnnotations(0, null);
+
+  final String text;
 
   // The PersistentHashMap class currently does not have a delete method.
   final PersistentHashMap<Type, Object?> _attributeStorage;
@@ -37,10 +39,9 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
 
   /// Update annotations of a specific type `T` and return a new [AnnotatedString].
   ///
-  /// The static type `T` is used as the key instead of the runtime type of
-  /// newAnnotations, in case newAnnotations is null (and for consistency too).
+  /// The runtime type of `newAnnotations` is used as the key.
   AnnotatedString setAnnotation<T extends Object>(T newAnnotations) {
-    return AnnotatedString._(string, _attributeStorage.put(newAnnotations.runtimeType, newAnnotations));
+    return AnnotatedString._(text, _attributeStorage.put(newAnnotations.runtimeType, newAnnotations));
   }
 
   @override
@@ -59,7 +60,7 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
         if (styleToApply != null) {
           builder.pushStyle(styleToApply);
         }
-        builder.addText(string.substring(styleStartIndex, nextStartIndex));
+        builder.addText(text.substring(styleStartIndex, nextStartIndex));
         if (styleToApply != null) {
           builder.pop();
         }
@@ -67,11 +68,11 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
       styleStartIndex = nextStartIndex;
       styleToApply = nextStyle?.getTextStyle(textScaler: textScaler);
     }
-    if (styleStartIndex < string.length) {
+    if (styleStartIndex < text.length) {
       if (styleToApply != null) {
         builder.pushStyle(styleToApply);
       }
-      builder.addText(string.substring(styleStartIndex, string.length));
+      builder.addText(text.substring(styleStartIndex, text.length));
     }
   }
 
@@ -83,7 +84,7 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
   }
 
   @override
-  int? codeUnitAt(int index) => string.codeUnitAt(index);
+  int? codeUnitAt(int index) => text.codeUnitAt(index);
 
   @override
   RenderComparison compareTo(InlineSpan other) {
@@ -101,8 +102,8 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
   int? codeUnitAtVisitor(int index, Accumulator offset) {
     final int localOffset = index - offset.value;
     assert(localOffset >= 0);
-    offset.increment(string.length);
-    return localOffset < string.length ? string.codeUnitAt(localOffset) : null;
+    offset.increment(text.length);
+    return localOffset < text.length ? text.codeUnitAt(localOffset) : null;
   }
 
   @override
@@ -116,7 +117,7 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
     final bool addSemanticsLabels = includeSemanticsLabels || false;
     final bool removePlaceholders = !includePlaceholders || false;
     if (!addSemanticsLabels && !removePlaceholders) {
-      return string;
+      return text;
     }
     throw UnimplementedError();
   }
@@ -124,21 +125,21 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
   @override
   AnnotatedString? getSpanForPositionVisitor(ui.TextPosition position, Accumulator offset) {
     final int localOffset = position.offset - offset.value;
-    offset.increment(string.length);
-    return 0 <= localOffset && localOffset < string.length ? this : null;
+    offset.increment(text.length);
+    return 0 <= localOffset && localOffset < text.length ? this : null;
   }
 
   @override
   bool debugAssertIsValid() => true;
 
   @override
-  int get contentLength => string.length;
+  int get contentLength => text.length;
 
   @override
   TextStyle? get style => baseStyle;
 
   @override
-  bool visitChildren(InlineSpanVisitor visitor) => string.isEmpty || visitor(this);
+  bool visitChildren(InlineSpanVisitor visitor) => text.isEmpty || visitor(this);
 
   @override
   bool visitDirectChildren(InlineSpanVisitor visitor) => true;
@@ -148,7 +149,7 @@ class AnnotatedString extends DiagnosticableTree implements InlineSpan {
 
   @override
   AnnotatedString? getSpanForPosition(TextPosition position) {
-    return 0 <= position.offset && position.offset < string.length ? this : null;
+    return 0 <= position.offset && position.offset < text.length ? this : null;
   }
 
   @override

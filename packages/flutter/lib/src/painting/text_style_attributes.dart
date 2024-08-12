@@ -11,27 +11,6 @@ import 'annotated_string.dart';
 import 'text_scaler.dart';
 import 'text_style.dart';
 
-abstract class TextHitTestAnnotations {
-  Iterable<HitTestTarget> getHitTestTargets(int codeUnitOffset);
-}
-
-extension type SemanticsAttributeSet._((String? semanticsLabel, bool? spellOut, Either<VoidCallback, VoidCallback>? gestureCallback) _value) {
-  SemanticsAttributeSet({
-    String? semanticsLabel,
-    bool? spellOut,
-    Either<VoidCallback, VoidCallback>? gestureCallback,
-  }) : this._((semanticsLabel, spellOut, gestureCallback));
-
-  String? get semanticsLabel => _value.$1;
-  bool? get spellOut => _value.$2;
-  Either<VoidCallback, VoidCallback>? get gestureCallback => _value.$3;
-}
-
-/// An annotation type that represents the extra semantics information of the text.
-abstract class SemanticsAnnotations {
-  Iterable<SemanticsAttributeSet> getSemanticsInformation(int codeUnitOffset);
-}
-
 extension Isomorphic on TextStyleAttributeSet {
   TextStyle toTextStyle(TextStyle baseStyle) {
     final (String? fontFamily, List<String>? fallback) = switch (fontFamilies) {

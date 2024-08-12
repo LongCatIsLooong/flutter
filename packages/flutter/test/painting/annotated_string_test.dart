@@ -17,6 +17,6 @@ void main() {
       text: text,
     ));
 
-    expect(string.string, text);
+    expect(string.text, text);
   });
 }
