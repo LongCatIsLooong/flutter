@@ -14,26 +14,12 @@ import 'text_scaler.dart';
 import 'text_style.dart';
 import 'text_style_attributes.dart';
 
-// ### NOTES
-// 1. TextSpan interop
-// 2. Font matching / Shaping / Layout / Paint subsystems
-// 3. Hit-testing
-// 4. Semantics
-
-//class _EmptyIterator<E> implements Iterator<E> {
-//  const _EmptyIterator();
-//  @override
-//  bool moveNext() => false;
-//  @override
-//  E get current => throw FlutterError('unreachable');
-//}
-
-
 /// An immutable representation of
 @immutable
 class AnnotatedString extends DiagnosticableTree implements InlineSpan {
   const AnnotatedString(this.string) : _attributeStorage = const PersistentHashMap<Type, Object?>.empty();
   const AnnotatedString._(this.string, this._attributeStorage);
+
   AnnotatedString.fromAnnotatedString(AnnotatedString string) :
     string = string.string,
     _attributeStorage = string._attributeStorage;
