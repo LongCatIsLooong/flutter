@@ -203,87 +203,63 @@ List<String>? _getFontFamilies(TextStyle textStyle) {
 }
 
 _MutableTextStyleAttributeSet _setLocale(_MutableTextStyleAttributeSet style, ui.Locale? input) => style..locale = input;
-ui.Locale? _getLocale(TextStyle textStyle) => textStyle.locale;
 
 _MutableTextStyleAttributeSet _setFontSize(_MutableTextStyleAttributeSet style, double? input) => style..fontSize = input;
-double? _getFontSize(TextStyle textStyle) => textStyle.fontSize;
 
 _MutableTextStyleAttributeSet _setFontWeight(_MutableTextStyleAttributeSet style, ui.FontWeight? input) => style..fontWeight = input;
-ui.FontWeight?_getFontWeight(TextStyle textStyle) => textStyle.fontWeight;
 
 _MutableTextStyleAttributeSet _setFontStyle(_MutableTextStyleAttributeSet style, ui.FontStyle? input) => style..fontStyle = input;
-ui.FontStyle?_getFontStyle(TextStyle textStyle) => textStyle.fontStyle;
 
 _MutableTextStyleAttributeSet _setFontFeatures(_MutableTextStyleAttributeSet style, List<ui.FontFeature>? input) => style..fontFeatures = input;
-List<ui.FontFeature>?_getFontFeatures(TextStyle textStyle) => textStyle.fontFeatures;
 
 _MutableTextStyleAttributeSet _setFontVariations(_MutableTextStyleAttributeSet style, List<ui.FontVariation>? input) => style..fontVariations = input;
-List<ui.FontVariation>?_getFontVariations(TextStyle textStyle) => textStyle.fontVariations;
 
 _MutableTextStyleAttributeSet _setHeight(_MutableTextStyleAttributeSet style, double? input) => style..height = input;
-double? _getHeight(TextStyle textStyle) => textStyle.height;
 
 _MutableTextStyleAttributeSet _setLeadingDistribution(_MutableTextStyleAttributeSet style, ui.TextLeadingDistribution? input) => style..leadingDistribution = input;
-ui.TextLeadingDistribution? _getLeadingDistribution(TextStyle textStyle) => textStyle.leadingDistribution;
 
 _MutableTextStyleAttributeSet _setTextBaseline(_MutableTextStyleAttributeSet style, ui.TextBaseline? input) => style..textBaseline = input;
-ui.TextBaseline? _getTextBaseline(TextStyle textStyle) => textStyle.textBaseline;
 
 _MutableTextStyleAttributeSet _setWordSpacing(_MutableTextStyleAttributeSet style, double? input) => style..wordSpacing = input;
-double? _getWordSpacing(TextStyle textStyle) => textStyle.wordSpacing;
 
 _MutableTextStyleAttributeSet _setLetterSpacing(_MutableTextStyleAttributeSet style, double? input) => style..letterSpacing = input;
-double? _getLetterSpacing(TextStyle textStyle) => textStyle.letterSpacing;
 
 _MutableTextStyleAttributeSet _setForeground(_MutableTextStyleAttributeSet style, Either<ui.Color, ui.Paint>? input) => style..foreground = input;
-Either<ui.Color, ui.Paint>? _getForeground(TextStyle textStyle) => textStyle.color.flatMap(Left.new) ?? textStyle.foreground.flatMap(Right.new);
-
 _MutableTextStyleAttributeSet _setBackground(_MutableTextStyleAttributeSet style, Either<ui.Color, ui.Paint>? input) => style..background = input;
-Either<ui.Color, ui.Paint>? _getBackground(TextStyle textStyle) => textStyle.backgroundColor.flatMap(Left.new) ?? textStyle.background.flatMap(Right.new);
 
 _MutableTextStyleAttributeSet _setDecorationColor(_MutableTextStyleAttributeSet style, ui.Color? input) => style..decorationColor = input;
-ui.Color? _getDecorationColor(TextStyle textStyle) => textStyle.decorationColor;
-
 _MutableTextStyleAttributeSet _setDecorationStyle(_MutableTextStyleAttributeSet style, ui.TextDecorationStyle? input) => style..decorationStyle = input;
-ui.TextDecorationStyle? _getDecorationStyle(TextStyle textStyle) => textStyle.decorationStyle;
-
 _MutableTextStyleAttributeSet _setDecorationThickness(_MutableTextStyleAttributeSet style, double? input) => style..decorationThickness = input;
-double? _getDecorationThickness(TextStyle textStyle) => textStyle.decorationThickness;
 
-List<ui.Shadow>? _getShadows(TextStyle textStyle) => textStyle.shadows;
 _MutableTextStyleAttributeSet _setShadows(_MutableTextStyleAttributeSet style, List<ui.Shadow>? input) => style..shadows = input;
 
 _MutableTextStyleAttributeSet _setUnderline(_MutableTextStyleAttributeSet style, bool? input) => style..underline = input;
 _MutableTextStyleAttributeSet _setOverline(_MutableTextStyleAttributeSet style, bool? input) => style..overline = input;
 _MutableTextStyleAttributeSet _setLineThrough(_MutableTextStyleAttributeSet style, bool? input) => style..lineThrough = input;
 
-bool? _getUnderline(TextStyle textStyle) => textStyle.decoration?.contains(ui.TextDecoration.underline);
-bool? _getOverline(TextStyle textStyle) => textStyle.decoration?.contains(ui.TextDecoration.overline);
-bool? _getLineThrough(TextStyle textStyle) => textStyle.decoration?.contains(ui.TextDecoration.lineThrough);
-
 final class _MutableTextStyleAttributeSet implements TextStyleAttributeSet {
   _MutableTextStyleAttributeSet.fromTextStyle(TextStyle textStyle)
    : fontFamilies = _getFontFamilies(textStyle),
-     locale = _getLocale(textStyle),
-     fontSize = _getFontSize(textStyle),
-     fontWeight = _getFontWeight(textStyle),
-     fontStyle = _getFontStyle(textStyle),
-     fontFeatures = _getFontFeatures(textStyle),
-     fontVariations = _getFontVariations(textStyle),
-     height = _getHeight(textStyle),
-     leadingDistribution = _getLeadingDistribution(textStyle),
-     textBaseline = _getTextBaseline(textStyle),
-     wordSpacing = _getWordSpacing(textStyle),
-     letterSpacing = _getLetterSpacing(textStyle),
-     foreground = _getForeground(textStyle),
-     background = _getBackground(textStyle),
-     shadows = _getShadows(textStyle),
-     underline = _getUnderline(textStyle),
-     overline = _getOverline(textStyle),
-     lineThrough = _getLineThrough(textStyle),
-     decorationColor = _getDecorationColor(textStyle),
-     decorationStyle = _getDecorationStyle(textStyle),
-     decorationThickness = _getDecorationThickness(textStyle);
+     locale = textStyle.locale,
+     fontSize = textStyle.fontSize,
+     fontWeight = textStyle.fontWeight,
+     fontStyle = textStyle.fontStyle,
+     fontFeatures = textStyle.fontFeatures,
+     fontVariations = textStyle.fontVariations,
+     height = textStyle.height,
+     leadingDistribution = textStyle.leadingDistribution,
+     textBaseline = textStyle.textBaseline,
+     wordSpacing = textStyle.wordSpacing,
+     letterSpacing = textStyle.letterSpacing,
+     foreground = textStyle.color.flatMap(Left.new) ?? textStyle.foreground.flatMap(Right.new),
+     background = textStyle.backgroundColor.flatMap(Left.new) ?? textStyle.background.flatMap(Right.new),
+     shadows = textStyle.shadows,
+     underline = textStyle.decoration?.contains(ui.TextDecoration.underline),
+     overline = textStyle.decoration?.contains(ui.TextDecoration.overline),
+     lineThrough = textStyle.decoration?.contains(ui.TextDecoration.lineThrough),
+     decorationColor = textStyle.decorationColor,
+     decorationStyle = textStyle.decorationStyle,
+     decorationThickness = textStyle.decorationThickness;
 
   @override
   List<String>? fontFamilies;
@@ -719,6 +695,7 @@ extension SemanticsAnnotatedString on AnnotatedString {
   List<InlineSpanSemanticsInformation> getCombinedSemanticsInfo() {
     final _SemanticsAnnotations? annotations = getAnnotation();
     final _TextHitTestAnnotations? hitTestAnnotations = getAnnotation();
+    // TODO: recognizers.
     if (annotations == null) {
       return const <InlineSpanSemanticsInformation>[];
     }
