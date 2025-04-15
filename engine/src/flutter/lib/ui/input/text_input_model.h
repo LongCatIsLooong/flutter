@@ -12,6 +12,7 @@
 #include "flutter/shell/platform/common/text_range.h"
 #include "third_party/dart/runtime/include/dart_api.h"
 #include "third_party/tonic/typed_data/dart_byte_data.h"
+#include "fml/closure.h"
 
 namespace flutter {
 
@@ -25,8 +26,10 @@ class UiTextInputModel : public RefCountedDartWrappable<UiTextInputModel> {
   ~UiTextInputModel() = default;
 
   static void Create(Dart_Handle wrapper,
-                     int client_id,
-                     Dart_Handle on_text_editing_state_updated_callback);
+                     Dart_Handle on_text_editing_state_updated_callback,
+                     Dart_Handle paragraphGetter,
+                     Dart_Handle paragraphOffsetXGetter,
+                     Dart_Handle paragraphOffsetYGetter);
 
   Dart_Handle getText();
   Dart_Handle getSelectionRange();
@@ -47,6 +50,17 @@ class UiTextInputModel : public RefCountedDartWrappable<UiTextInputModel> {
   void detach();
 
   void dispose();
+
+protected:
+  void onEditingStateChanged() {
+    std::shared_ptr<tonic::DartState> dart_state =
+        update_callback_.dart_state().lock();
+    if (!dart_state) {
+      return;
+    }
+    tonic::DartState::Scope scope(dart_state);
+    tonic::DartInvoke(update_callback_.value(), {});
+  }
 
  private:
   std::shared_ptr<TextInputConnection> connection_;

@@ -16,7 +16,7 @@ IMPLEMENT_WRAPPERTYPEINFO(ui, UiTextInputModel);
 
 // static
 void UiTextInputModel::Create(
-    Dart_Handle wrapper,                         
+    Dart_Handle wrapper,
     Dart_Handle on_text_editing_state_updated_callback,
     Dart_Handle paragraphGetter,
     Dart_Handle paragraphOffsetXGetter,
@@ -25,31 +25,17 @@ void UiTextInputModel::Create(
   fml::RefPtr<UiTextInputModel> res = fml::MakeRefCounted<UiTextInputModel>();
   res->AssociateWithDartWrapper(wrapper);
 
-  update_callback_.Set(tonic::DartState::Current(),
-                       on_text_editing_stat_updated_callback);
-
-  connection_->SetUpdateCallback([&] {
-    std::shared_ptr<tonic::DartState> dart_state =
-        update_callback_.dart_state().lock();
-    if (!dart_state) {
-      return;
-    }
-    tonic::DartState::Scope scope(dart_state);
-    tonic::DartInvoke(update_callback_.value(), {});
-  });
+  res->update_callback_.Set(tonic::DartState::Current(),
+                            on_text_editing_state_updated_callback);
 }
 
-UiTextInputModel::UiTextInputModel() {
-  connection_ = UIDartState::Current()
-                    ->GetTextInputConnectionFactory()
-                    .CreateTextInputConnection();
-}
+UiTextInputModel::UiTextInputModel() {}
 
 Dart_Handle UiTextInputModel::getText() {
   // TODO: cache?
   // TODO: latin1
-  return Dart_NewStringFromUTF16(reinterpret_cast<const uint16_t*>(text.data()),
-                                 text.size());
+  return Dart_NewStringFromUTF16(
+      reinterpret_cast<const uint16_t*>(text_.data()), text_.size());
 }
 Dart_Handle UiTextInputModel::getSelectionRange() {
   std::vector<size_t> result = {
@@ -81,14 +67,22 @@ void UiTextInputModel::replace(Dart_Handle replacementText,
   const size_t selection_offset = composing_.collapsed() ? 0 : composingStart;
   selection_ = TextRange(selection_offset + selectionStart,
                          selection_offset + selectionEnd);
-  text_.replace(rangeStart, rangeLength, ::FromDart(replacementText));
+  text_.replace(
+      rangeStart, rangeLength,
+      tonic::DartConverter<std::u16string>::FromDart(replacementText));
 }
 
-void UiTextInputModel::attach(const tonic::DartByteData& data) {}
+void UiTextInputModel::attach(const tonic::DartByteData& data) {
+  connection_ = UIDartState::Current()
+                    ->GetTextInputConnectionFactory()
+                    .CreateTextInputConnection(
+                        *this, fml::MallocMapping((uint8_t*)data.data(),
+                                                  data.length_in_bytes()));
+}
 void UiTextInputModel::detach() {}
 
 void UiTextInputModel::setTextInputConfiguration(
-    const tonic::DartByteData& data) {}
+    const tonic::DartByteData& data, const Dart_Handle paragraph) {}
 
 void UiTextInputModel::setSizeAndTransform(const tonic::DartByteData& data) {}
 

@@ -15,21 +15,14 @@ namespace flutter {
 
 class IOSTextInputConnection : public TextInputConnection {
  public:
-  IOSTextInputConnection() = default;
-
-  std::string GetCurrentText() override { return current_text_; }
-
-  void SetCurrentText(std::string_view text) override {
-    auto old_text = current_text_;
-    current_text_ = text;
-    if (old_text != text && callback_) {
-      callback_();
-    }
+  IOSTextInputConnection(const UiTextInputModel& model,
+                         fml::MallocMapping textInputConfiguration)
+      : flutter::TextInputConnection(model) {
+    UpdateTextInputConfiguration(std::move(textInputConfiguration));
   }
 
-  void SetUpdateCallback(fml::closure callback) override {
-    callback_ = callback;
-  }
+  void UpdateTextInputConfiguration(
+      fml::MallocMapping textInputConfiguration) override {};
 
  private:
   fml::closure callback_;
@@ -39,8 +32,10 @@ class IOSTextInputConnectionFactory : public TextInputConnectionFactory {
  public:
   IOSTextInputConnectionFactory() = default;
 
-  std::shared_ptr<TextInputConnection> CreateTextInputConnection() override {
-    return std::make_shared<IOSTextInputConnection>();
+  std::shared_ptr<TextInputConnection> CreateTextInputConnection(
+      const UiTextInputModel& model,
+      fml::MallocMapping textInputConfiguration) override {
+    return std::make_shared<IOSTextInputConnection>(model, std::move(textInputConfiguration));
   }
 };
 

@@ -8,36 +8,35 @@
 #include <cstddef>
 #include <memory>
 #include <string>
-#include "fml/closure.h"
+#include "fml/mapping.h"
 
 namespace flutter {
 
+class UiTextInputModel;
 class TextInputConnection {
  public:
-  explicit TextInputConnection(fml::closure callback,
-                               fml::Mapping textInputConfiguration)
-      : on_editing_state_changed_(callback) {
-    UpdateTextInputConfiguration(textInputConfiguration);
+  TextInputConnection(const UiTextInputModel& model)
+      : model(model) {
+    // UpdateTextInputConfiguration(std::move(textInputConfiguration));
   }
 
   virtual ~TextInputConnection() {}
 
-  virtual std::string GetCurrentText() = 0;
-
-  virtual void SetCurrentText(std::string_view text) = 0;
-  virtual void Replace(std::string_view text,
-                       size_t range_start,
-                       size_t range_end,
-                       size_t selection_start,
-                       size_t selection_end) = 0;
+  // virtual std::string GetText() = 0;
+  // virtual void Replace(std::string_view text,
+  //                      size_t range_start,
+  //                      size_t range_end,
+  //                      size_t selection_start,
+  //                      size_t selection_end) = 0;
   virtual void UpdateTextInputConfiguration(
-      fml::Mapping textInputConfiguration) = 0;
+      fml::MallocMapping textInputConfiguration) = 0;
 
   TextInputConnection(const TextInputConnection&) = delete;
   TextInputConnection& operator=(const TextInputConnection&) = delete;
 
- private:
-  fml::closure on_editing_state_changed_;
+  const UiTextInputModel& model;
+  // private:
+  //  std::weak_ptr<UiTextInputModel> model;
 };
 
 class TextInputConnectionFactory {
@@ -47,7 +46,8 @@ class TextInputConnectionFactory {
   virtual ~TextInputConnectionFactory() {}
 
   virtual std::shared_ptr<TextInputConnection> CreateTextInputConnection(
-      fml::closure callback) = 0;
+      const UiTextInputModel& model,
+      fml::MallocMapping textInputConfiguration) = 0;
 
   TextInputConnectionFactory(const TextInputConnectionFactory&) = delete;
   TextInputConnectionFactory& operator=(const TextInputConnectionFactory&) =

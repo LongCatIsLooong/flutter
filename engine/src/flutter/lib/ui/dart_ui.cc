@@ -316,7 +316,7 @@ typedef CanvasPath Path;
   V(Vertices, dispose)                           \
   V(UiTextInputModel, getText)                   \
   V(UiTextInputModel, getSelectionRange)         \
-  V(UiTextInputModel, getMarkedRange)            \
+  V(UiTextInputModel, getComposingRange)            \
   V(UiTextInputModel, replace)                   \
   V(UiTextInputModel, attach)                    \
   V(UiTextInputModel, detach)                    \

@@ -188,6 +188,7 @@ source_set("ui") {
     "//flutter/skia",
     "//flutter/third_party/rapidjson",
     "//flutter/third_party/tonic",
+    "//flutter/shell/platform/common:common_cpp_input",
     "//third_party/zlib:zlib",
   ]
 

@@ -26,13 +26,15 @@ namespace {
 
 class FakeTextInputConnection : public TextInputConnection {
  public:
-  FakeTextInputConnection() = default;
+  FakeTextInputConnection(const UiTextInputModel& model,
+                          fml::MallocMapping textInputConfiguration)
+      : flutter::TextInputConnection(model) {
+        };
 
   ~FakeTextInputConnection() override {}
 
-  std::string GetCurrentText() override { return ""; }
-
-  void SetCurrentText(std::string_view text) override {}
+  void UpdateTextInputConfiguration(
+      fml::MallocMapping textInputConfiguration) override {};
 };
 
 class FakeTextInputConnectionFactory : public TextInputConnectionFactory {
@@ -41,8 +43,11 @@ class FakeTextInputConnectionFactory : public TextInputConnectionFactory {
 
   ~FakeTextInputConnectionFactory() override {}
 
-  std::shared_ptr<TextInputConnection> CreateTextInputConnection() override {
-    return std::make_shared<FakeTextInputConnection>();
+  std::shared_ptr<TextInputConnection> CreateTextInputConnection(
+      const UiTextInputModel& model,
+      fml::MallocMapping textInputConfiguration) override {
+    return std::make_shared<FakeTextInputConnection>(
+        model, std::move(textInputConfiguration));
   }
 };
 
