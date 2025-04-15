@@ -3789,42 +3789,144 @@ external void _loadFontFromList(Uint8List list, _Callback<void> callback, String
 ///
 
 base class TextInputModel extends NativeFieldWrapperClass1 {
-  static TextInputModel create() {
-    return TextInputModel._();
+  TextInputModel({
+    required this.didChangeTextEditingState,
+    required String initialText,
+    required TextSelection initialSelection,
+    required Map<String, Object> textInputConfiguration,
+  }) {
+    _constructor(_replaceRange, getParagraph, _getParagraphOffsetX, _getParagraphOffsetY);
+    replace(initialText, const TextRange.collapsed(0), initialSelection);
+    updateTextInputConfiguration(textInputConfiguration);
   }
 
-  TextInputModel._() {
-    _constructor();
+  _NativeParagraph getParagraph();
+  Offset getParagraphOffset();
+  double _getParagraphOffsetX() => getParagraphOffset().dx;
+  double _getParagraphOffsetY() => getParagraphOffset().dy;
+
+  String get text => _getText();
+  TextSelection get selectionRange {
+    final selection = switch (_getSelection) {
+      [final int offset] => TextSelection.collapsed(offset),
+      [final int base, final int extent] => TextSelection(base: base, extent: extent),
+    };
+    assert(selection.isValid);
+    return selection;
   }
 
-  String getCurrentText() {
-    return _getCurrentText();
+  TextRange? get _composingRange {
+    final TextRange? composing = switch (_getComposing()) {
+      null => null,
+      [final int start, final int end] => TextRange(start: start, end: end),
+    };
+    return composing;
   }
 
-  void setCurrentText(String value) {
-    _setCurrentText(value);
+  void updateTextInputConfiguration(Map<String, Object> configuration) {
+    _setTextInputConfiguration(utf8.encode(json.encode(configuration)));
   }
 
-  void dispose() {
-    _dispose();
+  void replace(
+    String replacement,
+    TextRange range,
+    TextRange? markedRange,
+    TextSelection selectionRange,
+  ) {
+    _replaceRange(
+      replacement,
+      range.start,
+      range.end - range.start,
+      markedRange?.start ?? 0,
+      markedRange == null ? 0 : (markedRange.end - markedRange.start),
+      selectionRange.start,
+      selectionRange.end,
+    );
   }
 
-  void setUpdateCallback(void Function() cb) {
-    _setUpdateCallback(cb);
+  //void Function(
+  //  String replacement,
+  //  TextRange range,
+  //  TextRange? markedRange,
+  //  TextRange selectionRange,
+  //)
+  final VoidCallback didChangeTextEditingState;
+
+  static final _sizeAndTransform = Float32List(18);
+  void didUpdateLayout(Size size, Float32List transform) {
+    _sizeAndTransform
+      ..[0] = size.x
+      ..[1] = size.y
+      ..[2] = transform[0]
+      ..[3] = transform[1]
+      ..[4] = transform[2]
+      ..[5] = transform[3]
+      ..[6] = transform[4]
+      ..[7] = transform[5]
+      ..[8] = transform[6]
+      ..[9] = transform[7]
+      ..[10] = transform[8]
+      ..[11] = transform[9]
+      ..[12] = transform[10]
+      ..[13] = transform[11]
+      ..[14] = transform[12]
+      ..[15] = transform[13]
+      ..[16] = transform[14]
+      ..[17] = transform[15];
+    _setSizeAndTransform(_sizeAndTransform);
   }
 
-  @Native<Void Function(Handle)>(symbol: 'UiTextInputModel::Create')
-  external void _constructor();
+  void dispose() => _dispose();
 
-  @Native<Handle Function(Pointer<Void>)>(symbol: 'UiTextInputModel::getCurrentText')
-  external String _getCurrentText();
+  @Native<Void Function(Handle, Handle, Handle, Handle)>(symbol: 'UiTextInputModel::Create')
+  external void _constructor(
+    VoidCallback onEditingStateUpdate,
+    _NativeParagraph Function() paragraphGetter,
+    double Function() offsetXGetter,
+    double Function() offsetYGetter,
+  );
 
-  @Native<Void Function(Pointer<Void>, Handle)>(symbol: 'UiTextInputModel::setCurrentText')
-  external void _setCurrentText(String value);
+  @Native<Handle Function(Pointer<Void>)>(symbol: 'UiTextInputModel::getText')
+  external String _getText();
+  @Native<Handle Function(Pointer<Void>)>(symbol: 'UiTextInputModel::getSelectionRange ')
+  external List<int> _getSelection();
+  @Native<Handle Function(Pointer<Void>)>(symbol: 'UiTextInputModel::getComposingRange')
+  external List<int> _getComposing();
 
-  @Native<Void Function(Pointer<Void>, Handle)>(symbol: 'UiTextInputModel::setUpdateCallback')
-  external void _setUpdateCallback(void Function() cb);
+  @Native<void Function(Pointer<Void>, Handle, Uint32, Uint32, Uint32, Uint32, Uint32, Uint32)>(
+    symbol: 'UiTextInputModel::replace',
+  )
+  external void _replaceRange(
+    String replacement,
+    int rangeStart,
+    int rangeEnd,
+    int markedStart,
+    int markedEnd,
+    int selectionStart,
+    int selectionEnd,
+  );
+
+  @Native<Void Function(Pointer<Void>, Handle)>(symbol: 'UiTextInputModel::attach')
+  external void _attach(Map<String, Objetct> configuration);
+
+  @Native<Void Function(Pointer<Void>, Handle)>(symbol: 'UiTextInputModel::detach')
+  external void _detach();
+
+  @Native<Void Function(Pointer<Void>, Handle)>(
+    symbol: 'UiTextInputModel::setTextInputConfiguration',
+  )
+  external void _setTextInputConfiguration(Map<String, Objetct> configuration);
+
+  @Native<Void Function(Pointer<Void>, Float32List)>(
+    symbol: 'UiTextInputModel::setSizeAndTransform',
+  )
+  external void _setSizeAndTransform(Float32 list);
 
   @Native<Void Function(Pointer<Void>)>(symbol: 'UiTextInputModel::dispose')
+  external void _dispose();
+}
+
+base class NativeInputClient extends NativeFieldWrapperClass1 {
+  @Native<Void Function(Pointer<Void>)>(symbol: 'TextInputConnection::dispose')
   external void _dispose();
 }

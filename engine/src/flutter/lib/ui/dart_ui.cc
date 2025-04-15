@@ -314,9 +314,14 @@ typedef CanvasPath Path;
   V(SemanticsUpdateBuilder, updateNode)          \
   V(SemanticsUpdate, dispose)                    \
   V(Vertices, dispose)                           \
-  V(UiTextInputModel, getCurrentText)            \
-  V(UiTextInputModel, setCurrentText)            \
-  V(UiTextInputModel, setUpdateCallback)         \
+  V(UiTextInputModel, getText)                   \
+  V(UiTextInputModel, getSelectionRange)         \
+  V(UiTextInputModel, getMarkedRange)            \
+  V(UiTextInputModel, replace)                   \
+  V(UiTextInputModel, attach)                    \
+  V(UiTextInputModel, detach)                    \
+  V(UiTextInputModel, setTextInputConfiguration) \
+  V(UiTextInputModel, setSizeAndTransform)       \
   V(UiTextInputModel, dispose)
 
 #define FFI_FUNCTION_INSERT(FUNCTION)           \

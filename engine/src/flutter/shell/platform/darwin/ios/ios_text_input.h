@@ -32,7 +32,6 @@ class IOSTextInputConnection : public TextInputConnection {
   }
 
  private:
-  std::string current_text_ = "";
   fml::closure callback_;
 };
 

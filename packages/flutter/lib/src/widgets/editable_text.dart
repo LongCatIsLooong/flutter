@@ -2415,6 +2415,8 @@ class EditableTextState extends State<EditableText>
   final ValueNotifier<bool> _cursorVisibilityNotifier = ValueNotifier<bool>(true);
   final GlobalKey _editableKey = GlobalKey();
 
+  late final TextInputModel model = TextInputModel.create();
+
   /// Detects whether the clipboard can paste.
   final ClipboardStatusNotifier clipboardStatus =
       kIsWeb
