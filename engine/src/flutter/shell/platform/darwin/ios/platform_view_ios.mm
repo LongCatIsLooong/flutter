@@ -91,6 +91,7 @@ void PlatformViewIOS::SetOwnerViewController(__weak FlutterViewController* owner
     accessibility_bridge_.Clear();
   }
   owner_controller_ = owner_controller;
+  text_input_connection_factory_->view_controller = owner_controller;
 
   // Add an observer that will clear out the owner_controller_ ivar and
   // the accessibility_bridge_ in case the view controller is deleted.

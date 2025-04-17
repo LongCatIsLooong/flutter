@@ -94,6 +94,8 @@ source_set("flutter_framework_source") {
     "framework/Source/FlutterTextInputDelegate.h",
     "framework/Source/FlutterTextInputPlugin.h",
     "framework/Source/FlutterTextInputPlugin.mm",
+    "framework/Source/FlutterTextInputClientView.h",
+    "framework/Source/FlutterTextInputClientView.mm",
     "framework/Source/FlutterTextureRegistryRelay.h",
     "framework/Source/FlutterTextureRegistryRelay.mm",
     "framework/Source/FlutterUIPressProxy.h",

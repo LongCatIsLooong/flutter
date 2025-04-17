@@ -741,6 +741,11 @@ class TextPainter {
   // The result of the most recent `layout` call.
   _TextPainterLayoutCacheWithOffset? _layoutCache;
 
+  (ui.Paragraph, Offset)? get paragraph => switch (_layoutCache) {
+    null => null,
+    final cache => (cache.paragraph, cache.paintOffset),
+  };
+
   // Whether _layoutCache contains outdated paint information and needs to be
   // updated before painting.
   //

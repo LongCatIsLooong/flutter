@@ -7,7 +7,9 @@ library;
 
 import 'dart:collection';
 import 'dart:math' as math;
-import 'dart:ui' as ui show BoxHeightStyle, BoxWidthStyle, LineMetrics, SemanticsInputType, TextBox;
+import 'dart:ui'
+    as ui
+    show BoxHeightStyle, BoxWidthStyle, LineMetrics, Paragraph, SemanticsInputType, TextBox;
 
 import 'package:characters/characters.dart';
 import 'package:flutter/foundation.dart';
@@ -2444,6 +2446,7 @@ class RenderEditable extends RenderBox
     offset.applyContentDimensions(0.0, _maxScrollExtent);
   }
 
+  (ui.Paragraph, Offset)? get paragraph => _textPainter.paragraph;
   // The relative origin in relation to the distance the user has theoretically
   // dragged the floating cursor offscreen. This value is used to account for the
   // difference in the rendering position and the raw offset value.

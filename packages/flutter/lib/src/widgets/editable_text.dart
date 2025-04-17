@@ -2415,7 +2415,13 @@ class EditableTextState extends State<EditableText>
   final ValueNotifier<bool> _cursorVisibilityNotifier = ValueNotifier<bool>(true);
   final GlobalKey _editableKey = GlobalKey();
 
-  late final TextInputModel model = TextInputModel.create();
+  late final ui.TextInputModel model = ui.TextInputModel(
+    didChangeTextEditingState: () {},
+    initialText: _value.text,
+    initialSelection: _value.selection,
+    getParagraph: () => renderEditable.paragraph!.$1,
+    getParagraphOffset: () => renderEditable.paragraph!.$2,
+  );
 
   /// Detects whether the clipboard can paste.
   final ClipboardStatusNotifier clipboardStatus =
@@ -3868,6 +3874,7 @@ class EditableTextState extends State<EditableText>
           _needsAutofill && currentAutofillScope != null
               ? currentAutofillScope!.attach(this, _effectiveAutofillClient.textInputConfiguration)
               : TextInput.attach(this, _effectiveAutofillClient.textInputConfiguration);
+      model.attach(_effectiveAutofillClient.textInputConfiguration.toJson());
       _updateSizeAndTransform();
       _schedulePeriodicPostFrameCallbacks();
       _textInputConnection!
@@ -3938,6 +3945,7 @@ class EditableTextState extends State<EditableText>
         currentAutofillScope?.attach(this, textInputConfiguration) ??
         TextInput.attach(this, _effectiveAutofillClient.textInputConfiguration);
     _textInputConnection = newConnection;
+    model.attach(_effectiveAutofillClient.textInputConfiguration.toJson());
 
     newConnection
       ..show()
@@ -4217,7 +4225,7 @@ class EditableTextState extends State<EditableText>
     // We return early if the selection is not valid. This can happen when the
     // text of [EditableText] is updated at the same time as the selection is
     // changed by a gesture event.
-    final String text = widget.controller.value.text;
+    final String text = _value.text;
     if (text.length < selection.end || text.length < selection.start) {
       return;
     }
@@ -5646,7 +5654,7 @@ class EditableTextState extends State<EditableText>
                       case TargetPlatform.linux:
                       case TargetPlatform.windows:
                         // Composing text is not counted in history coalescing.
-                        if (!widget.controller.value.composing.isCollapsed) {
+                        if (!_value.composing.isCollapsed) {
                           return false;
                         }
                       case TargetPlatform.android:

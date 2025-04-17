@@ -7,7 +7,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
+#include <memory>
 #include "dart_api.h"
+#include "lib/ui/text/paragraph.h"
 #include "lib/ui/ui_dart_state.h"
 
 namespace flutter {
@@ -27,6 +29,9 @@ void UiTextInputModel::Create(
 
   res->update_callback_.Set(tonic::DartState::Current(),
                             on_text_editing_state_updated_callback);
+
+  res->get_paragraph_callback_.Set(tonic::DartState::Current(),
+                                   paragraphGetter);
 }
 
 UiTextInputModel::UiTextInputModel() {}
@@ -56,6 +61,40 @@ Dart_Handle UiTextInputModel::getComposingRange() {
   return tonic::DartConverter<decltype(result)>::ToDart(result);
 }
 
+void UiTextInputModel::replaceText(
+    const std::u16string replacementText,
+    size_t rangeStart,
+    size_t rangeLength,
+    size_t composingStart,
+    size_t composingLength,
+    size_t selectionStart,
+    size_t selectionEnd,
+    std::function<void(size_t)> editingStateWillChange,
+    std::function<void(size_t)> editingStateDidChange) {
+  const TextRange composing =
+      TextRange(composingStart, composingStart + composingLength);
+  const size_t selection_offset = composing_.collapsed() ? 0 : composingStart;
+  const TextRange selection = TextRange(selection_offset + selectionStart,
+                                        selection_offset + selectionEnd);
+  const bool textWillChange =
+      text_.compare(rangeStart, rangeLength, replacementText);
+  const size_t changeType = (selection == selection_ ? 0 : 1 << 2) |
+                            (composing == composing_ ? 0 : 1 << 1) |
+                            textWillChange;
+  if (changeType != 0 && editingStateWillChange) {
+    editingStateWillChange(changeType);
+  }
+
+  selection_ = selection;
+  composing_ = composing;
+  if (textWillChange) {
+    text_.replace(rangeStart, rangeLength, replacementText);
+  }
+  if (changeType != 0 && editingStateDidChange) {
+  editingStateDidChange(changeType);
+  }
+}
+
 void UiTextInputModel::replace(Dart_Handle replacementText,
                                size_t rangeStart,
                                size_t rangeLength,
@@ -63,13 +102,10 @@ void UiTextInputModel::replace(Dart_Handle replacementText,
                                size_t composingLength,
                                size_t selectionStart,
                                size_t selectionEnd) {
-  composing_ = TextRange(composingStart, composingStart + composingLength);
-  const size_t selection_offset = composing_.collapsed() ? 0 : composingStart;
-  selection_ = TextRange(selection_offset + selectionStart,
-                         selection_offset + selectionEnd);
-  text_.replace(
-      rangeStart, rangeLength,
-      tonic::DartConverter<std::u16string>::FromDart(replacementText));
+  replaceText(tonic::DartConverter<std::u16string>::FromDart(replacementText),
+              rangeStart, rangeLength, composingStart, composingLength,
+              selectionStart, selectionEnd, notifyIMEEditingStateWillChange,
+              notifyIMEEditingStateDidChange);
 }
 
 void UiTextInputModel::attach(const tonic::DartByteData& data) {
@@ -79,15 +115,26 @@ void UiTextInputModel::attach(const tonic::DartByteData& data) {
                         *this, fml::MallocMapping((uint8_t*)data.data(),
                                                   data.length_in_bytes()));
 }
+
 void UiTextInputModel::detach() {}
 
 void UiTextInputModel::setTextInputConfiguration(
-    const tonic::DartByteData& data, const Dart_Handle paragraph) {}
+    const tonic::DartByteData& data,
+    const Dart_Handle paragraph) {}
 
 void UiTextInputModel::setSizeAndTransform(const tonic::DartByteData& data) {}
 
 void UiTextInputModel::dispose() {
   //
+}
+
+const txt::Paragraph& UiTextInputModel::getParagraph() {
+  if (!paragraph_) {
+    Dart_Handle paragraph =
+        Dart_InvokeClosure(get_paragraph_callback_.Release(), 0, nullptr);
+    paragraph_ = tonic::DartConverter<Paragraph*>::FromDart(paragraph);
+  }
+  return *paragraph_->m_paragraph_;
 }
 
 }  // namespace flutter

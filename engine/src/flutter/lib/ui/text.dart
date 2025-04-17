@@ -4130,25 +4130,26 @@ external void _loadFontFromList(
 ///
 ///
 
-abstract base class TextInputModel extends NativeFieldWrapperClass1 {
+base class TextInputModel extends NativeFieldWrapperClass1 {
   TextInputModel({
     required this.didChangeTextEditingState,
     required String initialText,
     required TextSelection initialSelection,
-    required Map<String, Object> textInputConfiguration,
+    required this.getParagraph,
+    required this.getParagraphOffset,
   }) {
     _constructor(
       didChangeTextEditingState,
-      getParagraph,
+      _getParagraph,
       _getParagraphOffsetX,
       _getParagraphOffsetY,
     );
     replace(initialText, const TextRange.collapsed(0), null, initialSelection);
-    updateTextInputConfiguration(textInputConfiguration);
   }
 
-  _NativeParagraph getParagraph();
-  Offset getParagraphOffset();
+  final Paragraph Function() getParagraph;
+  _NativeParagraph _getParagraph() => getParagraph() as _NativeParagraph;
+  final Offset Function() getParagraphOffset;
   double _getParagraphOffsetX() => getParagraphOffset().dx;
   double _getParagraphOffsetY() => getParagraphOffset().dy;
 
@@ -4196,6 +4197,8 @@ abstract base class TextInputModel extends NativeFieldWrapperClass1 {
     );
   }
 
+  void test() {}
+
   //void Function(
   //  String replacement,
   //  TextRange range,
@@ -4227,8 +4230,6 @@ abstract base class TextInputModel extends NativeFieldWrapperClass1 {
       ..[17] = transform[15];
     _setSizeAndTransform(_sizeAndTransform);
   }
-
-  void dispose() => _dispose();
 
   @Native<Void Function(Handle, Handle, Handle, Handle, Handle)>(
     symbol: 'UiTextInputModel::Create',
@@ -4276,10 +4277,10 @@ abstract base class TextInputModel extends NativeFieldWrapperClass1 {
   @Native<Void Function(Pointer<Void>, Handle)>(
     symbol: 'UiTextInputModel::attach',
   )
-  external void _attach(Map<String, Object> configuration);
+  external void attach(Map<String, Object?> configuration);
 
   @Native<Void Function(Pointer<Void>)>(symbol: 'UiTextInputModel::detach')
-  external void _detach();
+  external void detach();
 
   @Native<Void Function(Pointer<Void>, Handle)>(
     symbol: 'UiTextInputModel::setTextInputConfiguration',
@@ -4292,7 +4293,7 @@ abstract base class TextInputModel extends NativeFieldWrapperClass1 {
   external void _setSizeAndTransform(Float32List list);
 
   @Native<Void Function(Pointer<Void>)>(symbol: 'UiTextInputModel::dispose')
-  external void _dispose();
+  external void dispose();
 }
 
 base class NativeInputClient extends NativeFieldWrapperClass1 {

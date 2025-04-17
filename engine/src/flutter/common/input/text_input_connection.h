@@ -15,8 +15,7 @@ namespace flutter {
 class UiTextInputModel;
 class TextInputConnection {
  public:
-  TextInputConnection(const UiTextInputModel& model)
-      : model(model) {
+  TextInputConnection(const UiTextInputModel& model) {
     // UpdateTextInputConfiguration(std::move(textInputConfiguration));
   }
 
@@ -34,8 +33,8 @@ class TextInputConnection {
   TextInputConnection(const TextInputConnection&) = delete;
   TextInputConnection& operator=(const TextInputConnection&) = delete;
 
-  const UiTextInputModel& model;
-  // private:
+  //private:
+  //const UiTextInputModel& model;
   //  std::weak_ptr<UiTextInputModel> model;
 };
 
