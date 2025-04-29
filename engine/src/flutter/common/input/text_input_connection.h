@@ -9,13 +9,14 @@
 #include <memory>
 #include <string>
 #include "fml/mapping.h"
+#include "third_party/dart/runtime/include/dart_api.h"
 
 namespace flutter {
 
 class UiTextInputModel;
 class TextInputConnection {
  public:
-  TextInputConnection(const UiTextInputModel& model) {
+  TextInputConnection(UiTextInputModel& model) {
     // UpdateTextInputConfiguration(std::move(textInputConfiguration));
   }
 
@@ -28,14 +29,18 @@ class TextInputConnection {
   //                      size_t selection_start,
   //                      size_t selection_end) = 0;
   virtual void UpdateTextInputConfiguration(
-      fml::MallocMapping textInputConfiguration) = 0;
+      Dart_Handle textInputConfiguration) = 0;
 
   TextInputConnection(const TextInputConnection&) = delete;
   TextInputConnection& operator=(const TextInputConnection&) = delete;
 
-  //private:
-  //const UiTextInputModel& model;
-  //  std::weak_ptr<UiTextInputModel> model;
+  virtual void SetSizeAndTransform(double width,
+                                   double height,
+                                   const double matrix4[16]) = 0;
+
+  // private:
+  // const UiTextInputModel& model;
+  //   std::weak_ptr<UiTextInputModel> model;
 };
 
 class TextInputConnectionFactory {
@@ -45,8 +50,8 @@ class TextInputConnectionFactory {
   virtual ~TextInputConnectionFactory() {}
 
   virtual std::shared_ptr<TextInputConnection> CreateTextInputConnection(
-      const UiTextInputModel& model,
-      fml::MallocMapping textInputConfiguration) = 0;
+      UiTextInputModel& model,
+      Dart_Handle textInputConfiguration) = 0;
 
   TextInputConnectionFactory(const TextInputConnectionFactory&) = delete;
   TextInputConnectionFactory& operator=(const TextInputConnectionFactory&) =

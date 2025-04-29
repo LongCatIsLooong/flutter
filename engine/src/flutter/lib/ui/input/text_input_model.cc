@@ -5,9 +5,13 @@
 
 #include "flutter/lib/ui/input/text_input_model.h"
 #include <algorithm>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <memory>
+#include <string_view>
+#include <type_traits>
 #include "dart_api.h"
 #include "lib/ui/text/paragraph.h"
 #include "lib/ui/ui_dart_state.h"
@@ -43,55 +47,49 @@ Dart_Handle UiTextInputModel::getText() {
       reinterpret_cast<const uint16_t*>(text_.data()), text_.size());
 }
 Dart_Handle UiTextInputModel::getSelectionRange() {
-  std::vector<size_t> result = {
-      selection_.base(),
-      selection_.extent(),
-  };
+  std::vector<size_t> result = {selection_.first, selection_.second};
   return tonic::DartConverter<decltype(result)>::ToDart(result);
 }
 
 Dart_Handle UiTextInputModel::getComposingRange() {
-  if (composing_.collapsed()) {
+  if (composing_.second == 0) {
     return Dart_Null();
   }
-  std::vector<size_t> result = {
-      composing_.base(),
-      composing_.extent(),
-  };
+  std::vector<size_t> result = {composing_.first, composing_.second};
   return tonic::DartConverter<decltype(result)>::ToDart(result);
 }
 
 void UiTextInputModel::replaceText(
-    const std::u16string replacementText,
-    size_t rangeStart,
-    size_t rangeLength,
-    size_t composingStart,
-    size_t composingLength,
-    size_t selectionStart,
-    size_t selectionEnd,
+    const std::u16string_view& replacementText,
+    const TextRange range,
+    const TextRange composing,
+    const TextSelection selection,
     std::function<void(size_t)> editingStateWillChange,
     std::function<void(size_t)> editingStateDidChange) {
-  const TextRange composing =
-      TextRange(composingStart, composingStart + composingLength);
-  const size_t selection_offset = composing_.collapsed() ? 0 : composingStart;
-  const TextRange selection = TextRange(selection_offset + selectionStart,
-                                        selection_offset + selectionEnd);
-  const bool textWillChange =
-      text_.compare(rangeStart, rangeLength, replacementText);
-  const size_t changeType = (selection == selection_ ? 0 : 1 << 2) |
-                            (composing == composing_ ? 0 : 1 << 1) |
-                            textWillChange;
+  printf("??? replace: (%lu, %lu), \n", range.first, range.second);
+  TextRange normalizedComposing = composing;
+  if (composing.second == 0) {
+    normalizedComposing = {0, 0};
+  }
+  const int textWillChange =
+      text_.compare(range.first, range.second, replacementText);
+
+  const size_t changeType = (selection == selection_) |
+                            ((normalizedComposing == composing_) << 1) |
+                            (textWillChange << 2);
   if (changeType != 0 && editingStateWillChange) {
     editingStateWillChange(changeType);
   }
 
   selection_ = selection;
-  composing_ = composing;
+  composing_ = normalizedComposing;
   if (textWillChange) {
-    text_.replace(rangeStart, rangeLength, replacementText);
+    printf("%lu text replace: (%lu, %lu), %lu \n", text_.size(), range.first,
+           range.second, replacementText.size());
+    text_.replace(range.first, range.second, replacementText);
   }
   if (changeType != 0 && editingStateDidChange) {
-  editingStateDidChange(changeType);
+    editingStateDidChange(changeType);
   }
 }
 
@@ -102,39 +100,48 @@ void UiTextInputModel::replace(Dart_Handle replacementText,
                                size_t composingLength,
                                size_t selectionStart,
                                size_t selectionEnd) {
-  replaceText(tonic::DartConverter<std::u16string>::FromDart(replacementText),
-              rangeStart, rangeLength, composingStart, composingLength,
-              selectionStart, selectionEnd, notifyIMEEditingStateWillChange,
-              notifyIMEEditingStateDidChange);
+  replaceText(
+      std::u16string_view(
+          tonic::DartConverter<std::u16string>::FromDart(replacementText)),
+      {rangeStart, rangeLength}, {composingStart, composingLength},
+      {selectionStart, selectionEnd}, notifyIMEEditingStateWillChange,
+      notifyIMEEditingStateDidChange);
 }
 
-void UiTextInputModel::attach(const tonic::DartByteData& data) {
+void UiTextInputModel::attach(Dart_Handle data) {
   connection_ = UIDartState::Current()
                     ->GetTextInputConnectionFactory()
-                    .CreateTextInputConnection(
-                        *this, fml::MallocMapping((uint8_t*)data.data(),
-                                                  data.length_in_bytes()));
+                    .CreateTextInputConnection(*this, data);
 }
 
 void UiTextInputModel::detach() {}
 
-void UiTextInputModel::setTextInputConfiguration(
-    const tonic::DartByteData& data,
-    const Dart_Handle paragraph) {}
+void UiTextInputModel::setTextInputConfiguration(Dart_Handle data) {}
 
-void UiTextInputModel::setSizeAndTransform(const tonic::DartByteData& data) {}
+void UiTextInputModel::setSizeAndTransform(Dart_Handle data) {
+  if (!connection_) {
+    return;
+  }
+  double array[16];
+  {
+    auto list = tonic::Float64List(data);
+    memcpy(array, list.data(), 16 * sizeof(double));
+  }
+  connection_->SetSizeAndTransform(array[0], array[1], array + 2);
+}
 
 void UiTextInputModel::dispose() {
   //
 }
 
-const txt::Paragraph& UiTextInputModel::getParagraph() {
-  if (!paragraph_) {
-    Dart_Handle paragraph =
-        Dart_InvokeClosure(get_paragraph_callback_.Release(), 0, nullptr);
-    paragraph_ = tonic::DartConverter<Paragraph*>::FromDart(paragraph);
-  }
-  return *paragraph_->m_paragraph_;
+txt::Paragraph& UiTextInputModel::getParagraph() {
+  tonic::DartState::Scope scope(get_paragraph_callback_.dart_state().lock());
+  Dart_Handle paragraph =
+      tonic::DartInvoke(get_paragraph_callback_.value(), {});
+  // printf("handle error: %s, paragraph: %p\n", Dart_GetError(paragraph),
+  //        paragraph);
+  auto wrapper = tonic::DartConverter<Paragraph*>::FromDart(paragraph);
+  return *wrapper->m_paragraph_;
 }
 
 }  // namespace flutter

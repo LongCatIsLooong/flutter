@@ -185,10 +185,10 @@ source_set("ui") {
     "//flutter/impeller/runtime_stage",
     "//flutter/runtime:dart_plugin_registrant",
     "//flutter/runtime:test_font",
+    "//flutter/shell/platform/common:common_cpp_input",
     "//flutter/skia",
     "//flutter/third_party/rapidjson",
     "//flutter/third_party/tonic",
-    "//flutter/shell/platform/common:common_cpp_input",
     "//third_party/zlib:zlib",
   ]
 

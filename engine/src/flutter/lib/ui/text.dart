@@ -137,11 +137,7 @@ class FontWeight {
     if (a == null && b == null) {
       return null;
     }
-    return values[_lerpInt(
-      (a ?? normal).index,
-      (b ?? normal).index,
-      t,
-    ).round().clamp(0, 8)];
+    return values[_lerpInt((a ?? normal).index, (b ?? normal).index, t).round().clamp(0, 8)];
   }
 
   @override
@@ -197,10 +193,7 @@ class FontFeature {
   ///
   /// See <https://docs.microsoft.com/en-us/typography/opentype/spec/featuretags>
   const FontFeature(this.feature, [this.value = 1])
-    : assert(
-        feature.length == 4,
-        'Feature tag must be exactly four characters long.',
-      ),
+    : assert(feature.length == 4, 'Feature tag must be exactly four characters long.'),
       assert(value >= 0, 'Feature value must be zero or a positive integer.');
 
   /// Create a [FontFeature] object that enables the feature with the given tag.
@@ -560,9 +553,7 @@ class FontFeature {
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_ko#locl>
   ///  * <https://en.wikipedia.org/wiki/Han_unification>
   ///  * <https://en.wikipedia.org/wiki/Cyrillic_script>
-  const FontFeature.localeAware({bool enable = true})
-    : feature = 'locl',
-      value = enable ? 1 : 0;
+  const FontFeature.localeAware({bool enable = true}) : feature = 'locl', value = enable ? 1 : 0;
 
   /// Display alternative glyphs for numerals (alternate annotation forms). (`nalt`)
   ///
@@ -593,9 +584,7 @@ class FontFeature {
   /// See also:
   ///
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_ko#nalt>
-  const FontFeature.notationalForms([this.value = 1])
-    : feature = 'nalt',
-      assert(value >= 0);
+  const FontFeature.notationalForms([this.value = 1]) : feature = 'nalt', assert(value >= 0);
 
   /// Display digits as numerators. (`numr`)
   ///
@@ -895,9 +884,7 @@ class FontFeature {
   ///
   ///  * <https://docs.microsoft.com/en-us/typography/opentype/spec/features_pt#swsh>
   ///  * <https://en.wikipedia.org/wiki/Swash_(typography)>
-  const FontFeature.swash([this.value = 1])
-    : feature = 'swsh',
-      assert(value >= 0);
+  const FontFeature.swash([this.value = 1]) : feature = 'swsh', assert(value >= 0);
 
   /// Use tabular (monospace) figures. (`tnum`)
   ///
@@ -987,9 +974,7 @@ class FontFeature {
     if (other.runtimeType != runtimeType) {
       return false;
     }
-    return other is FontFeature &&
-        other.feature == feature &&
-        other.value == value;
+    return other is FontFeature && other.feature == feature && other.value == value;
   }
 
   @override
@@ -1032,10 +1017,7 @@ class FontVariation {
   /// `value` is the value that the axis will be set to. The behavior
   /// depends on how the font implements the axis.
   const FontVariation(this.axis, this.value)
-    : assert(
-        axis.length == 4,
-        'Axis tag must be exactly four characters long.',
-      ),
+    : assert(axis.length == 4, 'Axis tag must be exactly four characters long.'),
       assert(
         value >= -32768.0 && value < 32768.0,
         'Value must be representable as a signed 16.16 fixed-point number, i.e. it must be in this range: -32768.0 ≤ value < 32768.0',
@@ -1090,9 +1072,7 @@ class FontVariation {
   /// See also:
   ///
   ///  * <https://learn.microsoft.com/en-us/typography/opentype/spec/dvaraxistag_opsz>
-  const FontVariation.opticalSize(this.value)
-    : assert(value > 0.0),
-      axis = 'opsz';
+  const FontVariation.opticalSize(this.value) : assert(value > 0.0), axis = 'opsz';
 
   /// Variable font width. (`slnt`)
   ///
@@ -1140,10 +1120,7 @@ class FontVariation {
   /// See also:
   ///
   ///  * <https://learn.microsoft.com/en-us/typography/opentype/spec/dvaraxistag_wght>
-  const FontVariation.weight(this.value)
-    : assert(value >= 1),
-      assert(value <= 1000),
-      axis = 'wght';
+  const FontVariation.weight(this.value) : assert(value >= 1), assert(value <= 1000), axis = 'wght';
 
   // ------------------------------------------------------------------------
   // End of axis tags list.
@@ -1221,11 +1198,7 @@ class FontVariation {
     }
     return FontVariation(
       a!.axis,
-      clampDouble(
-        lerpDouble(a.value, b!.value, t)!,
-        -32768.0,
-        32768.0 - 1.0 / 65536.0,
-      ),
+      clampDouble(lerpDouble(a.value, b!.value, t)!, -32768.0, 32768.0 - 1.0 / 65536.0),
     );
   }
 
@@ -1259,10 +1232,7 @@ final class GlyphInfo {
     int graphemeEnd,
     bool isLTR,
   ) : graphemeClusterLayoutBounds = Rect.fromLTRB(left, top, right, bottom),
-      graphemeClusterCodeUnitRange = TextRange(
-        start: graphemeStart,
-        end: graphemeEnd,
-      ),
+      graphemeClusterCodeUnitRange = TextRange(start: graphemeStart, end: graphemeEnd),
       writingDirection = isLTR ? TextDirection.ltr : TextDirection.rtl;
 
   /// The layout bounding rect of the associated character, in the paragraph's
@@ -1292,11 +1262,8 @@ final class GlyphInfo {
   }
 
   @override
-  int get hashCode => Object.hash(
-    graphemeClusterLayoutBounds,
-    graphemeClusterCodeUnitRange,
-    writingDirection,
-  );
+  int get hashCode =>
+      Object.hash(graphemeClusterLayoutBounds, graphemeClusterCodeUnitRange, writingDirection);
 
   @override
   String toString() =>
@@ -1533,8 +1500,7 @@ class TextHeightBehavior {
   /// Returns an encoded int representation of this object (excluding
   /// [leadingDistribution]).
   int _encode() {
-    return (applyHeightToFirstAscent ? 0 : 1 << 0) |
-        (applyHeightToLastDescent ? 0 : 1 << 1);
+    return (applyHeightToFirstAscent ? 0 : 1 << 0) | (applyHeightToLastDescent ? 0 : 1 << 1);
   }
 
   @override
@@ -1669,8 +1635,7 @@ Int32List _encodeTextStyle(
   if (decorationThickness != null) {
     result[0] |= 1 << 8;
   }
-  if (fontFamily != null ||
-      (fontFamilyFallback != null && fontFamilyFallback.isNotEmpty)) {
+  if (fontFamily != null || (fontFamilyFallback != null && fontFamilyFallback.isNotEmpty)) {
     result[0] |= 1 << 9;
     // Passed separately to native.
   }
@@ -2103,8 +2068,7 @@ class ParagraphStyle {
        _ellipsis = ellipsis,
        _locale = locale,
        _leadingDistribution =
-           textHeightBehavior?.leadingDistribution ??
-           TextLeadingDistribution.proportional;
+           textHeightBehavior?.leadingDistribution ?? TextLeadingDistribution.proportional;
 
   final Int32List _encoded;
   final String? _fontFamily;
@@ -2211,8 +2175,7 @@ ByteData _encodeStrut(
     data.setInt8(byteCount, fontStyle.index);
     byteCount += 1;
   }
-  if (fontFamily != null ||
-      (fontFamilyFallback != null && fontFamilyFallback.isNotEmpty)) {
+  if (fontFamily != null || (fontFamilyFallback != null && fontFamilyFallback.isNotEmpty)) {
     bitmask |= 1 << 2;
     // passed separately to native
   }
@@ -2340,18 +2303,12 @@ class StrutStyle {
         other._fontFamily == _fontFamily &&
         other._leadingDistribution == _leadingDistribution &&
         _listEquals<String>(other._fontFamilyFallback, _fontFamilyFallback) &&
-        _listEquals<int>(
-          other._encoded.buffer.asInt8List(),
-          _encoded.buffer.asInt8List(),
-        );
+        _listEquals<int>(other._encoded.buffer.asInt8List(), _encoded.buffer.asInt8List());
   }
 
   @override
-  int get hashCode => Object.hash(
-    Object.hashAll(_encoded.buffer.asInt8List()),
-    _fontFamily,
-    _leadingDistribution,
-  );
+  int get hashCode =>
+      Object.hash(Object.hashAll(_encoded.buffer.asInt8List()), _fontFamily, _leadingDistribution);
 }
 
 /// A direction in which text flows.
@@ -2452,13 +2409,7 @@ enum TextDirection {
 /// This is similar to [Rect] but includes an inherent [TextDirection].
 class TextBox {
   /// Creates an object that describes a box containing text.
-  const TextBox.fromLTRBD(
-    this.left,
-    this.top,
-    this.right,
-    this.bottom,
-    this.direction,
-  );
+  const TextBox.fromLTRBD(this.left, this.top, this.right, this.bottom, this.direction);
 
   /// The left edge of the text box, irrespective of direction.
   ///
@@ -2591,10 +2542,7 @@ class TextPosition {
   /// Creates an object representing a particular position in a string.
   ///
   /// The arguments must not be null (so the [offset] argument is required).
-  const TextPosition({
-    required this.offset,
-    this.affinity = TextAffinity.downstream,
-  });
+  const TextPosition({required this.offset, this.affinity = TextAffinity.downstream});
 
   /// The index of the character that immediately follows the position in the
   /// string representation of the text.
@@ -2618,9 +2566,7 @@ class TextPosition {
     if (other.runtimeType != runtimeType) {
       return false;
     }
-    return other is TextPosition &&
-        other.offset == offset &&
-        other.affinity == affinity;
+    return other is TextPosition && other.offset == offset && other.affinity == affinity;
   }
 
   @override
@@ -2651,10 +2597,7 @@ class TextRange {
   /// A text range that starts and ends at offset.
   ///
   /// The [offset] argument must be non-null and greater than or equal to -1.
-  const TextRange.collapsed(int offset)
-    : assert(offset >= -1),
-      start = offset,
-      end = offset;
+  const TextRange.collapsed(int offset) : assert(offset >= -1), start = offset, end = offset;
 
   /// A text range that contains nothing and is not in the text.
   static const TextRange empty = TextRange(start: -1, end: -1);
@@ -2729,13 +2672,11 @@ class TextSelection extends TextRange {
   /// A collapsed selection starts and ends at the same offset, which means it
   /// contains zero characters but instead serves as an insertion point in the
   /// text.
-  const TextSelection.collapsed({
-    required int offset,
-    this.affinity = TextAffinity.downstream,
-  }) : baseOffset = offset,
-       extentOffset = offset,
-       isDirectional = false,
-       super.collapsed(offset);
+  const TextSelection.collapsed({required int offset, this.affinity = TextAffinity.downstream})
+    : baseOffset = offset,
+      extentOffset = offset,
+      isDirectional = false,
+      super.collapsed(offset);
 
   /// Creates a collapsed selection at the given text position.
   ///
@@ -2856,15 +2797,10 @@ class TextSelection extends TextRange {
   @override
   int get hashCode {
     if (!isValid) {
-      return Object.hash(
-        -1.hashCode,
-        -1.hashCode,
-        TextAffinity.downstream.hashCode,
-      );
+      return Object.hash(-1.hashCode, -1.hashCode, TextAffinity.downstream.hashCode);
     }
 
-    final int affinityHash =
-        isCollapsed ? affinity.hashCode : TextAffinity.downstream.hashCode;
+    final int affinityHash = isCollapsed ? affinity.hashCode : TextAffinity.downstream.hashCode;
     return Object.hash(
       baseOffset.hashCode,
       extentOffset.hashCode,
@@ -3385,8 +3321,7 @@ abstract class Paragraph {
   bool get debugDisposed;
 }
 
-base class _NativeParagraph extends NativeFieldWrapperClass1
-    implements Paragraph {
+base class _NativeParagraph extends NativeFieldWrapperClass1 implements Paragraph {
   /// This class is created by the engine, and should not be instantiated
   /// or extended directly.
   ///
@@ -3396,59 +3331,35 @@ base class _NativeParagraph extends NativeFieldWrapperClass1
   bool _needsLayout = true;
 
   @override
-  @Native<Double Function(Pointer<Void>)>(
-    symbol: 'Paragraph::width',
-    isLeaf: true,
-  )
+  @Native<Double Function(Pointer<Void>)>(symbol: 'Paragraph::width', isLeaf: true)
   external double get width;
 
   @override
-  @Native<Double Function(Pointer<Void>)>(
-    symbol: 'Paragraph::height',
-    isLeaf: true,
-  )
+  @Native<Double Function(Pointer<Void>)>(symbol: 'Paragraph::height', isLeaf: true)
   external double get height;
 
   @override
-  @Native<Double Function(Pointer<Void>)>(
-    symbol: 'Paragraph::longestLine',
-    isLeaf: true,
-  )
+  @Native<Double Function(Pointer<Void>)>(symbol: 'Paragraph::longestLine', isLeaf: true)
   external double get longestLine;
 
   @override
-  @Native<Double Function(Pointer<Void>)>(
-    symbol: 'Paragraph::minIntrinsicWidth',
-    isLeaf: true,
-  )
+  @Native<Double Function(Pointer<Void>)>(symbol: 'Paragraph::minIntrinsicWidth', isLeaf: true)
   external double get minIntrinsicWidth;
 
   @override
-  @Native<Double Function(Pointer<Void>)>(
-    symbol: 'Paragraph::maxIntrinsicWidth',
-    isLeaf: true,
-  )
+  @Native<Double Function(Pointer<Void>)>(symbol: 'Paragraph::maxIntrinsicWidth', isLeaf: true)
   external double get maxIntrinsicWidth;
 
   @override
-  @Native<Double Function(Pointer<Void>)>(
-    symbol: 'Paragraph::alphabeticBaseline',
-    isLeaf: true,
-  )
+  @Native<Double Function(Pointer<Void>)>(symbol: 'Paragraph::alphabeticBaseline', isLeaf: true)
   external double get alphabeticBaseline;
 
   @override
-  @Native<Double Function(Pointer<Void>)>(
-    symbol: 'Paragraph::ideographicBaseline',
-    isLeaf: true,
-  )
+  @Native<Double Function(Pointer<Void>)>(symbol: 'Paragraph::ideographicBaseline', isLeaf: true)
   external double get ideographicBaseline;
 
   @override
-  @Native<Bool Function(Pointer<Void>)>(
-    symbol: 'Paragraph::didExceedMaxLines',
-    isLeaf: true,
-  )
+  @Native<Bool Function(Pointer<Void>)>(symbol: 'Paragraph::didExceedMaxLines', isLeaf: true)
   external bool get didExceedMaxLines;
 
   @override
@@ -3460,10 +3371,7 @@ base class _NativeParagraph extends NativeFieldWrapperClass1
     }());
   }
 
-  @Native<Void Function(Pointer<Void>, Double)>(
-    symbol: 'Paragraph::layout',
-    isLeaf: true,
-  )
+  @Native<Void Function(Pointer<Void>, Double)>(symbol: 'Paragraph::layout', isLeaf: true)
   external void _layout(double width);
 
   List<TextBox> _decodeTextBoxes(Float32List encoded) {
@@ -3500,43 +3408,28 @@ base class _NativeParagraph extends NativeFieldWrapperClass1
   @Native<Handle Function(Pointer<Void>, Uint32, Uint32, Uint32, Uint32)>(
     symbol: 'Paragraph::getRectsForRange',
   )
-  external Float32List _getBoxesForRange(
-    int start,
-    int end,
-    int boxHeightStyle,
-    int boxWidthStyle,
-  );
+  external Float32List _getBoxesForRange(int start, int end, int boxHeightStyle, int boxWidthStyle);
 
   @override
   List<TextBox> getBoxesForPlaceholders() {
     return _decodeTextBoxes(_getBoxesForPlaceholders());
   }
 
-  @Native<Handle Function(Pointer<Void>)>(
-    symbol: 'Paragraph::getRectsForPlaceholders',
-  )
+  @Native<Handle Function(Pointer<Void>)>(symbol: 'Paragraph::getRectsForPlaceholders')
   external Float32List _getBoxesForPlaceholders();
 
   @override
   TextPosition getPositionForOffset(Offset offset) {
     final List<int> encoded = _getPositionForOffset(offset.dx, offset.dy);
-    return TextPosition(
-      offset: encoded[0],
-      affinity: TextAffinity.values[encoded[1]],
-    );
+    return TextPosition(offset: encoded[0], affinity: TextAffinity.values[encoded[1]]);
   }
 
-  @Native<Handle Function(Pointer<Void>, Double, Double)>(
-    symbol: 'Paragraph::getPositionForOffset',
-  )
+  @Native<Handle Function(Pointer<Void>, Double, Double)>(symbol: 'Paragraph::getPositionForOffset')
   external List<int> _getPositionForOffset(double dx, double dy);
 
   @override
-  GlyphInfo? getGlyphInfoAt(int codeUnitOffset) =>
-      _getGlyphInfoAt(codeUnitOffset, GlyphInfo._);
-  @Native<Handle Function(Pointer<Void>, Uint32, Handle)>(
-    symbol: 'Paragraph::getGlyphInfoAt',
-  )
+  GlyphInfo? getGlyphInfoAt(int codeUnitOffset) => _getGlyphInfoAt(codeUnitOffset, GlyphInfo._);
+  @Native<Handle Function(Pointer<Void>, Uint32, Handle)>(symbol: 'Paragraph::getGlyphInfoAt')
   external GlyphInfo? _getGlyphInfoAt(int codeUnitOffset, Function constructor);
 
   @override
@@ -3545,11 +3438,7 @@ base class _NativeParagraph extends NativeFieldWrapperClass1
   @Native<Handle Function(Pointer<Void>, Double, Double, Handle)>(
     symbol: 'Paragraph::getClosestGlyphInfo',
   )
-  external GlyphInfo? _getClosestGlyphInfoForOffset(
-    double dx,
-    double dy,
-    Function constructor,
-  );
+  external GlyphInfo? _getClosestGlyphInfoForOffset(double dx, double dy, Function constructor);
 
   @override
   TextRange getWordBoundary(TextPosition position) {
@@ -3564,9 +3453,7 @@ base class _NativeParagraph extends NativeFieldWrapperClass1
     return TextRange(start: boundary[0], end: boundary[1]);
   }
 
-  @Native<Handle Function(Pointer<Void>, Uint32)>(
-    symbol: 'Paragraph::getWordBoundary',
-  )
+  @Native<Handle Function(Pointer<Void>, Uint32)>(symbol: 'Paragraph::getWordBoundary')
   external List<int> _getWordBoundary(int offset);
 
   @override
@@ -3575,10 +3462,7 @@ base class _NativeParagraph extends NativeFieldWrapperClass1
     final TextRange line = TextRange(start: boundary[0], end: boundary[1]);
 
     final List<int> nextBoundary = _getLineBoundary(position.offset + 1);
-    final TextRange nextLine = TextRange(
-      start: nextBoundary[0],
-      end: nextBoundary[1],
-    );
+    final TextRange nextLine = TextRange(start: nextBoundary[0], end: nextBoundary[1]);
     // If there is no next line, because we're at the end of the field, return line.
     if (!nextLine.isValid) {
       return line;
@@ -3596,17 +3480,13 @@ base class _NativeParagraph extends NativeFieldWrapperClass1
     return line;
   }
 
-  @Native<Handle Function(Pointer<Void>, Uint32)>(
-    symbol: 'Paragraph::getLineBoundary',
-  )
+  @Native<Handle Function(Pointer<Void>, Uint32)>(symbol: 'Paragraph::getLineBoundary')
   external List<int> _getLineBoundary(int offset);
 
   // Redirecting the paint function in this way solves some dependency problems
   // in the C++ code. If we straighten out the C++ dependencies, we can remove
   // this indirection.
-  @Native<Void Function(Pointer<Void>, Pointer<Void>, Double, Double)>(
-    symbol: 'Paragraph::paint',
-  )
+  @Native<Void Function(Pointer<Void>, Pointer<Void>, Double, Double)>(symbol: 'Paragraph::paint')
   external void _paint(_NativeCanvas canvas, double x, double y);
 
   @override
@@ -3631,17 +3511,12 @@ base class _NativeParagraph extends NativeFieldWrapperClass1
     return metrics;
   }
 
-  @Native<Handle Function(Pointer<Void>)>(
-    symbol: 'Paragraph::computeLineMetrics',
-  )
+  @Native<Handle Function(Pointer<Void>)>(symbol: 'Paragraph::computeLineMetrics')
   external Float64List _computeLineMetrics();
 
   @override
-  LineMetrics? getLineMetricsAt(int lineNumber) =>
-      _getLineMetricsAt(lineNumber, LineMetrics._);
-  @Native<Handle Function(Pointer<Void>, Uint32, Handle)>(
-    symbol: 'Paragraph::getLineMetricsAt',
-  )
+  LineMetrics? getLineMetricsAt(int lineNumber) => _getLineMetricsAt(lineNumber, LineMetrics._);
+  @Native<Handle Function(Pointer<Void>, Uint32, Handle)>(symbol: 'Paragraph::getLineMetricsAt')
   external LineMetrics? _getLineMetricsAt(int lineNumber, Function constructor);
 
   @override
@@ -3654,9 +3529,7 @@ base class _NativeParagraph extends NativeFieldWrapperClass1
     return lineNumber < 0 ? null : lineNumber;
   }
 
-  @Native<Int32 Function(Pointer<Void>, Uint32)>(
-    symbol: 'Paragraph::getLineNumberAt',
-  )
+  @Native<Int32 Function(Pointer<Void>, Uint32)>(symbol: 'Paragraph::getLineNumberAt')
   external int _getLineNumber(int codeUnitOffset);
 
   @override
@@ -3818,8 +3691,7 @@ abstract class ParagraphBuilder {
   Paragraph build();
 }
 
-base class _NativeParagraphBuilder extends NativeFieldWrapperClass1
-    implements ParagraphBuilder {
+base class _NativeParagraphBuilder extends NativeFieldWrapperClass1 implements ParagraphBuilder {
   _NativeParagraphBuilder(ParagraphStyle style)
     : _defaultLeadingDistribution = style._leadingDistribution {
     List<String>? strutFontFamilies;
@@ -3854,19 +3726,9 @@ base class _NativeParagraphBuilder extends NativeFieldWrapperClass1
     );
   }
 
-  @Native<
-    Void Function(
-      Handle,
-      Handle,
-      Handle,
-      Handle,
-      Handle,
-      Double,
-      Double,
-      Handle,
-      Handle,
-    )
-  >(symbol: 'ParagraphBuilder::Create')
+  @Native<Void Function(Handle, Handle, Handle, Handle, Handle, Double, Double, Handle, Handle)>(
+    symbol: 'ParagraphBuilder::Create',
+  )
   external void _constructor(
     Int32List encoded,
     ByteData? strutData,
@@ -3910,17 +3772,11 @@ base class _NativeParagraphBuilder extends NativeFieldWrapperClass1
     ByteData? encodedFontFeatures;
     final List<FontFeature>? fontFeatures = style._fontFeatures;
     if (fontFeatures != null) {
-      encodedFontFeatures = ByteData(
-        fontFeatures.length * FontFeature._kEncodedSize,
-      );
+      encodedFontFeatures = ByteData(fontFeatures.length * FontFeature._kEncodedSize);
       int byteOffset = 0;
       for (final FontFeature feature in fontFeatures) {
         feature._encode(
-          ByteData.view(
-            encodedFontFeatures.buffer,
-            byteOffset,
-            FontFeature._kEncodedSize,
-          ),
+          ByteData.view(encodedFontFeatures.buffer, byteOffset, FontFeature._kEncodedSize),
         );
         byteOffset += FontFeature._kEncodedSize;
       }
@@ -3929,17 +3785,11 @@ base class _NativeParagraphBuilder extends NativeFieldWrapperClass1
     ByteData? encodedFontVariations;
     final List<FontVariation>? fontVariations = style._fontVariations;
     if (fontVariations != null) {
-      encodedFontVariations = ByteData(
-        fontVariations.length * FontVariation._kEncodedSize,
-      );
+      encodedFontVariations = ByteData(fontVariations.length * FontVariation._kEncodedSize);
       int byteOffset = 0;
       for (final FontVariation variation in fontVariations) {
         variation._encode(
-          ByteData.view(
-            encodedFontVariations.buffer,
-            byteOffset,
-            FontVariation._kEncodedSize,
-          ),
+          ByteData.view(encodedFontVariations.buffer, byteOffset, FontVariation._kEncodedSize),
         );
         byteOffset += FontVariation._kEncodedSize;
       }
@@ -4005,10 +3855,7 @@ base class _NativeParagraphBuilder extends NativeFieldWrapperClass1
   static String _encodeLocale(Locale? locale) => locale?.toString() ?? '';
 
   @override
-  @Native<Void Function(Pointer<Void>)>(
-    symbol: 'ParagraphBuilder::pop',
-    isLeaf: true,
-  )
+  @Native<Void Function(Pointer<Void>)>(symbol: 'ParagraphBuilder::pop', isLeaf: true)
   external void pop();
 
   @override
@@ -4019,9 +3866,7 @@ base class _NativeParagraphBuilder extends NativeFieldWrapperClass1
     }
   }
 
-  @Native<Handle Function(Pointer<Void>, Handle)>(
-    symbol: 'ParagraphBuilder::addText',
-  )
+  @Native<Handle Function(Pointer<Void>, Handle)>(symbol: 'ParagraphBuilder::addText')
   external String? _addText(String text);
 
   @override
@@ -4072,9 +3917,7 @@ base class _NativeParagraphBuilder extends NativeFieldWrapperClass1
     return paragraph;
   }
 
-  @Native<Void Function(Pointer<Void>, Handle)>(
-    symbol: 'ParagraphBuilder::build',
-  )
+  @Native<Void Function(Pointer<Void>, Handle)>(symbol: 'ParagraphBuilder::build')
   external void _build(_NativeParagraph outParagraph);
 
   @override
@@ -4094,10 +3937,7 @@ Future<void> loadFontFromList(Uint8List list, {String? fontFamily}) {
 }
 
 final ByteData _fontChangeMessage =
-    utf8
-        .encode(json.encode(<String, Object?>{'type': 'fontsChange'}))
-        .buffer
-        .asByteData();
+    utf8.encode(json.encode(<String, Object?>{'type': 'fontsChange'})).buffer.asByteData();
 
 FutureOr<void> _sendFontChangeMessage() async {
   const String kSystemChannelName = 'flutter/system';
@@ -4110,22 +3950,12 @@ FutureOr<void> _sendFontChangeMessage() async {
       (ByteData? responseData) {},
     );
   } else {
-    channelBuffers.push(
-      kSystemChannelName,
-      _fontChangeMessage,
-      (ByteData? responseData) {},
-    );
+    channelBuffers.push(kSystemChannelName, _fontChangeMessage, (ByteData? responseData) {});
   }
 }
 
-@Native<Void Function(Handle, Handle, Handle)>(
-  symbol: 'FontCollection::LoadFontFromList',
-)
-external void _loadFontFromList(
-  Uint8List list,
-  _Callback<void> callback,
-  String fontFamily,
-);
+@Native<Void Function(Handle, Handle, Handle)>(symbol: 'FontCollection::LoadFontFromList')
+external void _loadFontFromList(Uint8List list, _Callback<void> callback, String fontFamily);
 
 ///
 ///
@@ -4155,23 +3985,20 @@ base class TextInputModel extends NativeFieldWrapperClass1 {
 
   String get text => _getText();
   TextSelection get selectionRange {
-    final selection = switch (_getSelection) {
+    final selection = switch (_getSelection()) {
       [final int offset] => TextSelection.collapsed(offset: offset),
-      [final int base, final int extent] => TextSelection(
-        baseOffset: base,
-        extentOffset: extent,
-      ),
-      _ => throw StateError('unreachable'),
+      [final int base, final int extent] => TextSelection(baseOffset: base, extentOffset: extent),
+      final value => throw StateError('unreachable: $value'),
     };
-    assert(selection.isValid);
+    assert(selection.isValid, '${selection.baseOffset} - ${selection.extentOffset}');
     return selection;
   }
 
-  TextRange? get _composingRange {
+  TextRange? get composingRange {
     final TextRange? composing = switch (_getComposing()) {
       null => null,
-      [final int start, final int end] => TextRange(start: start, end: end),
-      _ => throw StateError('unreachable'),
+      [final int start, final int length] => TextRange(start: start, end: start + length),
+      final value => throw StateError('unreachable: $value'),
     };
     return composing;
   }
@@ -4197,8 +4024,6 @@ base class TextInputModel extends NativeFieldWrapperClass1 {
     );
   }
 
-  void test() {}
-
   //void Function(
   //  String replacement,
   //  TextRange range,
@@ -4207,8 +4032,8 @@ base class TextInputModel extends NativeFieldWrapperClass1 {
   //)
   final VoidCallback didChangeTextEditingState;
 
-  static final _sizeAndTransform = Float32List(18);
-  void didUpdateLayout(Size size, Float32List transform) {
+  static final _sizeAndTransform = Float64List(18);
+  void didUpdateLayout(Size size, Float64List transform) {
     _sizeAndTransform
       ..[0] = size.width
       ..[1] = size.height
@@ -4231,9 +4056,7 @@ base class TextInputModel extends NativeFieldWrapperClass1 {
     _setSizeAndTransform(_sizeAndTransform);
   }
 
-  @Native<Void Function(Handle, Handle, Handle, Handle, Handle)>(
-    symbol: 'UiTextInputModel::Create',
-  )
+  @Native<Void Function(Handle, Handle, Handle, Handle, Handle)>(symbol: 'UiTextInputModel::Create')
   external void _constructor(
     VoidCallback onEditingStateUpdate,
     _NativeParagraph Function() paragraphGetter,
@@ -4243,27 +4066,14 @@ base class TextInputModel extends NativeFieldWrapperClass1 {
 
   @Native<Handle Function(Pointer<Void>)>(symbol: 'UiTextInputModel::getText')
   external String _getText();
-  @Native<Handle Function(Pointer<Void>)>(
-    symbol: 'UiTextInputModel::getSelectionRange ',
-  )
+  @Native<Handle Function(Pointer<Void>)>(symbol: 'UiTextInputModel::getSelectionRange')
   external List<int> _getSelection();
-  @Native<Handle Function(Pointer<Void>)>(
-    symbol: 'UiTextInputModel::getComposingRange',
-  )
+  @Native<Handle Function(Pointer<Void>)>(symbol: 'UiTextInputModel::getComposingRange')
   external List<int> _getComposing();
 
-  @Native<
-    Void Function(
-      Pointer<Void>,
-      Handle,
-      Uint32,
-      Uint32,
-      Uint32,
-      Uint32,
-      Uint32,
-      Uint32,
-    )
-  >(symbol: 'UiTextInputModel::replace')
+  @Native<Void Function(Pointer<Void>, Handle, Uint32, Uint32, Uint32, Uint32, Uint32, Uint32)>(
+    symbol: 'UiTextInputModel::replace',
+  )
   external void _replaceRange(
     String replacement,
     int rangeStart,
@@ -4274,10 +4084,10 @@ base class TextInputModel extends NativeFieldWrapperClass1 {
     int selectionEnd,
   );
 
-  @Native<Void Function(Pointer<Void>, Handle)>(
-    symbol: 'UiTextInputModel::attach',
-  )
-  external void attach(Map<String, Object?> configuration);
+  void attach(Map<String, Object?> configuration) =>
+      _attach(utf8.encode(json.encode(configuration)));
+  @Native<Void Function(Pointer<Void>, Handle)>(symbol: 'UiTextInputModel::attach')
+  external void _attach(Uint8List data);
 
   @Native<Void Function(Pointer<Void>)>(symbol: 'UiTextInputModel::detach')
   external void detach();
@@ -4287,10 +4097,8 @@ base class TextInputModel extends NativeFieldWrapperClass1 {
   )
   external void _setTextInputConfiguration(Uint8List configuration);
 
-  @Native<Void Function(Pointer<Void>, Handle)>(
-    symbol: 'UiTextInputModel::setSizeAndTransform',
-  )
-  external void _setSizeAndTransform(Float32List list);
+  @Native<Void Function(Pointer<Void>, Handle)>(symbol: 'UiTextInputModel::setSizeAndTransform')
+  external void _setSizeAndTransform(Float64List list);
 
   @Native<Void Function(Pointer<Void>)>(symbol: 'UiTextInputModel::dispose')
   external void dispose();

@@ -8,9 +8,9 @@
 #include <algorithm>
 #include <cstddef>
 #include <string>
+#include <tuple>
 #include "flutter/lib/ui/dart_wrapper.h"
 #include "flutter/lib/ui/ui_dart_state.h"
-#include "flutter/shell/platform/common/text_range.h"
 #include "fml/closure.h"
 #include "third_party/dart/runtime/include/dart_api.h"
 #include "third_party/tonic/typed_data/dart_byte_data.h"
@@ -20,6 +20,8 @@ class Paragraph;
 }
 namespace flutter {
 class Paragraph;
+using TextRange = std::pair<size_t, size_t>;
+using TextSelection = std::pair<size_t, size_t>;
 class UiTextInputModel : public RefCountedDartWrappable<UiTextInputModel> {
   DEFINE_WRAPPERTYPEINFO();
   FML_FRIEND_MAKE_REF_COUNTED(UiTextInputModel);
@@ -47,11 +49,10 @@ class UiTextInputModel : public RefCountedDartWrappable<UiTextInputModel> {
                size_t selectionStart,
                size_t selectionEnd);
 
-  void setTextInputConfiguration(const tonic::DartByteData& data,
-                                 const Dart_Handle paragraph);
-  void setSizeAndTransform(const tonic::DartByteData& data);
+  void setTextInputConfiguration(Dart_Handle data);
+  void setSizeAndTransform(Dart_Handle data);
 
-  void attach(const tonic::DartByteData& data);
+  void attach(Dart_Handle data);
   void detach();
 
   void dispose();
@@ -59,20 +60,22 @@ class UiTextInputModel : public RefCountedDartWrappable<UiTextInputModel> {
   std::function<void(size_t)> notifyIMEEditingStateWillChange;
   std::function<void(size_t)> notifyIMEEditingStateDidChange;
 
-  const txt::Paragraph& getParagraph();
+  txt::Paragraph& getParagraph();
+  const std::u16string& text() const { return text_; }
+  const TextSelection& selection() const { return selection_; }
+  const TextRange& composing() const { return composing_; }
 
- protected:
-  void replaceText(const std::u16string replacementText,
-                   size_t rangeStart,
-                   size_t rangeLength,
-                   size_t composingStart,
-                   size_t composingLength,
-                   size_t selectionStart,
-                   size_t selectionEnd,
+  void replaceText(const std::u16string_view& replacementText,
+                   const TextRange range,
+                   const TextRange composing,
+                   const TextSelection selection,
                    std::function<void(size_t)> editingStateWillChange = nullptr,
                    std::function<void(size_t)> editingStateDidChange = nullptr);
 
-  void onEditingStateChanged() {
+  void onEditingStateChanged(size_t change) {
+    if (change == 0) {
+      return;
+    }
     std::shared_ptr<tonic::DartState> dart_state =
         update_callback_.dart_state().lock();
     if (!dart_state) {
@@ -85,16 +88,13 @@ class UiTextInputModel : public RefCountedDartWrappable<UiTextInputModel> {
  private:
   std::shared_ptr<TextInputConnection> connection_;
   tonic::DartPersistentValue update_callback_;
-
   tonic::DartPersistentValue get_paragraph_callback_;
-  Paragraph* paragraph_;
-
   tonic::DartPersistentValue get_paragraph_offset_x_callback_;
   tonic::DartPersistentValue get_paragraph_offset_y_callback_;
 
   std::u16string text_;
-  TextRange selection_ = TextRange(0);
-  TextRange composing_ = TextRange(0);
+  TextSelection selection_ = {0, 0};
+  TextRange composing_ = {0, 0};
 
   UiTextInputModel(const UiTextInputModel&) = delete;
   UiTextInputModel(UiTextInputModel&&) = delete;

@@ -2416,12 +2416,25 @@ class EditableTextState extends State<EditableText>
   final GlobalKey _editableKey = GlobalKey();
 
   late final ui.TextInputModel model = ui.TextInputModel(
-    didChangeTextEditingState: () {},
-    initialText: _value.text,
-    initialSelection: _value.selection,
+    didChangeTextEditingState: _updateValue,
+    initialText: widget.controller.text,
+    initialSelection:
+        widget.controller.selection.isValid
+            ? widget.controller.selection
+            : TextSelection.collapsed(offset: widget.controller.text.length),
     getParagraph: () => renderEditable.paragraph!.$1,
     getParagraphOffset: () => renderEditable.paragraph!.$2,
   );
+
+  void _updateValue() {
+    final v = widget.controller.value;
+    _value = TextEditingValue(
+      text: model.text,
+      selection: model.selectionRange,
+      composing: model.composingRange ?? TextRange.empty,
+    );
+    //print("IME update: $v => $_value");
+  }
 
   /// Detects whether the clipboard can paste.
   final ClipboardStatusNotifier clipboardStatus =
@@ -3776,7 +3789,11 @@ class EditableTextState extends State<EditableText>
     _lastKnownRemoteTextEditingValue = localValue;
   }
 
-  TextEditingValue get _value => widget.controller.value;
+  TextEditingValue get _value => TextEditingValue(
+    text: model.text,
+    selection: model.selectionRange,
+    composing: model.composingRange ?? TextRange.empty,
+  );
   set _value(TextEditingValue value) {
     widget.controller.value = value;
   }
@@ -3870,31 +3887,31 @@ class EditableTextState extends State<EditableText>
       // _needsAutofill changes to false from true, the platform needs to be
       // notified to exclude this field from the autofill context. So we need to
       // provide the autofillId.
-      _textInputConnection =
-          _needsAutofill && currentAutofillScope != null
-              ? currentAutofillScope!.attach(this, _effectiveAutofillClient.textInputConfiguration)
-              : TextInput.attach(this, _effectiveAutofillClient.textInputConfiguration);
+      //_textInputConnection =
+      //    _needsAutofill && currentAutofillScope != null
+      //        ? currentAutofillScope!.attach(this, _effectiveAutofillClient.textInputConfiguration)
+      //        : TextInput.attach(this, _effectiveAutofillClient.textInputConfiguration);
       model.attach(_effectiveAutofillClient.textInputConfiguration.toJson());
       _updateSizeAndTransform();
       _schedulePeriodicPostFrameCallbacks();
-      _textInputConnection!
-        ..setStyle(
-          fontFamily: _style.fontFamily,
-          fontSize: _style.fontSize,
-          fontWeight: _style.fontWeight,
-          textDirection: _textDirection,
-          textAlign: widget.textAlign,
-        )
-        ..setEditingState(localValue)
-        ..show();
-      if (_needsAutofill) {
-        // Request autofill AFTER the size and the transform have been sent to
-        // the platform text input plugin.
-        _textInputConnection!.requestAutofill();
-      }
+      //_textInputConnection!
+      //  ..setStyle(
+      //    fontFamily: _style.fontFamily,
+      //    fontSize: _style.fontSize,
+      //    fontWeight: _style.fontWeight,
+      //    textDirection: _textDirection,
+      //    textAlign: widget.textAlign,
+      //  )
+      //  ..setEditingState(localValue)
+      //  ..show();
+      //if (_needsAutofill) {
+      //  // Request autofill AFTER the size and the transform have been sent to
+      //  // the platform text input plugin.
+      //  _textInputConnection!.requestAutofill();
+      //}
       _lastKnownRemoteTextEditingValue = localValue;
     } else {
-      _textInputConnection!.show();
+      //_textInputConnection!.show();
     }
   }
 
@@ -3902,6 +3919,7 @@ class EditableTextState extends State<EditableText>
     if (_hasInputConnection) {
       _textInputConnection!.close();
       _textInputConnection = null;
+      model.detach();
       _lastKnownRemoteTextEditingValue = null;
       _scribbleCacheKey = null;
       removeTextPlaceholder();
@@ -3938,6 +3956,7 @@ class EditableTextState extends State<EditableText>
     }
     _textInputConnection!.close();
     _textInputConnection = null;
+    model.detach();
     _lastKnownRemoteTextEditingValue = null;
 
     final AutofillScope? currentAutofillScope = _needsAutofill ? this.currentAutofillScope : null;
@@ -4708,7 +4727,7 @@ class EditableTextState extends State<EditableText>
     // The callback can be invoked when the layer is detached.
     // The input connection can be closed by the platform in which case this
     // widget doesn't rebuild.
-    if (!renderEditable.attached || !_hasInputConnection) {
+    if (!renderEditable.attached) {
       return;
     }
     assert(mounted);
@@ -4721,7 +4740,7 @@ class EditableTextState extends State<EditableText>
   void _updateSizeAndTransform() {
     final Size size = renderEditable.size;
     final Matrix4 transform = renderEditable.getTransformTo(null);
-    _textInputConnection!.setEditableSizeAndTransform(size, transform);
+    model.didUpdateLayout(size, transform.storage);
   }
 
   void _schedulePeriodicPostFrameCallbacks([Duration? duration]) {
@@ -5620,7 +5639,7 @@ class EditableTextState extends State<EditableText>
 
     return _CompositionCallback(
       compositeCallback: _compositeCallback,
-      enabled: _hasInputConnection,
+      enabled: true,
       child: Actions(
         actions: _actions,
         child: Builder(

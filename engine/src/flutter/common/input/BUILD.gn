@@ -12,7 +12,10 @@ source_set("input") {
     "text_input_connection.h",
   ]
 
-  deps = [ "//flutter/fml" ]
+  deps = [
+    "//flutter/fml",
+    "//flutter/third_party/dart/runtime:dart_api",
+  ]
 
   public_configs = [ "//flutter:config" ]
 }

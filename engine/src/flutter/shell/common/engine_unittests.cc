@@ -26,15 +26,17 @@ namespace {
 
 class FakeTextInputConnection : public TextInputConnection {
  public:
-  FakeTextInputConnection(const UiTextInputModel& model,
-                          fml::MallocMapping textInputConfiguration)
-      : flutter::TextInputConnection(model) {
-        };
+  FakeTextInputConnection(UiTextInputModel& model)
+      : flutter::TextInputConnection(model){};
 
   ~FakeTextInputConnection() override {}
 
   void UpdateTextInputConfiguration(
-      fml::MallocMapping textInputConfiguration) override {};
+      Dart_Handle textInputConfiguration) override {}
+
+  void SetSizeAndTransform(double width,
+                           double height,
+                           const double matrix4[16]) override {}
 };
 
 class FakeTextInputConnectionFactory : public TextInputConnectionFactory {
@@ -44,10 +46,9 @@ class FakeTextInputConnectionFactory : public TextInputConnectionFactory {
   ~FakeTextInputConnectionFactory() override {}
 
   std::shared_ptr<TextInputConnection> CreateTextInputConnection(
-      const UiTextInputModel& model,
-      fml::MallocMapping textInputConfiguration) override {
-    return std::make_shared<FakeTextInputConnection>(
-        model, std::move(textInputConfiguration));
+      UiTextInputModel& model,
+      Dart_Handle textInputConfiguration) override {
+    return std::make_shared<FakeTextInputConnection>(model);
   }
 };
 
