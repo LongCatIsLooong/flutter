@@ -159,29 +159,51 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
 
 // Informs the IME that the editing state will change.
 - (void)editingStateWillChange:(size_t)flag {
+  // NSLog(@"editingStateWillChange: %lu, delegate: %@\n", flag, self.inputDelegate);
   if (flag & 1) {
+    [self.inputDelegate selectionWillChange:self];
   }
   if (flag >> 1) {
+    [self.inputDelegate textWillChange:self];
   }
 }
 
 // Informs the IME that the editing state has changed.
 - (void)editingStateDidChange:(size_t)flag {
+  // NSLog(@"editingStateDidChange: %lu, delegate: %@\n", flag, self.inputDelegate);
+  if (flag & 1) {
+    [self.inputDelegate selectionDidChange:self];
+  }
+  if (flag >> 1) {
+    [self.inputDelegate textDidChange:self];
+
+    // auto notification = [[NSNotification alloc] initWithName:UITextViewTextDidChangeNotification
+    // object:self userInfo:nil];
+
+    // Is this notification private?
+    auto notification = [[NSNotification alloc] initWithName:@"UITextSelectionDidScroll"
+                                                      object:self
+                                                    userInfo:nil];
+    [[NSNotificationCenter defaultCenter] postNotification:notification];
+  }
 }
 
 - (void)replaceText:(NSString*)replacementText
               range:(const flutter::TextRange&)replaceRange
         markedRange:(const flutter::TextRange&)markedRange
      selectionRange:(const flutter::TextSelection&)selectionRange {
-  std::function<void(size_t)> x = [&](size_t flag) {
+  std::function<void(size_t)> willChange = [&](size_t flag) { [self editingStateWillChange:flag]; };
+  std::function<void(size_t)> didChange = [&](size_t flag) {
     _textInputState->onEditingStateChanged(flag);
+    [self editingStateDidChange:flag];
   };
 
   const char16_t* data = (const char16_t*)CFStringGetCStringPtr(
       (__bridge CFStringRef)replacementText, kCFStringEncodingUTF16LE);
   if (data || !replacementText) {
     return _textInputState->replaceText(std::u16string_view(data, replacementText.length),
-                                        replaceRange, markedRange, selectionRange, nullptr, x);
+                                        replaceRange, markedRange, selectionRange, willChange,
+                                        didChange);
   }
   // TODO:
   //  const char* latin1 = replacementText.UTF8String;
@@ -190,7 +212,8 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
   //  char16_t*>([replacementText characterAtIndex:0]), replacementText.length);
   std::u16string string = std::u16string(replacementText.length, 0);
   [replacementText getCharacters:(unichar*)string.data()];
-  _textInputState->replaceText(string, replaceRange, markedRange, selectionRange, nullptr, x);
+  _textInputState->replaceText(string, replaceRange, markedRange, selectionRange, willChange,
+                               didChange);
 }
 
 #pragma mark - UIResponder

@@ -66,16 +66,15 @@ void UiTextInputModel::replaceText(
     const TextSelection selection,
     std::function<void(size_t)> editingStateWillChange,
     std::function<void(size_t)> editingStateDidChange) {
-  printf("??? replace: (%lu, %lu), \n", range.first, range.second);
   TextRange normalizedComposing = composing;
   if (composing.second == 0) {
     normalizedComposing = {0, 0};
   }
-  const int textWillChange =
+  const bool textWillChange =
       text_.compare(range.first, range.second, replacementText);
 
-  const size_t changeType = (selection == selection_) |
-                            ((normalizedComposing == composing_) << 1) |
+  const size_t changeType = (selection != selection_) |
+                            ((normalizedComposing != composing_) << 1) |
                             (textWillChange << 2);
   if (changeType != 0 && editingStateWillChange) {
     editingStateWillChange(changeType);
@@ -84,8 +83,6 @@ void UiTextInputModel::replaceText(
   selection_ = selection;
   composing_ = normalizedComposing;
   if (textWillChange) {
-    printf("%lu text replace: (%lu, %lu), %lu \n", text_.size(), range.first,
-           range.second, replacementText.size());
     text_.replace(range.first, range.second, replacementText);
   }
   if (changeType != 0 && editingStateDidChange) {

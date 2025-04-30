@@ -45,12 +45,10 @@ class IOSTextInputConnection : public TextInputConnection {
   void SetSizeAndTransform(double width, double height, const double* matrix4) override {
     // Column major?
     const CATransform3D* transform = (const CATransform3D*)matrix4;
-    CGPoint origin =
-    CGPointApplyAffineTransform(CGPointZero, CATransform3DGetAffineTransform(*transform));
-    text_input_.frame = CGRectMake(origin.x, origin.y, width, height);
-    //text_input_.frame = CGRectMake(0, 0, width, height);
+    // CGPoint origin = CGPointApplyAffineTransform(CGPointZero,
+    // CATransform3DGetAffineTransform(*transform)); text_input_.frame = CGRectMake(origin.x,
+    // origin.y, width, height); text_input_.frame = CGRectMake(0, 0, width, height);
     text_input_.transform = CATransform3DGetAffineTransform(*transform);
-    NSLog(@"??");
   }
 
  private:
