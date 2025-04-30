@@ -73,19 +73,19 @@ std::unique_ptr<Engine> CreateEngine(
         text_input_connection_factory,
     const std::shared_future<impeller::RuntimeStageBackend>&
         runtime_stage_backend) {
-  return std::make_unique<Engine>(delegate,             //
-                                  dispatcher_maker,     //
-                                  vm,                   //
-                                  isolate_snapshot,     //
-                                  task_runners,         //
-                                  platform_data,        //
-                                  settings,             //
-                                  std::move(animator),  //
-                                  io_manager,           //
-                                  unref_queue,          //
+  return std::make_unique<Engine>(delegate,                       //
+                                  dispatcher_maker,               //
+                                  vm,                             //
+                                  isolate_snapshot,               //
+                                  task_runners,                   //
+                                  platform_data,                  //
+                                  settings,                       //
+                                  std::move(animator),            //
+                                  io_manager,                     //
+                                  unref_queue,                    //
                                   text_input_connection_factory,  //
-                                  snapshot_delegate,    //
-                                  gpu_disabled_switch,  //
+                                  snapshot_delegate,              //
+                                  gpu_disabled_switch,            //
                                   runtime_stage_backend);
 }
 
@@ -362,15 +362,9 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
                          &snapshot_delegate_future,                       //
                          &runtime_stage_future,                           //
                          &unref_queue_future,                             //
-<<<<<<< HEAD
-                         &on_create_engine,                               //
                          text_input_connection_factory =
                              platform_view->GetTextInputConnectionFactory(),  //
-                         runtime_stage_backend = DetermineRuntimeStageBackend(
-                             platform_view->GetImpellerContext())]() mutable {
-=======
                          &on_create_engine]() mutable {
->>>>>>> upstream/master
         TRACE_EVENT0("flutter", "ShellSetupUISubsystem");
         const auto& task_runners = shell->GetTaskRunners();
 
@@ -379,24 +373,6 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
         auto animator = std::make_unique<Animator>(*shell, task_runners,
                                                    std::move(vsync_waiter));
 
-<<<<<<< HEAD
-        engine_promise.set_value(on_create_engine(
-            *shell,                               //
-            dispatcher_maker,                     //
-            *shell->GetDartVM(),                  //
-            std::move(isolate_snapshot),          //
-            task_runners,                         //
-            platform_data,                        //
-            shell->GetSettings(),                 //
-            std::move(animator),                  //
-            weak_io_manager_future.get(),         //
-            unref_queue_future.get(),             //
-            snapshot_delegate_future.get(),       //
-            shell->is_gpu_disabled_sync_switch_,  //
-            text_input_connection_factory,        //
-            runtime_stage_backend                 //
-            ));
-=======
         engine_promise.set_value(
             on_create_engine(*shell,                               //
                              dispatcher_maker,                     //
@@ -410,8 +386,8 @@ std::unique_ptr<Shell> Shell::CreateShellOnPlatformThread(
                              unref_queue_future.get(),             //
                              snapshot_delegate_future.get(),       //
                              shell->is_gpu_disabled_sync_switch_,  //
+                             text_input_connection_factory,        //
                              runtime_stage_future));
->>>>>>> upstream/master
       }));
 
   if (!shell->Setup(std::move(platform_view),  //
@@ -687,14 +663,10 @@ std::unique_ptr<Shell> Shell::Spawn(
           const fml::RefPtr<SkiaUnrefQueue>& unref_queue,
           fml::TaskRunnerAffineWeakPtr<SnapshotDelegate> snapshot_delegate,
           const std::shared_ptr<fml::SyncSwitch>& is_gpu_disabled_sync_switch,
-<<<<<<< HEAD
           const std::shared_ptr<TextInputConnectionFactory>&
               text_input_connection_factory,
-          impeller::RuntimeStageBackend runtime_stage_backend) {
-=======
           const std::shared_future<impeller::RuntimeStageBackend>&
               runtime_stage_backend) {
->>>>>>> upstream/master
         return engine->Spawn(
             /*delegate=*/delegate,
             /*dispatcher_maker=*/dispatcher_maker,

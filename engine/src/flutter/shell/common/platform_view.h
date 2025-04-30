@@ -988,7 +988,6 @@ class PlatformView {
   ///             This is intended to be called from the raster thread so that
   ///             Impeller context creation can be moved off the startup path.
   virtual void SetupImpellerContext() {}
->>>>>>> upstream/master
 
  protected:
   // This is the only method called on the raster task runner.

@@ -252,14 +252,12 @@ Dart_Isolate UIDartState::CreatePlatformIsolate(Dart_Handle entry_point,
   return nullptr;
 }
 
-<<<<<<< HEAD
 TextInputConnectionFactory& UIDartState::GetTextInputConnectionFactory() const {
   return *context_.text_input_connection_factory;
-=======
+}
 /// The runtime stage to use for fragment shaders.
 impeller::RuntimeStageBackend UIDartState::GetRuntimeStageBackend() const {
   return context_.runtime_stage_backend.get();
->>>>>>> upstream/master
 }
 
 }  // namespace flutter
