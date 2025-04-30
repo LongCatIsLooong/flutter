@@ -40,7 +40,6 @@ source_set("ui") {
     "floating_point.h",
     "input/text_input_model.cc",
     "input/text_input_model.h",
-    "io_manager.cc",
     "io_manager.h",
     "isolate_name_server/isolate_name_server.cc",
     "isolate_name_server/isolate_name_server.h",

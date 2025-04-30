@@ -11,6 +11,7 @@
 #include "flutter/shell/common/shell_test.h"
 #include "flutter/testing/fixture_test.h"
 #include "gmock/gmock.h"
+#include "impeller/core/runtime_types.h"
 
 // CREATE_NATIVE_ENTRY is leaky by design
 // NOLINTBEGIN(clang-analyzer-core.StackAddressEscape)
@@ -241,6 +242,8 @@ class EngineContext {
           [](DefaultPointerDataDispatcher::Delegate& delegate) {
             return std::make_unique<DefaultPointerDataDispatcher>(delegate);
           };
+      std::promise<impeller::RuntimeStageBackend> rsb;
+      rsb.set_value(impeller::RuntimeStageBackend::kVulkan);
       engine_ = std::make_unique<Engine>(
           /*delegate=*/delegate,
           /*dispatcher_maker=*/dispatcher_maker,
@@ -254,7 +257,8 @@ class EngineContext {
           /*unref_queue=*/nullptr,
           /*text_input_connection_factory=*/nullptr,
           /*snapshot_delegate=*/snapshot_delegate_,
-          /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>());
+          /*gpu_disabled_switch=*/std::make_shared<fml::SyncSwitch>(),
+          /*runtime_stage_backend=*/rsb.get_future());
     });
   }
 
