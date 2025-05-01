@@ -79,11 +79,11 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
 }
 
 - (UITextPosition*)start {
-  return [_FlutterTextPosition positionWithIndex:self.selection.first];
+  return [_FlutterTextPosition positionWithIndex:_selection.first];
 }
 
 - (UITextPosition*)end {
-  return [_FlutterTextPosition positionWithIndex:self.selection.second];
+  return [_FlutterTextPosition positionWithIndex:_selection.second];
 }
 - (flutter::TextRange)range {
   return normalize(_selection);
@@ -192,17 +192,18 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
               range:(const flutter::TextRange&)replaceRange
         markedRange:(const flutter::TextRange&)markedRange
      selectionRange:(const flutter::TextSelection&)selectionRange {
-  std::function<void(size_t)> willChange = [&](size_t flag) { [self editingStateWillChange:flag]; };
+  // std::function<void(size_t)> willChange = [&](size_t flag) { [self editingStateWillChange:flag];
+  // };
   std::function<void(size_t)> didChange = [&](size_t flag) {
     _textInputState->onEditingStateChanged(flag);
-    [self editingStateDidChange:flag];
+    //[self editingStateDidChange:flag];
   };
 
   const char16_t* data = (const char16_t*)CFStringGetCStringPtr(
       (__bridge CFStringRef)replacementText, kCFStringEncodingUTF16LE);
   if (data || !replacementText) {
     return _textInputState->replaceText(std::u16string_view(data, replacementText.length),
-                                        replaceRange, markedRange, selectionRange, willChange,
+                                        replaceRange, markedRange, selectionRange, nullptr,
                                         didChange);
   }
   // TODO:
@@ -212,7 +213,7 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
   //  char16_t*>([replacementText characterAtIndex:0]), replacementText.length);
   std::u16string string = std::u16string(replacementText.length, 0);
   [replacementText getCharacters:(unichar*)string.data()];
-  _textInputState->replaceText(string, replaceRange, markedRange, selectionRange, willChange,
+  _textInputState->replaceText(string, replaceRange, markedRange, selectionRange, nullptr,
                                didChange);
 }
 
@@ -392,7 +393,7 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
   if (position.index > other.index) {
     return NSOrderedDescending;
   } else if (position.index < other.index) {
-    return NSOrderedDescending;
+    return NSOrderedAscending;
   }
   return NSOrderedSame;
 }
@@ -439,7 +440,6 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
 
 - (CGRect)firstRectForRange:(UITextRange*)range {
   const auto [start, length] = range.range;
-  // NSAssert(length > 0, @"empty range: %lu, %lu", start, length);
   const bool isEmpty = length == 0;
   txt::Paragraph* paragraph = &_textInputState->getParagraph();
   const int lineNumber = paragraph->GetLineNumberAt(start);

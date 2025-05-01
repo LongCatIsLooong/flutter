@@ -13,7 +13,16 @@ library;
 
 import 'dart:async';
 import 'dart:io' show Platform;
-import 'dart:ui' show FlutterView, FontWeight, Locale, Offset, Rect, Size, TextAlign, TextDirection;
+import 'dart:ui'
+    show
+        FlutterView,
+        FontWeight,
+        Locale,
+        Offset,
+        Rect,
+        Size,
+        TextAlign,
+        TextDirection;
 
 import 'package:flutter/foundation.dart';
 import 'package:vector_math/vector_math_64.dart' show Matrix4;
@@ -108,7 +117,10 @@ class TextInputType {
   ///
   /// Requests a numeric keyboard with additional settings.
   /// The [signed] and [decimal] parameters are optional.
-  const TextInputType.numberWithOptions({this.signed = false, this.decimal = false}) : index = 2;
+  const TextInputType.numberWithOptions({
+    this.signed = false,
+    this.decimal = false,
+  }) : index = 2;
 
   /// Enum value index, corresponds to one of the [values].
   final int index;
@@ -252,7 +264,11 @@ class TextInputType {
 
   /// Returns a representation of this object as a JSON object.
   Map<String, dynamic> toJson() {
-    return <String, dynamic>{'name': _name, 'signed': signed, 'decimal': decimal};
+    return <String, dynamic>{
+      'name': _name,
+      'signed': signed,
+      'decimal': decimal,
+    };
   }
 
   @override
@@ -532,9 +548,11 @@ class TextInputConfiguration {
     this.enableDeltaModel = false,
     this.hintLocales = const <Locale>[],
   }) : smartDashesType =
-           smartDashesType ?? (obscureText ? SmartDashesType.disabled : SmartDashesType.enabled),
+           smartDashesType ??
+           (obscureText ? SmartDashesType.disabled : SmartDashesType.enabled),
        smartQuotesType =
-           smartQuotesType ?? (obscureText ? SmartQuotesType.disabled : SmartQuotesType.enabled);
+           smartQuotesType ??
+           (obscureText ? SmartQuotesType.disabled : SmartQuotesType.enabled);
 
   /// The ID of the view that the text input belongs to.
   ///
@@ -733,7 +751,8 @@ class TextInputConfiguration {
       smartDashesType: smartDashesType ?? this.smartDashesType,
       smartQuotesType: smartQuotesType ?? this.smartQuotesType,
       enableSuggestions: enableSuggestions ?? this.enableSuggestions,
-      enableInteractiveSelection: enableInteractiveSelection ?? this.enableInteractiveSelection,
+      enableInteractiveSelection:
+          enableInteractiveSelection ?? this.enableInteractiveSelection,
       actionLabel: actionLabel ?? this.actionLabel,
       inputAction: inputAction ?? this.inputAction,
       textCapitalization: textCapitalization ?? this.textCapitalization,
@@ -741,7 +760,8 @@ class TextInputConfiguration {
       enableIMEPersonalizedLearning:
           enableIMEPersonalizedLearning ?? this.enableIMEPersonalizedLearning,
       allowedMimeTypes: allowedMimeTypes ?? this.allowedMimeTypes,
-      autofillConfiguration: autofillConfiguration ?? this.autofillConfiguration,
+      autofillConfiguration:
+          autofillConfiguration ?? this.autofillConfiguration,
       enableDeltaModel: enableDeltaModel ?? this.enableDeltaModel,
       hintLocales: hintLocales ?? this.hintLocales,
     );
@@ -793,7 +813,9 @@ class TextInputConfiguration {
       'contentCommitMimeTypes': allowedMimeTypes,
       if (autofill != null) 'autofill': autofill,
       'enableDeltaModel': enableDeltaModel,
-      'hintLocales': hintLocales?.map((Locale locale) => locale.toLanguageTag()).toList(),
+      'hintLocales': hintLocales
+          ?.map((Locale locale) => locale.toLanguageTag())
+          .toList(),
     };
   }
 
@@ -971,7 +993,9 @@ class TextEditingValue {
     final TextSelection selection = TextSelection(
       baseOffset: encoded['selectionBase'] as int? ?? -1,
       extentOffset: encoded['selectionExtent'] as int? ?? -1,
-      affinity: _toTextAffinity(encoded['selectionAffinity'] as String?) ?? TextAffinity.downstream,
+      affinity:
+          _toTextAffinity(encoded['selectionAffinity'] as String?) ??
+          TextAffinity.downstream,
       isDirectional: encoded['selectionIsDirectional'] as bool? ?? false,
     );
     final TextRange composing = TextRange(
@@ -980,7 +1004,11 @@ class TextEditingValue {
     );
     assert(_textRangeIsValid(selection, text));
     assert(_textRangeIsValid(composing, text));
-    return TextEditingValue(text: text, selection: selection, composing: composing);
+    return TextEditingValue(
+      text: text,
+      selection: selection,
+      composing: composing,
+    );
   }
 
   /// The current text being edited.
@@ -1025,7 +1053,11 @@ class TextEditingValue {
   static const TextEditingValue empty = TextEditingValue();
 
   /// Creates a copy of this value but with the given fields replaced with the new values.
-  TextEditingValue copyWith({String? text, TextSelection? selection, TextRange? composing}) {
+  TextEditingValue copyWith({
+    String? text,
+    TextSelection? selection,
+    TextRange? composing,
+  }) {
     return TextEditingValue(
       text: text ?? this.text,
       selection: selection ?? this.selection,
@@ -1043,7 +1075,9 @@ class TextEditingValue {
   /// it usually indicates the current [composing] range is invalid because of a
   /// programming error.
   bool get isComposingRangeValid =>
-      composing.isValid && composing.isNormalized && composing.end <= text.length;
+      composing.isValid &&
+      composing.isNormalized &&
+      composing.end <= text.length;
 
   /// Returns a new [TextEditingValue], which is this [TextEditingValue] with
   /// its [text] partially replaced by the `replacementString`.
@@ -1063,7 +1097,10 @@ class TextEditingValue {
   ///
   /// This method does nothing if the given `replacementRange` is not
   /// [TextRange.isValid].
-  TextEditingValue replaced(TextRange replacementRange, String replacementString) {
+  TextEditingValue replaced(
+    TextRange replacementRange,
+    String replacementString,
+  ) {
     if (!replacementRange.isValid) {
       return this;
     }
@@ -1073,16 +1110,18 @@ class TextEditingValue {
       replacementString,
     );
 
-    if (replacementRange.end - replacementRange.start == replacementString.length) {
+    if (replacementRange.end - replacementRange.start ==
+        replacementString.length) {
       return copyWith(text: newText);
     }
 
     int adjustIndex(int originalIndex) {
       // The length added by adding the replacementString.
       final int replacedLength =
-          originalIndex <= replacementRange.start && originalIndex < replacementRange.end
-              ? 0
-              : replacementString.length;
+          originalIndex <= replacementRange.start &&
+              originalIndex < replacementRange.end
+          ? 0
+          : replacementString.length;
       // The length removed by removing the replacementRange.
       final int removedLength =
           originalIndex.clamp(replacementRange.start, replacementRange.end) -
@@ -1138,7 +1177,8 @@ class TextEditingValue {
   }
 
   @override
-  int get hashCode => Object.hash(text.hashCode, selection.hashCode, composing.hashCode);
+  int get hashCode =>
+      Object.hash(text.hashCode, selection.hashCode, composing.hashCode);
 
   // Verify that the given range is within the text.
   //
@@ -1233,7 +1273,10 @@ mixin TextSelectionDelegate {
   /// * [EditableTextState.userUpdateTextEditingValue]: an implementation that
   ///   applies additional pre-processing to the specified [value], before
   ///   updating the text editing state.
-  void userUpdateTextEditingValue(TextEditingValue value, SelectionChangedCause cause);
+  void userUpdateTextEditingValue(
+    TextEditingValue value,
+    SelectionChangedCause cause,
+  );
 
   /// Hides the text selection toolbar.
   ///
@@ -1384,7 +1427,10 @@ mixin TextInputClient {
   ///
   ///  * [TextInputControl.hide], a method to hide the old input control.
   ///  * [TextInputControl.show], a method to show the new input control.
-  void didChangeInputControl(TextInputControl? oldControl, TextInputControl? newControl) {}
+  void didChangeInputControl(
+    TextInputControl? oldControl,
+    TextInputControl? newControl,
+  ) {}
 
   /// Requests that the client show the editing toolbar, for example when the
   /// platform changes the selection through a non-flutter method such as
@@ -1607,7 +1653,10 @@ class TextInputConnection {
     if (editableBoxSize != _cachedSize || transform != _cachedTransform) {
       _cachedSize = editableBoxSize;
       _cachedTransform = transform;
-      TextInput._instance._setEditableSizeAndTransform(editableBoxSize, transform);
+      TextInput._instance._setEditableSizeAndTransform(
+        editableBoxSize,
+        transform,
+      );
     }
   }
 
@@ -1624,7 +1673,9 @@ class TextInputConnection {
       return;
     }
     _cachedRect = rect;
-    final Rect validRect = rect.isFinite ? rect : Offset.zero & const Size(-1, -1);
+    final Rect validRect = rect.isFinite
+        ? rect
+        : Offset.zero & const Size(-1, -1);
     TextInput._instance._setComposingTextRect(validRect);
   }
 
@@ -1635,7 +1686,9 @@ class TextInputConnection {
       return;
     }
     _cachedCaretRect = rect;
-    final Rect validRect = rect.isFinite ? rect : Offset.zero & const Size(-1, -1);
+    final Rect validRect = rect.isFinite
+        ? rect
+        : Offset.zero & const Size(-1, -1);
     TextInput._instance._setCaretRect(validRect);
   }
 
@@ -1708,10 +1761,9 @@ TextInputAction _toTextInputAction(String action) {
     'TextInputAction.emergencyCall' => TextInputAction.emergencyCall,
     'TextInputAction.done' => TextInputAction.done,
     'TextInputAction.newline' => TextInputAction.newline,
-    _ =>
-      throw FlutterError.fromParts(<DiagnosticsNode>[
-        ErrorSummary('Unknown text input action: $action'),
-      ]),
+    _ => throw FlutterError.fromParts(<DiagnosticsNode>[
+      ErrorSummary('Unknown text input action: $action'),
+    ]),
   };
 }
 
@@ -1720,14 +1772,16 @@ FloatingCursorDragState _toTextCursorAction(String state) {
     'FloatingCursorDragState.start' => FloatingCursorDragState.Start,
     'FloatingCursorDragState.update' => FloatingCursorDragState.Update,
     'FloatingCursorDragState.end' => FloatingCursorDragState.End,
-    _ =>
-      throw FlutterError.fromParts(<DiagnosticsNode>[
-        ErrorSummary('Unknown text cursor action: $state'),
-      ]),
+    _ => throw FlutterError.fromParts(<DiagnosticsNode>[
+      ErrorSummary('Unknown text cursor action: $state'),
+    ]),
   };
 }
 
-RawFloatingCursorPoint _toTextPoint(FloatingCursorDragState state, Map<String, dynamic> encoded) {
+RawFloatingCursorPoint _toTextPoint(
+  FloatingCursorDragState state,
+  Map<String, dynamic> encoded,
+) {
   assert(
     encoded['X'] != null,
     'You must provide a value for the horizontal location of the floating cursor.',
@@ -1736,10 +1790,12 @@ RawFloatingCursorPoint _toTextPoint(FloatingCursorDragState state, Map<String, d
     encoded['Y'] != null,
     'You must provide a value for the vertical location of the floating cursor.',
   );
-  final Offset offset =
-      state == FloatingCursorDragState.Update
-          ? Offset((encoded['X'] as num).toDouble(), (encoded['Y'] as num).toDouble())
-          : Offset.zero;
+  final Offset offset = state == FloatingCursorDragState.Update
+      ? Offset(
+          (encoded['X'] as num).toDouble(),
+          (encoded['Y'] as num).toDouble(),
+        )
+      : Offset.zero;
   return RawFloatingCursorPoint(offset: offset, state: state);
 }
 
@@ -1811,8 +1867,8 @@ class TextInput {
   @visibleForTesting
   static void setChannel(MethodChannel newChannel) {
     assert(() {
-      _instance._channel =
-          newChannel..setMethodCallHandler(_instance._loudlyHandleTextInputInvocation);
+      _instance._channel = newChannel
+        ..setMethodCallHandler(_instance._loudlyHandleTextInputInvocation);
       return true;
     }());
   }
@@ -1876,31 +1932,33 @@ class TextInput {
     _PlatformTextInputControl.instance,
   };
 
-  static const List<TextInputAction> _androidSupportedInputActions = <TextInputAction>[
-    TextInputAction.none,
-    TextInputAction.unspecified,
-    TextInputAction.done,
-    TextInputAction.send,
-    TextInputAction.go,
-    TextInputAction.search,
-    TextInputAction.next,
-    TextInputAction.previous,
-    TextInputAction.newline,
-  ];
+  static const List<TextInputAction> _androidSupportedInputActions =
+      <TextInputAction>[
+        TextInputAction.none,
+        TextInputAction.unspecified,
+        TextInputAction.done,
+        TextInputAction.send,
+        TextInputAction.go,
+        TextInputAction.search,
+        TextInputAction.next,
+        TextInputAction.previous,
+        TextInputAction.newline,
+      ];
 
-  static const List<TextInputAction> _iOSSupportedInputActions = <TextInputAction>[
-    TextInputAction.unspecified,
-    TextInputAction.done,
-    TextInputAction.send,
-    TextInputAction.go,
-    TextInputAction.search,
-    TextInputAction.next,
-    TextInputAction.newline,
-    TextInputAction.continueAction,
-    TextInputAction.join,
-    TextInputAction.route,
-    TextInputAction.emergencyCall,
-  ];
+  static const List<TextInputAction> _iOSSupportedInputActions =
+      <TextInputAction>[
+        TextInputAction.unspecified,
+        TextInputAction.done,
+        TextInputAction.send,
+        TextInputAction.go,
+        TextInputAction.search,
+        TextInputAction.next,
+        TextInputAction.newline,
+        TextInputAction.continueAction,
+        TextInputAction.join,
+        TextInputAction.route,
+        TextInputAction.emergencyCall,
+      ];
 
   /// Ensure that a [TextInput] instance has been set up so that the platform
   /// can handle messages on the text input method channel.
@@ -1918,7 +1976,10 @@ class TextInput {
   /// A client that no longer wishes to interact with the text input control
   /// should call [TextInputConnection.close] on the returned
   /// [TextInputConnection].
-  static TextInputConnection attach(TextInputClient client, TextInputConfiguration configuration) {
+  static TextInputConnection attach(
+    TextInputClient client,
+    TextInputConfiguration configuration,
+  ) {
     final TextInputConnection connection = TextInputConnection._(client);
     _instance._attach(connection, configuration);
     return connection;
@@ -1927,14 +1988,19 @@ class TextInput {
   // This method actually notifies the embedding of the client. It is utilized
   // by [attach] and by [_handleTextInputInvocation] for the
   // `TextInputClient.requestExistingInputState` method.
-  void _attach(TextInputConnection connection, TextInputConfiguration configuration) {
+  void _attach(
+    TextInputConnection connection,
+    TextInputConfiguration configuration,
+  ) {
     assert(_debugEnsureInputActionWorksOnPlatform(configuration.inputAction));
     _currentConnection = connection;
     _currentConfiguration = configuration;
     _setClient(connection._client, configuration);
   }
 
-  static bool _debugEnsureInputActionWorksOnPlatform(TextInputAction inputAction) {
+  static bool _debugEnsureInputActionWorksOnPlatform(
+    TextInputAction inputAction,
+  ) {
     assert(() {
       if (kIsWeb) {
         // TODO(flutterweb): what makes sense here?
@@ -1961,12 +2027,14 @@ class TextInput {
   TextInputConnection? _currentConnection;
   late TextInputConfiguration _currentConfiguration;
 
-  final Map<String, ScribbleClient> _scribbleClients = <String, ScribbleClient>{};
+  final Map<String, ScribbleClient> _scribbleClients =
+      <String, ScribbleClient>{};
   bool _scribbleInProgress = false;
 
   /// Used for testing within the Flutter SDK to get the currently registered [ScribbleClient] list.
   @visibleForTesting
-  static Map<String, ScribbleClient> get scribbleClients => TextInput._instance._scribbleClients;
+  static Map<String, ScribbleClient> get scribbleClients =>
+      TextInput._instance._scribbleClients;
 
   /// Returns true if a scribble interaction is currently happening.
   bool get scribbleInProgress => _scribbleInProgress;
@@ -1981,14 +2049,13 @@ class TextInput {
           stack: stack,
           library: 'services library',
           context: ErrorDescription('during method call ${call.method}'),
-          informationCollector:
-              () => <DiagnosticsNode>[
-                DiagnosticsProperty<MethodCall>(
-                  'call',
-                  call,
-                  style: DiagnosticsTreeStyle.errorProperty,
-                ),
-              ],
+          informationCollector: () => <DiagnosticsNode>[
+            DiagnosticsProperty<MethodCall>(
+              'call',
+              call,
+              style: DiagnosticsTreeStyle.errorProperty,
+            ),
+          ],
         ),
       );
       rethrow;
@@ -2005,25 +2072,40 @@ class TextInput {
         );
         return;
       case 'TextInputClient.requestElementsInRect':
-        final List<double> args =
-            (methodCall.arguments as List<dynamic>)
-                .cast<num>()
-                .map<double>((num value) => value.toDouble())
-                .toList();
+        final List<double> args = (methodCall.arguments as List<dynamic>)
+            .cast<num>()
+            .map<double>((num value) => value.toDouble())
+            .toList();
         return _scribbleClients.keys
             .where((String elementIdentifier) {
-              final Rect rect = Rect.fromLTWH(args[0], args[1], args[2], args[3]);
-              if (!(_scribbleClients[elementIdentifier]?.isInScribbleRect(rect) ?? false)) {
+              final Rect rect = Rect.fromLTWH(
+                args[0],
+                args[1],
+                args[2],
+                args[3],
+              );
+              if (!(_scribbleClients[elementIdentifier]?.isInScribbleRect(
+                    rect,
+                  ) ??
+                  false)) {
                 return false;
               }
-              final Rect bounds = _scribbleClients[elementIdentifier]?.bounds ?? Rect.zero;
-              return !(bounds == Rect.zero || bounds.hasNaN || bounds.isInfinite);
+              final Rect bounds =
+                  _scribbleClients[elementIdentifier]?.bounds ?? Rect.zero;
+              return !(bounds == Rect.zero ||
+                  bounds.hasNaN ||
+                  bounds.isInfinite);
             })
             .map((String elementIdentifier) {
               final Rect bounds = _scribbleClients[elementIdentifier]!.bounds;
               return <dynamic>[
                 elementIdentifier,
-                ...<dynamic>[bounds.left, bounds.top, bounds.width, bounds.height],
+                ...<dynamic>[
+                  bounds.left,
+                  bounds.top,
+                  bounds.width,
+                  bounds.height,
+                ],
               ];
             })
             .toList();
@@ -2042,7 +2124,8 @@ class TextInput {
     // the client ID, as long as we have a _currentConnection.
     if (method == 'TextInputClient.requestExistingInputState') {
       _attach(_currentConnection!, _currentConfiguration);
-      final TextEditingValue? editingValue = _currentConnection!._client.currentTextEditingValue;
+      final TextEditingValue? editingValue =
+          _currentConnection!._client.currentTextEditingValue;
       if (editingValue != null) {
         _setEditingState(editingValue);
       }
@@ -2062,7 +2145,8 @@ class TextInput {
           editingValue[tag] as Map<String, dynamic>,
         );
         final AutofillClient? client = scope?.getAutofillClient(tag);
-        if (client != null && client.textInputConfiguration.autofillConfiguration.enabled) {
+        if (client != null &&
+            client.textInputConfiguration.autofillConfiguration.enabled) {
           client.autofill(textEditingValue);
         }
       }
@@ -2091,8 +2175,13 @@ class TextInput {
 
     switch (method) {
       case 'TextInputClient.updateEditingState':
-        final TextEditingValue value = TextEditingValue.fromJSON(args[1] as Map<String, dynamic>);
-        TextInput._instance._updateEditingValue(value, exclude: _PlatformTextInputControl.instance);
+        final TextEditingValue value = TextEditingValue.fromJSON(
+          args[1] as Map<String, dynamic>,
+        );
+        TextInput._instance._updateEditingValue(
+          value,
+          exclude: _PlatformTextInputControl.instance,
+        );
       case 'TextInputClient.updateEditingStateWithDeltas':
         assert(
           _currentConnection!._client is DeltaTextInputClient,
@@ -2104,33 +2193,44 @@ class TextInput {
             TextEditingDelta.fromJSON(encodedDelta as Map<String, dynamic>),
         ];
 
-        (_currentConnection!._client as DeltaTextInputClient).updateEditingValueWithDeltas(deltas);
+        (_currentConnection!._client as DeltaTextInputClient)
+            .updateEditingValueWithDeltas(deltas);
       case 'TextInputClient.performAction':
         if (args[1] as String == 'TextInputAction.commitContent') {
-          final KeyboardInsertedContent content = KeyboardInsertedContent.fromJson(
-            args[2] as Map<String, dynamic>,
-          );
+          final KeyboardInsertedContent content =
+              KeyboardInsertedContent.fromJson(args[2] as Map<String, dynamic>);
           _currentConnection!._client.insertContent(content);
         } else {
-          _currentConnection!._client.performAction(_toTextInputAction(args[1] as String));
+          _currentConnection!._client.performAction(
+            _toTextInputAction(args[1] as String),
+          );
         }
       case 'TextInputClient.performSelectors':
-        final List<String> selectors = (args[1] as List<dynamic>).cast<String>();
+        final List<String> selectors = (args[1] as List<dynamic>)
+            .cast<String>();
         selectors.forEach(_currentConnection!._client.performSelector);
       case 'TextInputClient.performPrivateCommand':
         final Map<String, dynamic> firstArg = args[1] as Map<String, dynamic>;
         _currentConnection!._client.performPrivateCommand(
           firstArg['action'] as String,
-          firstArg['data'] == null ? <String, dynamic>{} : firstArg['data'] as Map<String, dynamic>,
+          firstArg['data'] == null
+              ? <String, dynamic>{}
+              : firstArg['data'] as Map<String, dynamic>,
         );
       case 'TextInputClient.updateFloatingCursor':
         _currentConnection!._client.updateFloatingCursor(
-          _toTextPoint(_toTextCursorAction(args[1] as String), args[2] as Map<String, dynamic>),
+          _toTextPoint(
+            _toTextCursorAction(args[1] as String),
+            args[2] as Map<String, dynamic>,
+          ),
         );
       case 'TextInputClient.onConnectionClosed':
         _currentConnection!._client.connectionClosed();
       case 'TextInputClient.showAutocorrectionPromptRect':
-        _currentConnection!._client.showAutocorrectionPromptRect(args[1] as int, args[2] as int);
+        _currentConnection!._client.showAutocorrectionPromptRect(
+          args[1] as int,
+          args[2] as int,
+        );
       case 'TextInputClient.showToolbar':
         _currentConnection!._client.showToolbar();
       case 'TextInputClient.insertTextPlaceholder':
@@ -2163,7 +2263,10 @@ class TextInput {
     });
   }
 
-  void _setClient(TextInputClient client, TextInputConfiguration configuration) {
+  void _setClient(
+    TextInputClient client,
+    TextInputConfiguration configuration,
+  ) {
     for (final TextInputControl control in _inputControls) {
       control.attach(client, configuration);
     }
@@ -2250,7 +2353,10 @@ class TextInput {
     }
   }
 
-  void _updateEditingValue(TextEditingValue value, {TextInputControl? exclude}) {
+  void _updateEditingValue(
+    TextEditingValue value, {
+    TextInputControl? exclude,
+  }) {
     if (_currentConnection == null) {
       return;
     }
@@ -2330,7 +2436,10 @@ class TextInput {
   ///
   /// For example, the registered [ScribbleClient] list is used to respond to
   /// UIIndirectScribbleInteraction on an iPad.
-  static void registerScribbleElement(String elementIdentifier, ScribbleClient scribbleClient) {
+  static void registerScribbleElement(
+    String elementIdentifier,
+    ScribbleClient scribbleClient,
+  ) {
     TextInput._instance._scribbleClients[elementIdentifier] = scribbleClient;
   }
 
@@ -2457,20 +2566,25 @@ class _PlatformTextInputControl with TextInputControl {
   _PlatformTextInputControl._();
 
   /// The shared instance of [_PlatformTextInputControl].
-  static final _PlatformTextInputControl instance = _PlatformTextInputControl._();
+  static final _PlatformTextInputControl instance =
+      _PlatformTextInputControl._();
 
   MethodChannel get _channel => TextInput._instance._channel;
 
-  Map<String, dynamic> _configurationToJson(TextInputConfiguration configuration) {
+  Map<String, dynamic> _configurationToJson(
+    TextInputConfiguration configuration,
+  ) {
     final Map<String, dynamic> json = configuration.toJson();
-    if (TextInput._instance._currentControl != _PlatformTextInputControl.instance) {
+    if (TextInput._instance._currentControl !=
+        _PlatformTextInputControl.instance) {
       final Map<String, dynamic> none = TextInputType.none.toJson();
       // See: https://github.com/flutter/flutter/issues/125875
       // On Web engine, use isMultiline to create <input> or <textarea> element
       // When there's a custom [TextInputControl] installed.
       // It's only needed When there's a custom [TextInputControl] installed.
       if (kIsWeb) {
-        none['isMultiline'] = configuration.inputType == TextInputType.multiline;
+        none['isMultiline'] =
+            configuration.inputType == TextInputType.multiline;
       }
       json['inputType'] = none;
     }
@@ -2492,7 +2606,10 @@ class _PlatformTextInputControl with TextInputControl {
 
   @override
   void updateConfig(TextInputConfiguration configuration) {
-    _channel.invokeMethod<void>('TextInput.updateConfig', _configurationToJson(configuration));
+    _channel.invokeMethod<void>(
+      'TextInput.updateConfig',
+      _configurationToJson(configuration),
+    );
   }
 
   @override
@@ -2512,21 +2629,27 @@ class _PlatformTextInputControl with TextInputControl {
 
   @override
   void setEditableSizeAndTransform(Size editableBoxSize, Matrix4 transform) {
-    _channel.invokeMethod<void>('TextInput.setEditableSizeAndTransform', <String, dynamic>{
-      'width': editableBoxSize.width,
-      'height': editableBoxSize.height,
-      'transform': transform.storage,
-    });
+    _channel.invokeMethod<void>(
+      'TextInput.setEditableSizeAndTransform',
+      <String, dynamic>{
+        'width': editableBoxSize.width,
+        'height': editableBoxSize.height,
+        'transform': transform.storage,
+      },
+    );
   }
 
   @override
   void setComposingRect(Rect rect) {
-    _channel.invokeMethod<void>('TextInput.setMarkedTextRect', <String, dynamic>{
-      'width': rect.width,
-      'height': rect.height,
-      'x': rect.left,
-      'y': rect.top,
-    });
+    _channel.invokeMethod<void>(
+      'TextInput.setMarkedTextRect',
+      <String, dynamic>{
+        'width': rect.width,
+        'height': rect.height,
+        'x': rect.left,
+        'y': rect.top,
+      },
+    );
   }
 
   @override
@@ -2701,7 +2824,9 @@ class SystemContextMenuController with SystemContextMenuClient {
     );
 
     // Don't show the same thing that's already being shown.
-    if (_lastShown != null && _lastShown!.isVisible && _lastShown!._lastTargetRect == targetRect) {
+    if (_lastShown != null &&
+        _lastShown!.isVisible &&
+        _lastShown!._lastTargetRect == targetRect) {
       return Future<void>.value();
     }
 
@@ -2715,14 +2840,17 @@ class SystemContextMenuController with SystemContextMenuClient {
     _lastTargetRect = targetRect;
     _lastShown = this;
     _hiddenBySystem = false;
-    return _channel.invokeMethod('ContextMenu.showSystemContextMenu', <String, dynamic>{
-      'targetRect': <String, double>{
-        'x': targetRect.left,
-        'y': targetRect.top,
-        'width': targetRect.width,
-        'height': targetRect.height,
+    return _channel.invokeMethod(
+      'ContextMenu.showSystemContextMenu',
+      <String, dynamic>{
+        'targetRect': <String, double>{
+          'x': targetRect.left,
+          'y': targetRect.top,
+          'width': targetRect.width,
+          'height': targetRect.height,
+        },
       },
-    });
+    );
   }
 
   /// Shows the system context menu anchored on the given [Rect] with the given
@@ -2752,7 +2880,11 @@ class SystemContextMenuController with SystemContextMenuClient {
   ///  * [hide], which hides the menu shown by this method.
   ///  * [MediaQuery.supportsShowingSystemContextMenu], which indicates whether
   ///    this method is supported on the current platform.
-  Future<void> showWithItems(Rect targetRect, List<IOSSystemContextMenuItemData> items) {
+  Future<void> showWithItems(
+    Rect targetRect,
+    List<IOSSystemContextMenuItemData> items,
+  ) {
+    return Future<void>.value();
     assert(!_isDisposed);
     assert(items.isNotEmpty);
     assert(
@@ -2775,21 +2907,27 @@ class SystemContextMenuController with SystemContextMenuClient {
 
     ServicesBinding.systemContextMenuClient = this;
 
-    final List<Map<String, dynamic>> itemsJson =
-        items.map<Map<String, dynamic>>((IOSSystemContextMenuItemData item) => item._json).toList();
+    final List<Map<String, dynamic>> itemsJson = items
+        .map<Map<String, dynamic>>(
+          (IOSSystemContextMenuItemData item) => item._json,
+        )
+        .toList();
     _lastTargetRect = targetRect;
     _lastItems = items;
     _lastShown = this;
     _hiddenBySystem = false;
-    return _channel.invokeMethod('ContextMenu.showSystemContextMenu', <String, dynamic>{
-      'targetRect': <String, double>{
-        'x': targetRect.left,
-        'y': targetRect.top,
-        'width': targetRect.width,
-        'height': targetRect.height,
+    return _channel.invokeMethod(
+      'ContextMenu.showSystemContextMenu',
+      <String, dynamic>{
+        'targetRect': <String, double>{
+          'x': targetRect.left,
+          'y': targetRect.top,
+          'width': targetRect.width,
+          'height': targetRect.height,
+        },
+        'items': itemsJson,
       },
-      'items': itemsJson,
-    });
+    );
   }
 
   /// Hides this system context menu.
@@ -2890,7 +3028,8 @@ sealed class IOSSystemContextMenuItemData {
 ///    menu.
 ///  * [IOSSystemContextMenuItemCopy], which performs a similar role but at the
 ///    widget level.
-final class IOSSystemContextMenuItemDataCopy extends IOSSystemContextMenuItemData {
+final class IOSSystemContextMenuItemDataCopy
+    extends IOSSystemContextMenuItemData {
   /// Creates an instance of [IOSSystemContextMenuItemDataCopy].
   const IOSSystemContextMenuItemDataCopy();
 
@@ -2908,7 +3047,8 @@ final class IOSSystemContextMenuItemDataCopy extends IOSSystemContextMenuItemDat
 ///    menu.
 ///  * [IOSSystemContextMenuItemCut], which performs a similar role but at the
 ///    widget level.
-final class IOSSystemContextMenuItemDataCut extends IOSSystemContextMenuItemData {
+final class IOSSystemContextMenuItemDataCut
+    extends IOSSystemContextMenuItemData {
   /// Creates an instance of [IOSSystemContextMenuItemDataCut].
   const IOSSystemContextMenuItemDataCut();
 
@@ -2926,7 +3066,8 @@ final class IOSSystemContextMenuItemDataCut extends IOSSystemContextMenuItemData
 ///    menu.
 ///  * [IOSSystemContextMenuItemPaste], which performs a similar role but at the
 ///    widget level.
-final class IOSSystemContextMenuItemDataPaste extends IOSSystemContextMenuItemData {
+final class IOSSystemContextMenuItemDataPaste
+    extends IOSSystemContextMenuItemData {
   /// Creates an instance of [IOSSystemContextMenuItemDataPaste].
   const IOSSystemContextMenuItemDataPaste();
 
@@ -2945,7 +3086,8 @@ final class IOSSystemContextMenuItemDataPaste extends IOSSystemContextMenuItemDa
 ///    menu.
 ///  * [IOSSystemContextMenuItemSelectAll], which performs a similar role but at
 ///    the widget level.
-final class IOSSystemContextMenuItemDataSelectAll extends IOSSystemContextMenuItemData {
+final class IOSSystemContextMenuItemDataSelectAll
+    extends IOSSystemContextMenuItemData {
   /// Creates an instance of [IOSSystemContextMenuItemDataSelectAll].
   const IOSSystemContextMenuItemDataSelectAll();
 
@@ -2967,7 +3109,8 @@ final class IOSSystemContextMenuItemDataSelectAll extends IOSSystemContextMenuIt
 ///  * [IOSSystemContextMenuItemLookUp], which performs a similar role but at the
 ///    widget level, where the title can be replaced with a default localized
 ///    value.
-final class IOSSystemContextMenuItemDataLookUp extends IOSSystemContextMenuItemData {
+final class IOSSystemContextMenuItemDataLookUp
+    extends IOSSystemContextMenuItemData {
   /// Creates an instance of [IOSSystemContextMenuItemDataLookUp].
   const IOSSystemContextMenuItemDataLookUp({required this.title});
 
@@ -2998,7 +3141,8 @@ final class IOSSystemContextMenuItemDataLookUp extends IOSSystemContextMenuItemD
 ///  * [IOSSystemContextMenuItemSearchWeb], which performs a similar role but at
 ///    the widget level, where the title can be replaced with a default localized
 ///    value.
-final class IOSSystemContextMenuItemDataSearchWeb extends IOSSystemContextMenuItemData {
+final class IOSSystemContextMenuItemDataSearchWeb
+    extends IOSSystemContextMenuItemData {
   /// Creates an instance of [IOSSystemContextMenuItemDataSearchWeb].
   const IOSSystemContextMenuItemDataSearchWeb({required this.title});
 
@@ -3028,7 +3172,8 @@ final class IOSSystemContextMenuItemDataSearchWeb extends IOSSystemContextMenuIt
 ///  * [IOSSystemContextMenuItemShare], which performs a similar role but at
 ///    the widget level, where the title can be replaced with a default
 ///    localized value.
-final class IOSSystemContextMenuItemDataShare extends IOSSystemContextMenuItemData {
+final class IOSSystemContextMenuItemDataShare
+    extends IOSSystemContextMenuItemData {
   /// Creates an instance of [IOSSystemContextMenuItemDataShare].
   const IOSSystemContextMenuItemDataShare({required this.title});
 
