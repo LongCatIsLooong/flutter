@@ -2435,12 +2435,35 @@ class EditableTextState extends State<EditableText>
 
   void _updateValue() {
     final v = widget.controller.value;
-    _value = TextEditingValue(
+    final newValue = TextEditingValue(
       text: model.text,
       selection: model.selectionRange,
       composing: model.composingRange ?? TextRange.empty,
     );
-    //print("IME update: $v => $_value");
+    //_formatAndSetValue(newValue, SelectionChangedCause.keyboard, userInteraction: true);
+    // Hide the toolbar if the text was changed, but only hide the toolbar
+    // overlay; the selection handle's visibility will be handled
+    // by `_handleSelectionChanged`. https://github.com/flutter/flutter/issues/108673
+    hideToolbar(false);
+    _currentPromptRectRange = null;
+
+    _obscureShowCharTicksPending = _kObscureShowLatestCharCursorTicks;
+    _obscureLatestCharIndex = _value.selection.baseOffset;
+    _formatAndSetValue(newValue, SelectionChangedCause.keyboard);
+
+    if (_showBlinkingCursor && _cursorTimer != null) {
+      // To keep the cursor from blinking while typing, restart the timer here.
+      _stopCursorBlink(resetCharTicks: false);
+      _startCursorBlink();
+    }
+
+    // Wherever the value is changed by the user, schedule a showCaretOnScreen
+    // to make sure the user can see the changes they just made. Programmatic
+    // changes to `textEditingValue` do not trigger the behavior even if the
+    // text field is focused.
+    _scheduleShowCaretOnScreen(withAnimation: false);
+
+    //print("IME update: $v => $newValue");
   }
 
   /// Detects whether the clipboard can paste.

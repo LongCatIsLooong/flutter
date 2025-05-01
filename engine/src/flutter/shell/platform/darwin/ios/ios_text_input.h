@@ -49,6 +49,10 @@ class IOSTextInputConnection : public TextInputConnection {
     // CATransform3DGetAffineTransform(*transform)); text_input_.frame = CGRectMake(origin.x,
     // origin.y, width, height); text_input_.frame = CGRectMake(0, 0, width, height);
     text_input_.transform = CATransform3DGetAffineTransform(*transform);
+    //        auto notification = [[NSNotification alloc] initWithName:@"UITextSelectionDidScroll"
+    //                                                      object:text_input_
+    //                                                    userInfo:nil];
+    //    [[NSNotificationCenter defaultCenter] postNotification:notification];
   }
 
  private:
