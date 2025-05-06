@@ -2461,7 +2461,7 @@ class EditableTextState extends State<EditableText>
     // to make sure the user can see the changes they just made. Programmatic
     // changes to `textEditingValue` do not trigger the behavior even if the
     // text field is focused.
-    _scheduleShowCaretOnScreen(withAnimation: false);
+    _scheduleShowCaretOnScreen(withAnimation: true);
 
     //print("IME update: $v => $newValue");
   }
@@ -4770,6 +4770,13 @@ class EditableTextState extends State<EditableText>
   void _updateSizeAndTransform() {
     final Size size = renderEditable.size;
     final Matrix4 transform = renderEditable.getTransformTo(null);
+    final Offset paintOffset =
+        renderEditable.maxLines != 1
+            ? Offset(0.0, -renderEditable.offset.pixels)
+            : Offset(-renderEditable.offset.pixels, 0.0);
+
+    final Offset offset = model.getParagraphOffset() + paintOffset;
+    transform.translate(offset.dx, offset.dy);
     model.didUpdateLayout(size, transform.storage);
   }
 

@@ -192,11 +192,10 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
               range:(const flutter::TextRange&)replaceRange
         markedRange:(const flutter::TextRange&)markedRange
      selectionRange:(const flutter::TextSelection&)selectionRange {
-  // std::function<void(size_t)> willChange = [&](size_t flag) { [self editingStateWillChange:flag];
-  // };
+  std::function<void(size_t)> willChange = [&](size_t flag) { [self editingStateWillChange:flag]; };
   std::function<void(size_t)> didChange = [&](size_t flag) {
     _textInputState->onEditingStateChanged(flag);
-    //[self editingStateDidChange:flag];
+    [self editingStateDidChange:flag];
   };
 
   const char16_t* data = (const char16_t*)CFStringGetCStringPtr(
@@ -252,7 +251,15 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
     if (selected.first == 0) {
       return;
     }
-    range = {selected.first - 1, 1};
+    _FlutterTextPosition* caret = [_FlutterTextPosition positionWithIndex:selected.first];
+    _FlutterTextPosition* newStart =
+        (_FlutterTextPosition*)[self.tokenizer positionFromPosition:caret
+                                                         toBoundary:UITextGranularityCharacter
+                                                        inDirection:UITextLayoutDirectionLeft];
+    if (!newStart) {
+      return;
+    }
+    range = {newStart.index, 1};
   }
   NSLog(@"deleteBackward: %lu, %lu\n", range.first, range.second);
   [self replaceRange:[FlutterTextSelection range:range] withText:@""];
@@ -548,8 +555,8 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
 - (void)dictationRecognitionFailed {
 }
 
-- (void)insertDictationResult:(NSArray<UIDictationPhrase*>*)dictationResult {
-}
+//- (void)insertDictationResult:(NSArray<UIDictationPhrase*>*)dictationResult {
+//}
 
 //- (id)insertDictationResultPlaceholder {
 //}

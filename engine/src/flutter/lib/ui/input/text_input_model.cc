@@ -106,12 +106,16 @@ void UiTextInputModel::replace(Dart_Handle replacementText,
 }
 
 void UiTextInputModel::attach(Dart_Handle data) {
-  connection_ = UIDartState::Current()
+  if (!connection_) {
+   connection_ = UIDartState::Current()
                     ->GetTextInputConnectionFactory()
                     .CreateTextInputConnection(*this, data);
+  }
 }
 
-void UiTextInputModel::detach() {}
+void UiTextInputModel::detach() {
+  
+}
 
 void UiTextInputModel::setTextInputConfiguration(Dart_Handle data) {}
 
