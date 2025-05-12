@@ -4776,6 +4776,7 @@ class EditableTextState extends State<EditableText>
             : Offset(-renderEditable.offset.pixels, 0.0);
 
     final Offset offset = model.getParagraphOffset() + paintOffset;
+    // TODO: this is wrong.
     transform.translate(offset.dx, offset.dy);
     model.didUpdateLayout(size, transform.storage);
   }

@@ -53,6 +53,7 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
 /// Convenience extension for casting UITextPosition to _FlutterTextPosition
 @interface UITextPosition ()
 - (NSUInteger)index;
+- (UITextStorageDirection)affinity;
 @end
 
 @interface FlutterTextSelection : UITextRange
@@ -374,16 +375,61 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
 - (UITextPosition*)positionFromPosition:(UITextPosition*)position
                             inDirection:(UITextLayoutDirection)direction
                                  offset:(NSInteger)offset {
+  if (offset == 0) {
+    return position;
+  }
+  int64_t lineOffset;
   switch (direction) {
-    case UITextLayoutDirectionUp:
-    case UITextLayoutDirectionDown:
-      NSAssert(false, @"implement");
-      return nil;
     case UITextLayoutDirectionLeft:
       return [self positionFromPosition:position offset:-offset];
     case UITextLayoutDirectionRight:
       return [self positionFromPosition:position offset:offset];
+    case UITextLayoutDirectionUp:
+      lineOffset = -offset;
+    case UITextLayoutDirectionDown:
+      lineOffset = offset;
+      return nil;
   };
+
+  txt::Paragraph* paragraph = &_textInputState->getParagraph();
+  int64_t lineNumber = paragraph->GetLineNumberAt(position.index);
+  NSAssert(lineNumber > 0, @"bad input position");
+  int64_t targetLineNumber = lineNumber + lineOffset;
+  if (targetLineNumber < 0 || (int64_t)paragraph->GetNumberOfLines() <= targetLineNumber) {
+    return nil;
+  }
+
+  skia::textlayout::Paragraph::GlyphInfo info;
+  if (!paragraph->GetGlyphInfoAt(position.index, &info)) {
+    return nil;
+  }
+  const bool useRightEdge = (position.affinity == UITextStorageDirectionForward) ==
+                            (info.fDirection == skia::textlayout::TextDirection::kLtr);
+  const float xOffset =
+      useRightEdge ? info.fGraphemeLayoutBounds.right() : info.fGraphemeLayoutBounds.left();
+  float yOffset =
+      offset < 0 ? info.fGraphemeLayoutBounds.top() : info.fGraphemeLayoutBounds.bottom();
+
+  // TODO: expose TextLine API from SkParagraph
+  skia::textlayout::LineMetrics lineMetrics;
+  for (size_t l = lineNumber; targetLineNumber < l && l < targetLineNumber;
+       l += (offset < 0 ? -1 : 1)) {
+    if (!paragraph->GetLineMetricsAt(l, &lineMetrics)) {
+      NSAssert(false, @"unreachable: %lu.", l);
+    }
+    yOffset += lineMetrics.fHeight * (offset < 0 ? -1 : 1);
+  }
+  if (!paragraph->GetLineMetricsAt(targetLineNumber, &lineMetrics)) {
+    NSAssert(false, @"target line number %lld has no line metrics.", targetLineNumber);
+  }
+  yOffset += lineMetrics.fHeight * (offset < 0 ? -1 : 1) / 2.0;
+
+  auto targetPosition = paragraph->GetGlyphPositionAtCoordinate(xOffset, yOffset);
+  return [[_FlutterTextPosition alloc]
+      initWithIndex:targetPosition.position
+           affinity:targetPosition.affinity == txt::Paragraph::Affinity::DOWNSTREAM
+                        ? UITextStorageDirectionForward
+                        : UITextStorageDirectionBackward];
 }
 
 - (UITextPosition*)beginningOfDocument {
@@ -518,7 +564,7 @@ const flutter::TextRange normalize(const flutter::TextSelection& selection) {
 
 #pragma mark - UITextInput: Providing the caret layout information
 - (CGRect)caretRectForPosition:(UITextPosition*)position {
-  // FIXME:
+  // TODO: IMPLEMENT
   skia::textlayout::Paragraph::GlyphInfo info;
   txt::Paragraph* paragraph = &_textInputState->getParagraph();
   const auto atEnd = position.index == _textInputState->text().length();
