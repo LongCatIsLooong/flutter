@@ -92,15 +92,22 @@ class BenchMaterial3ScrollSemantics extends WidgetRecorder {
   void frameDidDraw() {
     final AggregatedTimings timings = FlutterTimeline.debugCollect();
     final AggregatedTimedBlock semanticsBlock = timings.getAggregated('SEMANTICS');
+    final AggregatedTimedBlock sorting = timings.getAggregated('Semantics.sorting');
     final AggregatedTimedBlock updateChildren = timings.getAggregated('Semantics.updateChildren');
     final AggregatedTimedBlock ensureGeometry = timings.getAggregated('Semantics.ensureGeometry');
     final AggregatedTimedBlock ensureSemanticsNode = timings.getAggregated(
       'Semantics.ensureSemanticsNode',
     );
+    final AggregatedTimedBlock updating = timings.getAggregated('Semantics.sendSemanticsUpdate');
+    final AggregatedTimedBlock fromLocalGeometry = timings.getAggregated(
+      'Semantics.fromLocalGeometry',
+    );
     profile!.addTimedBlock(semanticsBlock, reported: true);
+    profile!.addTimedBlock(sorting, reported: true);
     profile!.addTimedBlock(updateChildren, reported: true);
     profile!.addTimedBlock(ensureGeometry, reported: true);
     profile!.addTimedBlock(ensureSemanticsNode, reported: true);
+    profile!.addTimedBlock(updating, reported: true);
 
     super.frameDidDraw();
     FlutterTimeline.debugReset();
