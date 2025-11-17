@@ -3793,7 +3793,7 @@ abstract class RenderObject with DiagnosticableTreeMixin implements HitTestTarge
     }
     RenderObject? parent;
     for (parent = this; parent != null; parent = parent.parent) {
-      final childrenGeometryCache = parent._semantics._cachedChildrenGeometry;
+      final _ChildGeometryCache? childrenGeometryCache = parent._semantics._cachedChildrenGeometry;
       if (childrenGeometryCache != null) {
         // assert(childrenGeometryCache.keys.every());
         // TODO: assert the these children's parent is parent.
@@ -5880,57 +5880,46 @@ class _RenderObjectSemantics extends _SemanticsFragment with DiagnosticableTreeM
         .expand(siblingChildrenWithSemanticsNode);
   }
 
+  _LocalGeometry _computeLocalGeometry(_RenderObjectSemantics child) {
+    final (_LocalGeometry localGeometry, List<RenderObject> pathToParent) = _LocalGeometry.from(
+      parent: this,
+      child: child,
+    );
+    assert(pathToParent.length >= 2);
+    for (int i = 1; i < pathToParent.length - 1; i++) {
+      pathToParent[i]._semantics._cachedChildrenGeometry = null;
+    }
+    return localGeometry;
+  }
+
   // All _RenderObjectSemantics whose geometry.transform's coordinate system is
   // given by this _RenderObjectSemantics, and with semantics geometry cache.
-  List<_RenderObjectSemantics>? _cachedChildrenGeometry;
+  _ChildGeometryCache? _cachedChildrenGeometry;
   void _updateChildGeometry() {
     final _SemanticsGeometry? parentGeometry = geometry;
     if (parentGeometry == null) {
       return;
     }
+    final _ChildGeometryCache cache = _cachedChildrenGeometry ??= _ChildGeometryCache();
     for (final _RenderObjectSemantics child in _children) {
-      final bool isCached = _cachedChildrenGeometry?.contains(child) ?? false;
-      final _LocalGeometry? cachedLocalGeometry;
-      if (isCached) {
-        final cached = child._cachedGeometry!;
-        if (cached.parent == renderObject) {
-          cachedLocalGeometry = cached;
-        } else {
-          cachedLocalGeometry = null;
-          _cachedChildrenGeometry?.remove(child);
-        }
-      } else {
-        cachedLocalGeometry = null;
+      if (!identical(child._cachedGeometry?.parent, renderObject)) {
+        child._cachedGeometry = null;
       }
-      if (cachedLocalGeometry != null) {
-        child._updateGeometry(
-          newGeometry: _SemanticsGeometry.fromLocalGeometry(
-            cachedLocalGeometry,
-            parentPaintClipRect: parentGeometry.paintClipRect,
-            parentSemanticsClipRect: parentGeometry.semanticsClipRect,
-            semanticBounds: child.renderObject.semanticBounds,
-          ),
-        );
-      } else {
-        final (
-          _SemanticsGeometry childGeometry,
-          _LocalGeometry localGeometry,
-        ) = _SemanticsGeometry.computeChildGeometry(
+      final _LocalGeometry localGeometry = cache.putCacheIfAbsent(child, _computeLocalGeometry);
+      child._cachedGeometry = localGeometry;
+      child._updateGeometry(
+        newGeometry: _SemanticsGeometry.fromLocalGeometry(
+          localGeometry,
           parentPaintClipRect: parentGeometry.paintClipRect,
           parentSemanticsClipRect: parentGeometry.semanticsClipRect,
-          parentTransform: null,
-          parent: this,
-          child: child,
-        );
-        child._cachedGeometry = localGeometry;
-        (_cachedChildrenGeometry ??= <_RenderObjectSemantics>[]).add(child);
-        child._updateGeometry(newGeometry: childGeometry);
-      }
+          semanticBounds: child.renderObject.semanticBounds,
+        ),
+      );
     }
-    // TODO: do we need to check removed semantics nodes?
+    _cachedChildrenGeometry?.didFinishUpdatingChildren(_children.length);
 
     for (final _RenderObjectSemantics explicitSiblingChild in _explicitSiblingChildren) {
-      final (_SemanticsGeometry childGeometry, _) = _SemanticsGeometry.computeChildGeometry(
+      final _SemanticsGeometry childGeometry = _SemanticsGeometry.computeChildGeometry(
         parentPaintClipRect: parentGeometry.paintClipRect,
         parentSemanticsClipRect: parentGeometry.semanticsClipRect,
         parentTransform: parentGeometry.transform,
@@ -6178,10 +6167,7 @@ class _RenderObjectSemantics extends _SemanticsFragment with DiagnosticableTreeM
         if (fragment.owner.shouldFormSemanticsNode) {
           continue;
         }
-        final (
-          _SemanticsGeometry fragmentOwnerGeometry,
-          _,
-        ) = _SemanticsGeometry.computeChildGeometry(
+        final _SemanticsGeometry fragmentOwnerGeometry = _SemanticsGeometry.computeChildGeometry(
           parentTransform: mainGeometry.transform,
           parentSemanticsClipRect: mainGeometry.semanticsClipRect,
           parentPaintClipRect: mainGeometry.paintClipRect,
@@ -6412,6 +6398,68 @@ final class _LocalGeometry {
     this.additionalSemanticsClipInParent,
     this.parent,
   );
+
+  static (_LocalGeometry, List<RenderObject>) from({
+    //required Matrix4? parentTransform,
+    //required Rect? parentPaintClipRect,
+    //required Rect? parentSemanticsClipRect,
+    required _RenderObjectSemantics parent,
+    required _RenderObjectSemantics child,
+  }) {
+    final RenderObject parentRenderObject = parent.renderObject;
+
+    final List<RenderObject> childToParent = <RenderObject>[];
+
+    // Find the path from childRenderObject to parentRenderObject.
+    // Currently the framework assumes that parentRenderObject is an ancestor of
+    // childRenderObject.
+
+    for (
+      RenderObject? node = child.renderObject;
+      node != null && node.depth >= parentRenderObject.depth;
+      node = node.parent
+    ) {
+      childToParent.add(node);
+    }
+    assert(childToParent.length >= 2);
+    assert(identical(childToParent.last, parentRenderObject));
+
+    // Calculate clips and transform.
+
+    Rect? paintClipRect;
+    Rect? semanticsClipRect;
+    final Matrix4 transform = Matrix4.identity();
+    // Traverse from `parent`'s render object to `child`'s.
+    for (int i = childToParent.length - 1; i > 0; i -= 1) {
+      final RenderObject nodeParent = childToParent[i];
+      final RenderObject node = childToParent[i - 1];
+
+      final Rect? localPaintClipInParent = _transformRect(
+        nodeParent.describeApproximatePaintClip(node),
+        transform, // paint transform from nodeParent to parent
+        MatrixUtils.transformRect,
+      );
+      final Rect? localSemanticsClipInParent = _transformRect(
+        nodeParent.describeSemanticsClip(node),
+        transform, // paint transform from nodeParent to parent
+        MatrixUtils.transformRect,
+      );
+      paintClipRect = _intersectRects(paintClipRect, localPaintClipInParent);
+      semanticsClipRect =
+          localSemanticsClipInParent ??
+          semanticsClipRect?.intersect(localPaintClipInParent ?? semanticsClipRect);
+      nodeParent.applyPaintTransform(node, transform);
+    }
+
+    final localGeometry = _LocalGeometry(
+      transform,
+      paintClipRect,
+      semanticsClipRect,
+      parentRenderObject,
+    );
+    return (localGeometry, childToParent);
+  }
+
   final Matrix4 transform;
   late final Matrix4 invertedTransform = Matrix4.zero()..copyInverse(transform);
   // The describeApproximatePaintClip from parent to child, in the parent's coordinates.
@@ -6502,67 +6550,15 @@ extension type _SemanticsGeometry._(
     ));
   }
 
-  // The returned record contains a non-null _LocalGeometry if it's cachable.
-  static (_SemanticsGeometry, _LocalGeometry) computeChildGeometry({
+  static _SemanticsGeometry computeChildGeometry({
     required Matrix4? parentTransform,
     required Rect? parentPaintClipRect,
     required Rect? parentSemanticsClipRect,
     required _RenderObjectSemantics parent,
     required _RenderObjectSemantics child,
   }) {
-    RenderObject childRenderObject = child.renderObject;
-    final RenderObject parentRenderObject = parent.renderObject;
-
-    final List<RenderObject> childToCommonAncestor = <RenderObject>[childRenderObject];
-
-    // Find the path from childRenderObject to parentRenderObject.
-    // Currently the framework assumes that parentRenderObject is an ancestor of
-    // childRenderObject.
-    while (childRenderObject.depth > parentRenderObject.depth) {
-      assert(
-        childRenderObject.parent != null,
-        'The render object of $parent is not an ancestor of the render object of $child.',
-      );
-      childRenderObject = childRenderObject.parent!;
-      childToCommonAncestor.add(childRenderObject);
-    }
-    assert(childToCommonAncestor.length >= 2);
-    assert(identical(childRenderObject, parentRenderObject));
-
-    // Calculate clips and transform.
-
-    Rect? paintClipRect;
-    Rect? semanticsClipRect;
-    final Matrix4 transform = Matrix4.identity();
-    // Traverse from `parent`'s render object to `child`'s.
-    for (int i = childToCommonAncestor.length - 1; i > 0; i -= 1) {
-      final RenderObject nodeParent = childToCommonAncestor[i];
-      final RenderObject node = childToCommonAncestor[i - 1];
-
-      final Rect? localPaintClipInParent = _transformRect(
-        nodeParent.describeApproximatePaintClip(node),
-        transform, // paint transform from nodeParent to parent
-        MatrixUtils.transformRect,
-      );
-      final Rect? localSemanticsClipInParent = _transformRect(
-        nodeParent.describeSemanticsClip(node),
-        transform, // paint transform from nodeParent to parent
-        MatrixUtils.transformRect,
-      );
-      paintClipRect = _intersectRects(paintClipRect, localPaintClipInParent);
-      semanticsClipRect =
-          localSemanticsClipInParent ??
-          semanticsClipRect?.intersect(localPaintClipInParent ?? semanticsClipRect);
-      nodeParent.applyPaintTransform(node, transform);
-    }
-
-    final localGeometry = _LocalGeometry(
-      transform,
-      paintClipRect,
-      semanticsClipRect,
-      parentRenderObject,
-    );
-    final geometry = _SemanticsGeometry.fromLocalGeometry(
+    final (_LocalGeometry localGeometry, _) = _LocalGeometry.from(parent: parent, child: child);
+    final _SemanticsGeometry geometry = _SemanticsGeometry.fromLocalGeometry(
       localGeometry,
       parentPaintClipRect: parentPaintClipRect,
       parentSemanticsClipRect: parentSemanticsClipRect,
@@ -6572,30 +6568,79 @@ extension type _SemanticsGeometry._(
     if (parentTransform != null) {
       MatrixUtils.multiplyInPlace(parentTransform, geometry.transform);
     }
-    return (geometry, localGeometry);
+    return geometry;
+  }
+}
+
+final class _ChildGeometryCache {
+  _ChildGeometryCache();
+  final List<_RenderObjectSemantics> childrenWithCache = <_RenderObjectSemantics>[];
+
+  int? processedChildrenCount;
+  static int hit = 0;
+  static int miss = 0;
+
+  void didFinishUpdatingChildren(int childCount) {
+    assert(processedChildrenCount != null || childCount == 0);
+    final int length = processedChildrenCount ?? 0;
+    assert(length == childCount);
+
+    childrenWithCache.removeRange(length, childrenWithCache.length);
+    processedChildrenCount = null;
   }
 
-  /// From parent to child coordinate system.
-  static Rect? _transformRect(
-    Rect? rect,
-    Matrix4 transform, [
-    Rect Function(Matrix4, Rect) apply = MatrixUtils.inverseTransformRect,
-  ]) {
-    if (rect == null) {
-      return null;
+  _LocalGeometry putCacheIfAbsent(
+    _RenderObjectSemantics child,
+    _LocalGeometry Function(_RenderObjectSemantics child) createCache,
+  ) {
+    final int startIndex = processedChildrenCount ??= 0;
+    int indexOfChild = childrenWithCache.indexOf(child, startIndex);
+    if (indexOfChild < 0) {
+      assert(indexOfChild == -1);
+      child._cachedGeometry = null;
+      childrenWithCache.add(child);
+      indexOfChild = childrenWithCache.length - 1;
     }
-    if (rect.isEmpty || transform.isZero()) {
-      return Rect.zero;
+
+    if (startIndex != indexOfChild) {
+      childrenWithCache[indexOfChild] = childrenWithCache[startIndex];
+      childrenWithCache[startIndex] = child;
     }
-    return apply(transform, rect);
+    processedChildrenCount = startIndex + 1;
+    //if (child._cachedGeometry == null) {
+    //  miss += 1;
+    //} else {
+    //  hit += 1;
+    //}
+    return child._cachedGeometry ??= createCache(child);
   }
 
-  static Rect? _intersectRects(Rect? a, Rect? b) {
-    if (b == null) {
-      return a;
-    }
-    return a?.intersect(b) ?? b;
+  void clear() {
+    assert(processedChildrenCount == null);
+    childrenWithCache.clear();
   }
+}
+
+/// From parent to child coordinate system.
+Rect? _transformRect(
+  Rect? rect,
+  Matrix4 transform, [
+  Rect Function(Matrix4, Rect) apply = MatrixUtils.inverseTransformRect,
+]) {
+  if (rect == null) {
+    return null;
+  }
+  if (rect.isEmpty || transform.isZero()) {
+    return Rect.zero;
+  }
+  return apply(transform, rect);
+}
+
+Rect? _intersectRects(Rect? a, Rect? b) {
+  if (b == null) {
+    return a;
+  }
+  return a?.intersect(b) ?? b;
 }
 
 /// A class that creates [DiagnosticsNode] by wrapping [RenderObject.debugCreator].
