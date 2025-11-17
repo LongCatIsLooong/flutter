@@ -1535,9 +1535,9 @@ base class PipelineOwner with DiagnosticableTreeMixin {
         FlutterTimeline.finishSync();
       }
     }
-    print('hits: ${_ChildGeometryCache.hit}, misses: ${_ChildGeometryCache.miss}');
-    _ChildGeometryCache.hit = 0;
-    _ChildGeometryCache.miss = 0;
+    //print('hits: ${_ChildGeometryCache.hit}, misses: ${_ChildGeometryCache.miss}');
+    //_ChildGeometryCache.hit = 0;
+    //_ChildGeometryCache.miss = 0;
   }
 
   @override
@@ -6609,11 +6609,11 @@ final class _ChildGeometryCache {
       childrenWithCache[startIndex] = child;
     }
     processedChildrenCount = startIndex + 1;
-    if (child._cachedGeometry == null) {
-      miss += 1;
-    } else {
-      hit += 1;
-    }
+    //if (child._cachedGeometry == null) {
+    //  miss += 1;
+    //} else {
+    //  hit += 1;
+    //}
     return child._cachedGeometry ??= createCache(child);
   }
 
