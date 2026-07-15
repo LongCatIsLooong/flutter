@@ -33,14 +33,16 @@ Future<Iterable<String>> getPrePushChangedFiles(
       const <Never>[];
 }
 
-/// Guesses the merge base commit SHA for a newly pushed branch [targetRef].
+/// Guesses the base commit for `git diff` given the `targetRef`.
 ///
-/// Computes the `git merge-base` between [targetRef] and the estimated main
-/// tracking branch (`$upstreamRemote/master`).
+/// Returns the common ancestor commit between [targetRef] and the estimated main
+/// tracking branch (typically upstream/master).
 ///
 /// Assumptions:
-/// - Assumes the remote containing the main branch is `upstream` if configured,
-///   falling back to `origin`.
+/// - Assumes `upstream`, if configured (falls back to `origin` otherwise),
+///   points to flutter/flutter.git and is thus a reasonable branch to find the
+///   base commit.
+///   .
 /// - Assumes the target integration branch on the remote is named `master`.
 Future<String> guessMergeBase(String flutterRoot, String targetRef, ProcessRunner runner) async {
   final String upstreamRemote = await _guessUpstreamRemote(flutterRoot, runner);
@@ -58,7 +60,7 @@ Future<String> guessMergeBase(String flutterRoot, String targetRef, ProcessRunne
 }
 
 // Returns the name of the remote who will be used as the diff base.
-// The logic is from `engine/src/flutter/ci/bin/format.dart`, which assumes
+// The logic is copied from `engine/src/flutter/ci/bin/format.dart`, which assumes
 // the remote name is either `upstream` or `origin`.
 Future<String> _guessUpstreamRemote(String flutterRoot, ProcessRunner runner) async {
   const upstream = 'upstream';

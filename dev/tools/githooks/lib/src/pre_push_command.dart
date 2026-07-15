@@ -112,7 +112,7 @@ class PrePushCommand extends Command<bool> {
     const zeroOid = '0000000000000000000000000000000000000000';
     for (final ref in refs) {
       final String base = switch (ref.remoteOid) {
-        zeroOid || '' => await guessMergeBase(flutterRoot, ref.remoteOid, io.Process.run),
+        zeroOid || '' => await guessMergeBase(flutterRoot, ref.localOid, io.Process.run),
         final String baseOid => baseOid,
       };
 

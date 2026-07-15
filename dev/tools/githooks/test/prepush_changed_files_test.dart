@@ -27,7 +27,7 @@ void main() {
   });
 
   group('getPrePushChangedFiles', () {
-    test('diffs against remoteOid when remoteOid is valid SHA', () async {
+    test('diffs against baseRef and targetRef accurately', () async {
       late final List<String> capturedArgs;
 
       Future<io.ProcessResult> mockRunner(
@@ -47,46 +47,32 @@ void main() {
       );
 
       expect(capturedArgs, contains('remote_sha_456...local_sha_123'));
-      expect(files, equals(<String>['engine/src/flutter/shell/platform/darwin/foo.mm']));
+      expect(files, <String>['engine/src/flutter/shell/platform/darwin/foo.mm']);
+    });
+  });
+
+  group('guessMergeBase', () {
+    test('uses upstream/master when upstream remote exists', () async {
+      Future<io.ProcessResult> mockRunner(
+        String executable,
+        List<String> arguments, {
+        String? workingDirectory,
+      }) async {
+        if (arguments.contains('get-url')) {
+          return io.ProcessResult(0, 0, 'git@github.com:flutter/flutter.git\n', '');
+        }
+        if (arguments.contains('merge-base')) {
+          expect(arguments, contains('upstream/master'));
+          return io.ProcessResult(0, 0, 'fork_point_sha_789\n', '');
+        }
+        return io.ProcessResult(1, 0, '', '');
+      }
+
+      final String base = await guessMergeBase('/fake/flutter', 'local_sha_123', mockRunner);
+      expect(base, equals('fork_point_sha_789'));
     });
 
-    test(
-      'uses upstream/master when upstream remote exists and diffs against merge-base when zeroOid',
-      () async {
-        late final List<String> capturedArgs;
-
-        Future<io.ProcessResult> mockRunner(
-          String executable,
-          List<String> arguments, {
-          String? workingDirectory,
-        }) async {
-          if (arguments.contains('get-url')) {
-            return io.ProcessResult(0, 0, 'git@github.com:flutter/flutter.git\n', '');
-          }
-          if (arguments.contains('merge-base')) {
-            expect(arguments, contains('upstream/master'));
-            return io.ProcessResult(0, 0, 'fork_point_sha_789\n', '');
-          }
-          capturedArgs = arguments;
-          return io.ProcessResult(0, 0, 'dev/tools/githooks/lib/githooks.dart\n', '');
-        }
-
-        const zeroOid = '0000000000000000000000000000000000000000';
-        final Iterable<String> files = await getPrePushChangedFiles(
-          '/fake/flutter',
-          baseRef: zeroOid,
-          targetRef: 'local_sha_123',
-          runner: mockRunner,
-        );
-
-        expect(capturedArgs, contains('fork_point_sha_789...local_sha_123'));
-        expect(files, ['dev/tools/githooks/lib/githooks.dart']);
-      },
-    );
-
     test('falls back to origin/master when upstream remote does not exist', () async {
-      late final List<String> capturedArgs;
-
       Future<io.ProcessResult> mockRunner(
         String executable,
         List<String> arguments, {
@@ -99,20 +85,11 @@ void main() {
           expect(arguments, contains('origin/master'));
           return io.ProcessResult(0, 0, 'fork_point_sha_789\n', '');
         }
-        capturedArgs = arguments;
-        return io.ProcessResult(0, 0, 'dev/tools/githooks/lib/githooks.dart\n', '');
+        return io.ProcessResult(1, 0, '', '');
       }
 
-      const zeroOid = '0000000000000000000000000000000000000000';
-      final Iterable<String> files = await getPrePushChangedFiles(
-        '/fake/flutter',
-        baseRef: zeroOid,
-        targetRef: 'local_sha_123',
-        runner: mockRunner,
-      );
-
-      expect(capturedArgs, contains('fork_point_sha_789...local_sha_123'));
-      expect(files, ['dev/tools/githooks/lib/githooks.dart']);
+      final String base = await guessMergeBase('/fake/flutter', 'local_sha_123', mockRunner);
+      expect(base, equals('fork_point_sha_789'));
     });
   });
 }
