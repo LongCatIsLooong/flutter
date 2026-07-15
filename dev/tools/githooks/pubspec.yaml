@@ -5,18 +5,27 @@
 name: githooks
 publish_to: none
 
-# Required for workspace support.
 environment:
   sdk: ^3.11.0-0
 
-# This package is managed as part of the engine workspace.
 resolution: workspace
 
 dependencies:
   args: any
-  clang_tidy: any
+  clang_tidy:
+    path: ../../../engine/src/flutter/tools/clang_tidy
   meta: any
   path: any
+
+dependency_overrides:
+  clang_tidy:
+    path: ../../../engine/src/flutter/tools/clang_tidy
+  git_repo_tools:
+    path: ../../../engine/src/flutter/tools/pkg/git_repo_tools
+  engine_repo_tools:
+    path: ../../../engine/src/flutter/tools/pkg/engine_repo_tools
+  process_fakes:
+    path: ../../../engine/src/flutter/tools/pkg/process_fakes
 
 dev_dependencies:
   test: any

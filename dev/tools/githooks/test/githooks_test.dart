@@ -5,9 +5,24 @@
 import 'dart:io' as io;
 
 import 'package:githooks/githooks.dart';
+import 'package:path/path.dart' as path;
 import 'package:test/test.dart';
 
+// The path to the flutter checkout. Used to run test against a real checkout.
+//
+// DO NOT use `dart test` to run this test or this path points to a temp dir
+// created by the test runner, causing tests to fail. Use `flutter test` instead.
+//
+// Since we set `resolution: workspace` in pubspec.yaml, `Platform.script` reports
+// FLUTTER_RROT/main.dart.
+final String _flutterRoot = io.File(io.Platform.script.path).parent.path;
+
 void main() {
+  assert(
+    io.Platform.environment.containsKey('FLUTTER_TEST'),
+    'Use "flutter test" to run this test.',
+  );
+
   test('Fails gracefully without a command', () async {
     int? result;
     try {
@@ -65,8 +80,7 @@ void main() {
   test('post-merge runs successfully', () async {
     int? result;
     try {
-      final io.Directory flutterPath = io.File(io.Platform.script.path).parent.parent.parent;
-      result = await run(<String>['post-merge', '--flutter', flutterPath.path]);
+      result = await run(<String>['post-merge', '--flutter', _flutterRoot]);
     } catch (e, st) {
       fail('Unexpected exception: $e\n$st');
     }
@@ -76,8 +90,7 @@ void main() {
   test('pre-rebase runs successfully', () async {
     int? result;
     try {
-      final io.Directory flutterPath = io.File(io.Platform.script.path).parent.parent.parent;
-      result = await run(<String>['pre-rebase', '--flutter', flutterPath.path]);
+      result = await run(<String>['pre-rebase', '--flutter', _flutterRoot]);
     } catch (e, st) {
       fail('Unexpected exception: $e\n$st');
     }
@@ -87,11 +100,23 @@ void main() {
   test('post-checkout runs successfully', () async {
     int? result;
     try {
-      final io.Directory flutterPath = io.File(io.Platform.script.path).parent.parent.parent;
-      result = await run(<String>['post-checkout', '--flutter', flutterPath.path]);
+      result = await run(<String>['post-checkout', '--flutter', _flutterRoot]);
     } catch (e, st) {
       fail('Unexpected exception: $e\n$st');
     }
     expect(result, equals(0));
+  });
+
+  test('Setting core.hooksPath to engine/src/flutter/tools/githooks still works', () async {
+    final String oldHooksPath = io.Directory(
+      path.join(_flutterRoot, 'engine', 'src', 'flutter', 'tools', 'githooks'),
+    ).path;
+
+    final io.ProcessResult postCheckoutResult = await io.Process.run(
+      path.join(oldHooksPath, 'post-checkout'),
+      <String>[],
+      workingDirectory: oldHooksPath,
+    );
+    expect(postCheckoutResult.exitCode, 0);
   });
 }

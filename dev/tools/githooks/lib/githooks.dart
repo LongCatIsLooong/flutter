@@ -15,7 +15,7 @@ import 'src/pre_rebase_command.dart';
 /// Runs the githooks
 Future<int> run(List<String> args) async {
   final runner =
-      CommandRunner<bool>('githooks', 'Githooks implementation for the flutter/engine repo.')
+      CommandRunner<bool>('githooks', 'Githooks implementation for the flutter/flutter repo.')
         ..addCommand(PostCheckoutCommand())
         ..addCommand(PostMergeCommand())
         ..addCommand(PrePushCommand())
@@ -27,7 +27,7 @@ Future<int> run(List<String> args) async {
     ..addOption(
       'flutter',
       abbr: 'f',
-      help: 'The absolute path to the root of the flutter/engine checkout.',
+      help: 'The absolute path to the root of the flutter checkout.',
     )
     ..addFlag('verbose', abbr: 'v', help: 'Runs with verbose logging');
 
