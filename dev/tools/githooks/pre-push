@@ -17,10 +17,12 @@ ENABLE_CLANG_TIDY = os.environ.get('PRE_PUSH_CLANG_TIDY')
 
 
 def GetDartBin():
+  # The bin/cache/dart-sdk/bin takes precedence because it's more likely to be
+  # up-to-date, unless the PR includes a Dart SDK roll.
   candidate_paths = [
+    os.path.join(FLUTTER_ROOT, 'bin', 'cache', 'dart-sdk', 'bin'),
     os.path.join(FLUTTER_ROOT, 'engine', 'src', 'flutter', 'third_party', 'dart', 'tools', 'sdks', 'dart-sdk', 'bin'),
     os.path.join(FLUTTER_ROOT, 'engine', 'src', 'third_party', 'dart', 'tools', 'sdks', 'dart-sdk', 'bin'),
-    os.path.join(FLUTTER_ROOT, 'bin', 'cache', 'dart-sdk', 'bin'),
   ]
   return next((p for p in candidate_paths if os.path.exists(p)), candidate_paths[0])
 

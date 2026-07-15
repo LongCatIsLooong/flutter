@@ -2,14 +2,43 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+import 'dart:convert';
 import 'dart:io' as io;
 
 import 'package:args/command_runner.dart';
 import 'package:clang_tidy/clang_tidy.dart';
 import 'package:path/path.dart' as path;
 
+import 'prepush_changed_files.dart';
+
+/// Extension type wrapping a raw line read from stdin in a pre-push hook:
+/// `<local_ref> <local_oid> <remote_ref> <remote_oid>`
+extension type PushRef._(String line) {
+  List<String> get _parts => line.trim().split(RegExp(r'\s+'));
+
+  String get localRef => _parts[0];
+  String get localOid => _parts[1];
+  String get remoteRef => _parts[2];
+  String get remoteOid => _parts[3];
+
+  static PushRef? parse(String line) {
+    final ref = PushRef._(line);
+    return ref._parts.length >= 4 ? ref : null;
+  }
+
+  static Iterable<PushRef> fromLines(String lines) =>
+      lines.split('\n').map(PushRef.parse).whereType<PushRef>();
+}
+
 /// The command that implements the pre-push githook
 class PrePushCommand extends Command<bool> {
+  // This getter must not be accessed outside of the `run` method.
+  // This guarantees the content in stdin is not consumed more than once.
+  late final Future<Iterable<PushRef>> pushRefs = io.stdin
+      .transform(utf8.decoder)
+      .join()
+      .then(PushRef.fromLines);
+
   @override
   final String name = 'pre-push';
 
@@ -31,7 +60,7 @@ class PrePushCommand extends Command<bool> {
     }
 
     final checkResults = <bool>[
-      await _runFormatter(flutterRoot, verbose),
+      await _runFormatter(flutterRoot, await pushRefs, verbose),
       if (enableClangTidy) await _runClangTidy(flutterRoot, verbose),
     ];
     sw.stop();
@@ -77,7 +106,30 @@ class PrePushCommand extends Command<bool> {
     return true;
   }
 
-  Future<bool> _runFormatter(String flutterRoot, bool verbose) async {
+  Future<bool> _runFormatter(String flutterRoot, Iterable<PushRef> refs, bool verbose) async {
+    var hasEngineChanges = false;
+
+    const zeroOid = '0000000000000000000000000000000000000000';
+    for (final ref in refs) {
+      final String base = switch (ref.remoteOid) {
+        zeroOid || '' => await guessMergeBase(flutterRoot, ref.remoteOid, io.Process.run),
+        final String baseOid => baseOid,
+      };
+
+      final Iterable<String> changedFiles = await getPrePushChangedFiles(
+        flutterRoot,
+        baseRef: base,
+        targetRef: ref.localOid,
+      );
+      if (changedFiles.any(_isEngineFile)) {
+        hasEngineChanges = true;
+        break;
+      }
+    }
+    if (!hasEngineChanges) {
+      io.stdout.writeln('No engine changes detected. Skipping formatting checks.');
+      return true;
+    }
     io.stdout.writeln('Starting formatting checks.');
     final sw = Stopwatch()..start();
     final String engineDir = path.join(flutterRoot, 'engine', 'src', 'flutter');
@@ -127,4 +179,12 @@ class PrePushCommand extends Command<bool> {
     }
     return true;
   }
+}
+
+/// This mirrows `getFileList` in engine/src/flutter/ci/bin/format.dart.
+bool _isEngineFile(String filePath) {
+  assert(filePath.isNotEmpty);
+  final String normalized = path.normalize(filePath);
+  const engineSubPath = 'engine/src/flutter';
+  return normalized.contains(engineSubPath) && !normalized.contains('third_party');
 }
